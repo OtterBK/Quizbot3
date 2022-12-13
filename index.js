@@ -5,7 +5,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 //로컬 modules
 const CONFIG = require('./config.json');
 const command_register = require('./commands.js');
-
+const quizbot_ui = require('./quizbot-ui.js');
 
 
 /**  이벤트 등록  **/
@@ -29,7 +29,11 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === '퀴즈') {
-    await interaction.reply('Pong!');
+    
+    let main_embed = quizbot_ui.createMainUI();
+    let control_rows = quizbot_ui.createControlRows();
+    
+    await interaction.reply({ embeds: [main_embed] , components: control_rows});
   }
 });
 
