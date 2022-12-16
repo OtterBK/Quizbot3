@@ -7,6 +7,7 @@ const CONFIG = require('./config.json');
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
 
+var uiHolder_map = {};
 
 /**  이벤트 등록  **/
 //봇 최초 실행 이벤트
@@ -26,18 +27,31 @@ client.on('ready', () => {
 
 // 상호작용 이벤트
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === '퀴즈') {
+  let guildID = interaction.guild.id;
+
+  if(interaction.commandName === '퀴즈') {
     
-    let main_embed = quizbot_ui.createMainUI();
-    let control_rows = quizbot_ui.createControlRows();
-    
-    await interaction.reply({ embeds: [main_embed] , components: control_rows});
+    let uiHolder = quizbot_ui.createUIHolder(interaction);
+    uiHolder_map[guildID] = uiHolder; //UIHolder 새로 등록
+
+    return;
   }
-});
 
+  if(uiHolder_map.hasOwnProperty(guildID))
+  {
+    interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
+    let uiHolder = uiHolder_map[guildID];
+    uiHolder.on('interactionCreate', interaction);
+  }
+
+});
 
 /** 메인 **/
 //봇 활성화
 client.login(CONFIG.BOT_TOKEN);
+
+//전역 에러 처리
+process.on('uncaughtException', (err) => {
+  console.error(err);
+});
