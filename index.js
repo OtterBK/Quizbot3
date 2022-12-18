@@ -40,9 +40,9 @@ client.on('interactionCreate', async interaction => {
 
   if(uiHolder_map.hasOwnProperty(guildID))
   {
-    interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
+    await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
     let uiHolder = uiHolder_map[guildID];
-    uiHolder.on('interactionCreate', interaction);
+    await uiHolder.on('interactionCreate', interaction);
   }
 
 });
