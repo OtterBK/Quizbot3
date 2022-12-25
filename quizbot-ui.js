@@ -2,6 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBu
 const { interaction } = require('lodash');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
+const { FORMERR } = require('dns');
 
 //로컬 modules
 const text_contents = require('./text_contents.json')["kor"];
@@ -180,10 +181,10 @@ class MainUI extends QuizbotUI {
         url: '',
       },
       // timestamp: new Date().toISOString(),
-      footer: {
-        text: '제육보끔#1916',
-        icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
-      },
+      // footer: {
+      //   text: '제육보끔#1916',
+      //   icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
+      // },
     };
   }
 
@@ -272,27 +273,24 @@ class DeveloperQuizSelectCategoryUI extends QuizbotUI  {
       thumbnail: {
         url: text_contents.dev_select_category.thumbnail.url,
       },
-
     };
 
-    this.current_path = process.cwd() + "/resources/quizdata/"; //현재 경로+/resources
+    this.cur_path = process.cwd() + "/resources/quizdata/"; //현재 경로+/resources
 
-    this.current_contents = [];
+    this.cur_contents = [];
     this.loadLocalDirectoryQuiz();
 
-    this.displayContents(0);
+    this.showPage(0);
+
   }
 
   loadLocalDirectoryQuiz() 
   {
-    fs.readdir(this.current_path, (error, file_list) => {
-      file_list.forEach(file => {
-        let quiz_content = this.parseContentInfoFromDirName(file);
-        this.current_contents.push(quiz_content);
-      });
-
-      console.log(this.current_contents);
-    });
+    let file_list = fs.readdirSync(this.cur_path);
+    file_list.forEach(file => {
+      let quiz_content = this.parseContentInfoFromDirName(file);
+      this.cur_contents.push(quiz_content);
+    })
   }
 
   parseContentInfoFromDirName(file_name)
@@ -314,11 +312,37 @@ class DeveloperQuizSelectCategoryUI extends QuizbotUI  {
     return content;
   }
 
-  displayContents(page_num)
+  showPage(page_num)
+  {
+    this.displayContents(this.getPageContents(page_num));
+    this.embed.description += 
+  }
+
+  displayContents(contents)
   {
 
+    let contents_message = text_contents.dev_select_category.description;
+    for(let i = 0; i < contents.length; i++)
+    {
+      let cur_content = contents[i];
+      let message = text_contents.icon["ICON_NUM_"+i];
+      contents_message += message + ")\u1CBC\u1CBC" + cur_content.icon + " " + cur_content.name + "\n\n";
+    }
 
-    
+    this.embed.description = contents_message;
+  }
+
+  getPageContents(page_num)
+  {
+    let count_per_page = 5; //페이지별 표시할 컨텐츠 수
+    let page_contents = [];
+
+    for(let index = count_per_page * page_num; index < count_per_page; index++)
+    {
+      page_contents.push(this.cur_contents[index]);
+    }
+
+    return page_contents;
   }
 
 }
