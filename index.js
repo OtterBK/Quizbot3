@@ -1,6 +1,6 @@
 //외부 modules
 const { Client, GatewayIntentBits } = require('discord.js');
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds,] });
 
 //로컬 modules
 const CONFIG = require('./config.json');

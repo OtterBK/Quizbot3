@@ -547,7 +547,8 @@ class QuizInfoUI extends QuizbotUI
     if(interaction.customId == 'start') //시작 버튼 눌렀을 떄
     {
       const guild = interaction.guild;
-      return new QuizPlayUI(guild, quiz_info);
+      const owner = interaction.member; //주최자
+      return new QuizPlayUI(guild, owner, quiz_info);
     }
 
     if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
@@ -566,12 +567,13 @@ class QuizInfoUI extends QuizbotUI
 class QuizPlayUI extends QuizbotUI
 {
 
-  constructor(guild, quiz_info)
+  constructor(guild, owner, quiz_info)
   {
     super();
 
     this.quiz_info = quiz_info;
     this.guild = guild;
+    this.owner = owner;
 
     this.embed = {
       color: 0x87CEEB,
