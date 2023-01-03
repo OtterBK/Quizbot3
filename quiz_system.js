@@ -10,7 +10,7 @@ const LIFE_CYCLE_STATE_TYPE =
 {
     'UNDEFINED': 'UNDEFINED',
     'INITIALIZING': 'INITIALIZING', //초기화 state
-    'EXPLANING': 'EXPLANING', //게임 설명 state
+    'EXPLAIN': 'EXPLAIN', //게임 설명 state
     'QUESTIONING': 'QUESTIONING', //문제 제출 중
     'CORRECTANSWER': 'CORRECTANSWER', //정답 맞췄을 시
     'TIMEOVER': 'TIMEOVER', //정답 못맞추고 제한 시간 종료 시
@@ -52,9 +52,9 @@ class QuizSession
         this.base_ui = base_ui;
 
         this.voice_connection = joinVoiceChannel({
-            channelId: voice_channel.id,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator,
+            channelId: this.voice_channel.id,
+            guildId: this.guild.id,
+            adapterCreator: this.guild.voiceAdapterCreator,
         }); //보이스 커넥션
         this.audio_player = createAudioPlayer();
         this.voice_connection.subscribe(this.audio_player);
@@ -66,14 +66,21 @@ class QuizSession
         this.game_data = undefined;
 
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
-        this.inputLifeCycleStates(new Initializing(this));
+        //기본 LifeCycle 동작은 다음과 같다
+        //Initializing ->
+        //EXPLAIN ->
+        //Questioning -> if quiz_finish Ending else ->
+        //(CorrectAnswer 또는 Timeover) -> Questioning
+        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.INITIALIZING, new Initializing(this));
+        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.EXPLAIN, new Explain(this));
+        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.QUESTIONING, new Questioning(this));
+        
 
         this.stateLoop();
     }
 
-    inputLifeCycleStates(lifecycle_state)
+    inputLifeCycleStates(state_type, lifecycle_state)
     {
-        const state_type = lifecycle_state.state_type;
         this.lifecycle_map[state_type] = lifecycle_state;
     }
 
@@ -135,7 +142,7 @@ class Initializing extends QuizLifecycle
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.EXPLANING;
+        this.next_state = LIFE_CYCLE_STATE_TYPE.EXPLAIN;
     }
 
     act()
@@ -147,7 +154,7 @@ class Initializing extends QuizLifecycle
        quiz_data['title'] = quiz_info['title'];
        quiz_data['description'] = quiz_info['description'];
        quiz_data['author'] = quiz_info['author'];
-       quiz_data['quiz_type'] = quiz_info['type'];
+       quiz_data['quiz_type'] = quiz_info['quiz_type'];
        quiz_data['quiz_size'] = quiz_info['quiz_size'];
        quiz_data['thumbnail'] = quiz_info['thumbnail'];
        quiz_data['winner_nickname'] = quiz_info['winner_nickname'];
@@ -161,27 +168,47 @@ class Initializing extends QuizLifecycle
            return;
        }
 
-       quiz_list = [];
+       let quiz_list = [];
        if(quiz_path != undefined) //Dev 퀴즈일 경우
        {
            //TODO 아 인트로 퀴즈도 있고 그림퀴즈도 있고 쨋든 종류가 많은데, 너무 예전이라 기억이 안난다. 우선 노래 퀴즈 중점으로 만들고 고치자
-           const quiz_folder_list = fs.readdirSync(); //TODO 여기도 그냥 정적으로 읽어올까..?
+           const quiz_folder_list = fs.readdirSync(quiz_path); //TODO 여기도 그냥 정적으로 읽어올까..?
            
            quiz_folder_list.forEach(quiz_folder_name => {
                
                if(quiz_folder_name.includes(".txt")) return;
 
-               quiz = {};
+               let quiz = {};
 
                quiz['type'] = quiz_data['quiz_type'];
 
-               const answers = quiz_folder_name.split("&#").trim(); //정답은 &#으로 끊었다.
+               let answer_row = undefined;
+               let author_row = undefined;
+
+               let try_parse_author =  quiz_folder_name.split("&^"); //가수는 &^로 끊었다.
+               if(try_parse_author.length > 1) //가수 데이터가 있다면 넣어주기
+               {
+                author_row = try_parse_author[1];
+                let authors = quiz_folder_name.split("&#"); //정답은 &#으로 끊었다.
+                authors.forEach((author) => {
+                    author = author.trim();
+                })
+                quiz['author'] = authors;
+               }
+
+               //정답 키워드 파싱
+               answer_row = try_parse_author[0];
+               answer_row = quiz_folder_name.split("&^")[0];
+               let answers = quiz_folder_name.split("&#"); //정답은 &#으로 끊었다.
+               answers.forEach((answer) => {
+                answer = answer.trim();
+               })
                quiz['answers'] = answers;
                
-               const quiz_folder_path = quiz_path + "/" + quiz_folder_name;
-               const quiz_file_list = fs.readFileSync(quiz_folder_path);
+               const quiz_folder_path = quiz_path + "/" + quiz_folder_name + "/";
+               const quiz_file_list = fs.readdirSync(quiz_folder_path);
                quiz_file_list.forEach(quiz_folder_filename => {
-                   if(quiz_folder_filename.includes("&#")) //TODO 내가 정답 우선순위를 폴더명 기준으로 했는지, 노래파일 기준으로 했는지 기억이 안난다. 확인하고 처리할 것
+                   if(quiz_folder_filename.includes("&^")) //TODO 내가 정답 우선순위를 폴더명 기준으로 했는지, 노래파일 기준으로 했는지 기억이 안난다. 확인하고 처리할 것
                    {
 
                    }
@@ -209,9 +236,9 @@ class Initializing extends QuizLifecycle
 }
 
 //게임 방식 설명하는 단계
-class Explaning extends QuizLifecycle
+class Explain extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.EXPLANING;
+    static state_type = LIFE_CYCLE_STATE_TYPE.EXPLAIN;
     constructor(quiz_session)
     {
         super(quiz_session);
@@ -227,7 +254,7 @@ class Explaning extends QuizLifecycle
 }
 
 //퀴즈 내는 단계, 여기가 제일 처리할게 많다.
-class QUESTIONING extends QuizLifecycle
+class Questioning extends QuizLifecycle
 {
     static state_type = LIFE_CYCLE_STATE_TYPE.QUESTIONING;
     constructor(quiz_session)
@@ -262,18 +289,18 @@ class QUESTIONING extends QuizLifecycle
     {
         const current_quiz = this.current_quiz;
         
-        const voice_connection = this.quiz_session.voice_connection;
+        let audio_player = this.quiz_session.audio_player;
         const quiz_type = current_quiz['type'];
         const question = current_quiz['question'];
         
         let resource = undefined;
-        if(question.endswith('.ogg'))
+        if(question.endsWith('.ogg'))
         {
             resource = createAudioResource(createReadStream(question, {
                 inputType: StreamType.OggOpus,
             }));
         }
-        else if(question.endswith('webm'))
+        else if(question.endsWith('webm'))
         {
             resource = createAudioResource(createReadStream(question, {
                 inputType: StreamType.WebmOpus,
@@ -284,7 +311,7 @@ class QUESTIONING extends QuizLifecycle
             resource = createAudioResource(question);
         }
         
-        this.audio_player.play(resource);
+        audio_player.play(resource);
     }
 
 }

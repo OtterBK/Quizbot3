@@ -78,7 +78,7 @@ class UIHolder
 
     this.prev_ui_stack = [];
 
-    this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getComponents()} );
+    this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
   }
 
   getUI()
@@ -267,7 +267,7 @@ class DevQuizSelectUI extends QuizbotUI
   static resource_path = process.cwd() + "/resources/quizdata/";
   static quiz_contents = DevQuizSelectUI.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..?
 
-  constructor()
+  constructor(contents)
   {
     super();
 
@@ -281,12 +281,12 @@ class DevQuizSelectUI extends QuizbotUI
       },
     };
 
-    this.cur_contents = DevQuizSelectUI.quiz_contents;
+    this.cur_contents = contents == undefined ? DevQuizSelectUI.quiz_contents : contents;
 
     this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
     this.cur_page = 0;
     this.total_page = 0;
-    this.showPage(this.cur_page);
+    this.displayContents(this.cur_page);
 
   }
 
@@ -351,24 +351,24 @@ class DevQuizSelectUI extends QuizbotUI
         const quiz_icon = quiz_content['icon'];
 
         if(quiz_icon == text_contents.icon.ICON_TYPE_SONG)
-            quiz_content['game_type'] = GAME_TYPE.SONG
+            quiz_content['quiz_type'] = GAME_TYPE.SONG
         else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE)
-            quiz_content['game_type'] = GAME_TYPE.PICTURE
+            quiz_content['quiz_type'] = GAME_TYPE.PICTURE
         else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE_LONG)
-            quiz_content['game_type'] = GAME_TYPE.PICTURE_LONG
+            quiz_content['quiz_type'] = GAME_TYPE.PICTURE_LONG
         else if(quiz_icon == text_contents.icon.ICON_TYPE_OX)
-            quiz_content['game_type'] = GAME_TYPE.OX
+            quiz_content['quiz_type'] = GAME_TYPE.OX
         else if(quiz_icon == text_contents.icon.ICON_TYPE_INTRO)
-            quiz_content['game_type'] = GAME_TYPE.INTRO
+            quiz_content['quiz_type'] = GAME_TYPE.INTRO
         else if(quiz_icon == text_contents.icon.ICON_TYPE_QNA)
-            quiz_content['game_type'] = GAME_TYPE.QNA
+            quiz_content['quiz_type'] = GAME_TYPE.QNA
         else if(quiz_icon == text_contents.icon.ICON_TYPE_SCRIPT)
-            quiz_content['game_type'] = GAME_TYPE.SCRIPT
+            quiz_content['quiz_type'] = GAME_TYPE.SCRIPT
         else if(quiz_icon == text_contents.icon.ICON_TYPE_SELECT)
-            quiz_content['game_type'] = GAME_TYPE.SELECT
+            quiz_content['quiz_type'] = GAME_TYPE.SELECT
         else if(quiz_icon == text_contents.icon.ICON_TYPE_MULTIPLAY)
-            quiz_content['game_type'] = GAME_TYPE.MULTIPLAY
-        else quiz_content['game_type'] = GAME_TYPE.SONG
+            quiz_content['quiz_type'] = GAME_TYPE.MULTIPLAY
+        else quiz_content['quiz_type'] = GAME_TYPE.SONG
 
 
         // 퀴즈 수
@@ -413,16 +413,21 @@ class DevQuizSelectUI extends QuizbotUI
     this.total_page = total_page; //나중에 쓸거라 저장
 
     let page_contents = [];
-    for(let i = this.count_per_page * page_num; i < this.count_per_page; i++)
+    let from = this.count_per_page * page_num;
+    let to = (this.count_per_page * page_num) + this.count_per_page;
+    if(to >=  contents.length) 
+      to = contents.length - 1;
+
+    for(let i = from; i < to; i++)
     {
       page_contents.push(this.cur_contents[i]);
     }
 
     let contents_message = text_contents.dev_select_category.description;
-    for(let i = 0; i < contents.length; i++)
+    for(let i = 0; i < page_contents.length; i++)
     {
-      const cur_content = contents[i];
-      let message = text_contents.icon["ICON_NUM_"+i];
+      const cur_content = page_contents[i];
+      let message = text_contents.icon["ICON_NUM_"+(i+1)];
       contents_message += message + ")\u1CBC\u1CBC" + cur_content.icon + " " + cur_content.name + "\n\n";
     }
 
@@ -455,7 +460,7 @@ class DevQuizSelectUI extends QuizbotUI
     if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
-    const index = this.count_per_page * this.cur_page + select_num;
+    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
 
     if(index >= this.cur_contents.length)
     {
@@ -463,7 +468,7 @@ class DevQuizSelectUI extends QuizbotUI
     }
 
     const content = this.cur_contents[index];
-    if(content['is_quiz'] == True)
+    if(content['is_quiz'] == true)
     {
       //어차피 여기서 만드는 quiz info 는 내가 하드코딩해도 되네
       let quiz_info = {};
@@ -478,7 +483,7 @@ class DevQuizSelectUI extends QuizbotUI
       quiz_info['winner_nickname'] = content['winner_nickname'];
 
       quiz_info['quiz_path'] = content['content_path'];//dev quiz는 path 필요
-      quiz_info['quiz_type'] = content['content_path'];//얘만 quiz_path 필요
+      quiz_info['quiz_type'] = content['quiz_type'];//얘만 quiz_path 필요
       return new QuizInfoUI(quiz_info);
     }
 
@@ -543,6 +548,14 @@ class QuizInfoUI extends QuizbotUI
     {
       const guild = interaction.guild;
       const owner = interaction.member; //주최자
+      const quiz_info = this.quiz_info;
+
+      if(!owner.voice.channel) //음성 채널 참가 중인 사람만 시작 가능
+      {
+          //TODO 음성 채널 들어가서 하라고 알림
+          return;
+      }  
+
       return new QuizPlayUI(guild, owner, quiz_info);
     }
 
@@ -625,7 +638,7 @@ class QuizPlayUI extends QuizbotUI
 
   startQuiz()
   {
-    quiz_machine.startQuiz(this.guild, this.quiz_info, this);
+    quiz_machine.startQuiz(this.guild, this.owner, this.quiz_info, this);
   }
 
 }
