@@ -265,18 +265,12 @@ class DevQuizSelectUI extends QuizbotUI
 {
 
   static resource_path = process.cwd() + "/resources/quizdata/";
-  static quiz_contents = DevQuizSelectUI.loadLocalDirectoryQuiz(resource_path); //동적 로드할 필요는 딱히 없을듯..?
+  static quiz_contents = DevQuizSelectUI.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..?
 
   constructor()
   {
     super();
 
-    this(DevQuizSelectUI.quiz_contents);
-
-  }
-
-  constructor(contents)
-  {
     this.embed = {
       color: 0x87CEEB,
       title: text_contents.dev_select_category.title,
@@ -287,12 +281,13 @@ class DevQuizSelectUI extends QuizbotUI
       },
     };
 
-    this.cur_contents = contents;
+    this.cur_contents = DevQuizSelectUI.quiz_contents;
 
     this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
     this.cur_page = 0;
     this.total_page = 0;
     this.showPage(this.cur_page);
+
   }
 
   static loadLocalDirectoryQuiz(content_path) 
@@ -322,7 +317,7 @@ class DevQuizSelectUI extends QuizbotUI
       else
       {
         //퀴즈면 info.txt 읽어옴
-        content_path_dir = content_path + "/";
+        const content_path_dir = content_path + "/";
         const quiz_list = fs.readdirSync(content_path_dir);
 
         let quiz_size = 0;
@@ -355,23 +350,23 @@ class DevQuizSelectUI extends QuizbotUI
         //아이콘으로 퀴즈 타입 가져오기... 예전에 자신을 원망하자
         const quiz_icon = quiz_content['icon'];
 
-        if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_SONG)
+        if(quiz_icon == text_contents.icon.ICON_TYPE_SONG)
             quiz_content['game_type'] = GAME_TYPE.SONG
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_PICTURE)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE)
             quiz_content['game_type'] = GAME_TYPE.PICTURE
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_PICTURE_LONG)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE_LONG)
             quiz_content['game_type'] = GAME_TYPE.PICTURE_LONG
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_OX)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_OX)
             quiz_content['game_type'] = GAME_TYPE.OX
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_INTRO)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_INTRO)
             quiz_content['game_type'] = GAME_TYPE.INTRO
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_QNA)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_QNA)
             quiz_content['game_type'] = GAME_TYPE.QNA
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_SCRIPT)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_SCRIPT)
             quiz_content['game_type'] = GAME_TYPE.SCRIPT
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_SELECT)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_SELECT)
             quiz_content['game_type'] = GAME_TYPE.SELECT
-        else if(quiz_icon == Config.EMOJI_ICON.ICON_TYPE_MULTIPLAY)
+        else if(quiz_icon == text_contents.icon.ICON_TYPE_MULTIPLAY)
             quiz_content['game_type'] = GAME_TYPE.MULTIPLAY
         else quiz_content['game_type'] = GAME_TYPE.SONG
 
