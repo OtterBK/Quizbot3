@@ -1,10 +1,14 @@
+'use strict';
+
 //외부 모듈 로드
 const fs = require('fs');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType } = require('@discordjs/voice');
 
 //로컬 모듈 로드
-const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
-const GAME_TYPE = require('./game_type.json');
+const { config } = require('./GAME_CONFIG.js');
+const text_contents = require('./text_contents.json')[config.language]; 
+const utility = require('./utility.js');
+const QUIZ_TYPE = require('./QUIZ_TYPE.json');
 
 const LIFE_CYCLE_STATE_TYPE = 
 {
@@ -20,28 +24,47 @@ const LIFE_CYCLE_STATE_TYPE =
     'FORCEFINISHED': 'FORCEFINISHED', //세션 강제 종료. 삭제 대기 중
 }
 
-let guild_session_map = [] //게임 중인 길드, 세션 map, //TODO 락 걸어줘야 하는지 확인해보자, 혹시 2에서 자주 죽은 이유가 이것..?
-exports.startQuiz = (guild, owner, quiz_info, base_ui) =>
-{
-    if(guild_session_map.hasOwnProperty(guild))
-    {
-        //TODO 이미 게임 진행 중이라고 알림
-        return;
-    }
+/** global 변수 **/
+let guild_session_map = {};
 
+
+/** exports **/
+exports.checkReadyForStartQuiz = (guild, owner) => 
+{
+    let result = false;
+    let reason = '';
     if(!owner.voice.channel) //음성 채널 참가 중인 사람만 시작 가능
     {
         //TODO 음성 채널 들어가서 하라고 알림
-        return;
+        reason = '음성채널참가';
+        return { 'result': result, 'reason': reason };
     }
 
-    guild_session_map[guild] = new QuizSession(guild, owner, quiz_info, base_ui);
+    if(guild_session_map.hasOwnProperty(guild))
+    {
+        //TODO 이미 게임 진행 중이라고 알림
+        reason = '이미 진행중'
+        return { 'result': result, 'reason': reason };
+    }
+
+    result = true;
+    return { 'result': result, 'reason': reason };
+}
+
+exports.startQuiz = (guild, owner, quiz_info, quiz_play_ui) =>
+{
+    guild_session_map[guild] = new QuizSession(guild, owner, quiz_info, quiz_play_ui);
+}
+
+exports.getSessionMap = () =>
+{
+    return guild_session_map;
 }
 
 //퀴즈 게임용 세션
 class QuizSession
 {
-    constructor(guild, owner, quiz_info, base_ui)
+    constructor(guild, owner, quiz_info, quiz_play_ui)
     {
         this.guild = guild;
         this.owner = owner;
@@ -49,7 +72,7 @@ class QuizSession
 
         this.guild_id = guild.id;
         this.quiz_info = quiz_info;
-        this.base_ui = base_ui;
+        this.quiz_ui = quiz_play_ui;
 
         this.voice_connection = joinVoiceChannel({
             channelId: this.voice_channel.id,
@@ -294,24 +317,41 @@ class Questioning extends QuizLifecycle
         const question = current_quiz['question'];
         
         let resource = undefined;
-        if(question.endsWith('.ogg'))
+
+        //주의! inline volume 옵션 사용 시, 성능 떨어짐
+        //fateIn, fateOut 구현을 위해 inline volume 사용해야할 듯...
+        if(question.endsWith('.ogg')) //ogg
         {
-            resource = createAudioResource(createReadStream(question, {
+            resource = createAudioResource(fs.createReadStream(question, {flags:'r'}), {
                 inputType: StreamType.OggOpus,
-            }));
+                inlineVolume: config.use_inline_volume,
+            });
         }
-        else if(question.endsWith('webm'))
+        // else if(question.endsWith('webm')) //webm
+        //굳이 webm 또는 ogg 파일이 아니더라도 Opuse 형식으로 변환하는 것이 더 좋은 성능을 나타낸다고함
+        //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
+        else 
         {
-            resource = createAudioResource(createReadStream(question, {
+            resource = createAudioResource(fs.createReadStream(question, {flags:'r'}), {
                 inputType: StreamType.WebmOpus,
-            }));
+                inlineVolume: config.use_inline_volume,
+            });
+        }
+        // else //mp3 or wav
+        // {
+        //     resource = createAudioResource(fs.createReadStream(question, {flags:'r'}), {
+        //         inputType: StreamType.Arbitrary,
+        //     });
+        // }
+        
+        if(config.use_inline_volume)
+        {
+            utility.fade_audio_play(audio_player, resource, 0, 1.0, 6250);
         }
         else
         {
-            resource = createAudioResource(question);
+            audio_player.play(resource);
         }
-        
-        audio_player.play(resource);
     }
 
 }
