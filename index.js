@@ -1,3 +1,5 @@
+'use strict';
+
 //외부 modules
 const { Client, GatewayIntentBits } = require('discord.js');
 const client = new Client({ intents: [
@@ -9,8 +11,11 @@ const client = new Client({ intents: [
 const CONFIG = require('./config.json');
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
+const quiz_system = require('./quiz_system.js');
 
-var uiHolder_map = {};
+/** global 변수 **/
+let uiHolder_map = quizbot_ui.getUIHolderMap(); //어차피 계속 사용할거라서 참조하고 있어도 된다.
+let guild_session_map = quiz_system.getSessionMap(); //어차피 계속 사용할거라서 참조하고 있어도 된다.
 
 /**  이벤트 등록  **/
 //봇 최초 실행 이벤트
@@ -50,11 +55,25 @@ client.on('interactionCreate', async interaction => {
 
 });
 
-/** 메인 **/
-//봇 활성화
-client.login(CONFIG.BOT_TOKEN);
-
 //전역 에러 처리
 process.on('uncaughtException', (err) => {
   console.error(err);
 });
+
+/** 메인 **/
+//봇 활성화
+client.login(CONFIG.BOT_TOKEN);
+
+//UI holder Aging Manager
+const uiholder_aging_for_oldkey_value = 600 * 1000; //last updated time이 600초 이전인 ui는 삭제할거임
+const uiholder_aging_manager = setInterval(()=>{
+  const criteria_value = Date.now() - uiholder_aging_for_oldkey_value; //이거보다 이전에 update 된 것은 삭제
+  const keys = Object.keys(uiHolder_map);
+  keys.forEach((key) => {
+    const value = uiHolder_map[key];
+    if(value.last_update_time < criteria_value)
+    {
+      delete uiHolder_map[key]; //삭제~
+    }
+  })
+}, 60*1000); //급한건 아니니 1분마다 확인하자

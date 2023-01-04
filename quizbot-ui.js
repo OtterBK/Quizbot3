@@ -1,3 +1,5 @@
+'use strict';
+
 // 필요한 외부 모듈
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder } = require('discord.js');
 const { interaction } = require('lodash');
@@ -6,12 +8,15 @@ const fs = require('fs');
 const { FORMERR } = require('dns');
 
 //로컬 modules
-const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
-const quiz_machine = require('./quiz_system.js'); //퀴즈봇 메인 시스템
-const GAME_TYPE = require('./game_type.json');
+const { config } = require('./GAME_CONFIG.js');
+const text_contents = require('./text_contents.json')[config.language]; 
+const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
+const QUIZ_TYPE = require('./QUIZ_TYPE.json');
+const utility = require('./utility.js');
 
 
 /** 사전 정의 UI들 */
+//ButtonStyle 바꿀 수도 있으니깐 개별로 넣어놓자
 const select_btn_row = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
@@ -57,11 +62,18 @@ const control_btn_row = new ActionRowBuilder()
     .setStyle(ButtonStyle.Secondary),
 )
 
+/** global 변수 **/
+let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
+
+/** exports **/
 //main embed 인스턴스 반환
 exports.createUIHolder = (interaction) => {
+  return new UIHolder(interaction);
+};
 
-    return new UIHolder(interaction);
-
+//uiHolder_map 반환
+exports.getUIHolderMap = () => {
+  return uiHolder_map;
 };
 
 
@@ -76,8 +88,9 @@ class UIHolder
     this.guild_id = interaction.guild.id;
     this.ui = new MainUI();
 
-    this.prev_ui_stack = [];
+    this.prev_ui_stack = []; //뒤로가기용 UI스택
 
+    this.last_update_time = Date.now(); //uiholder aging manager에서 삭제 기준이될 값
     this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
   }
 
@@ -114,7 +127,7 @@ class UIHolder
     let newUI = this.ui.on(event_name, event_object); //UI가 새로 변경됐다면 업데이트 진행
     if(newUI != undefined)
     {
-      if(this.ui != newUI) //ui stack 에 쌓는 것은 새 UI가 생성됐을 때만
+      if(this.ui != newUI) //ui stack 에 쌓는 것은 새 UI 인스턴스가 생성됐을 때만
       {
         this.prev_ui_stack.push(this.ui);
         this.ui = newUI;
@@ -126,36 +139,44 @@ class UIHolder
   //UI 재전송
   updateUI()
   {
+    this.last_update_time = Date.now();
     this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
   }
 
 }
 
-//QuizBotUI 인터페이스
+//QuizBotUI 
 class QuizbotUI {
 
   constructor()
   {
-    this.embed = {
-
-    }
-    // this.components = [cloneDeep(select_btn_row), cloneDeep(control_btn_row)]; //내가 clonedeep을 왜 해줬지?
+    this.embed = {};
+    // this.components = [cloneDeep(select_btn_row), cloneDeep(control_btn_row)]; //내가 clonedeep을 왜 해줬었지?
     this.components = [select_btn_row, control_btn_row]; //이게 기본 component임
   }
 
-  //각 ui 별 on은 필수 구현 필요
+  //각 ui 별 on은 필요시 구현
   on(event_name, event_object)
   {
-    let newUI = undefined;
-
-    switch(event_name)
+    switch(event_name) 
     {
       case "interactionCreate":
-        newUI = this.onInteractionCreate(event_object); break;
-      
+        return this.onInteractionCreate(event_object);
     }
+  }
 
-    return newUI;
+  onInteractionCreate() //더미용 이벤트 콜백
+  {
+
+  }
+
+  update() //UI자체에서 ui holder를 찾아내 업데이트할 수 있는 메서드를 추가는 해뒀다... //TODO 나중에 더 좋은 방법을 생각해보자
+  {
+    if(uiHolder_map.hasOwnProperty(this.guild_id))
+    {
+      const uiHolder = uiHolder_map[this.guild_id];
+      uiHolder.updateUI();
+    }
   }
   
 }
@@ -264,8 +285,8 @@ class SelectQuizTypeUI extends QuizbotUI {
 class DevQuizSelectUI extends QuizbotUI  
 {
 
-  static resource_path = process.cwd() + "/resources/quizdata/";
-  static quiz_contents = DevQuizSelectUI.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..?
+  static resource_path = process.cwd() + "/resources/quizdata";
+  static quiz_contents = utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자
 
   constructor(contents)
   {
@@ -281,128 +302,13 @@ class DevQuizSelectUI extends QuizbotUI
       },
     };
 
-    this.cur_contents = contents == undefined ? DevQuizSelectUI.quiz_contents : contents;
+    this.cur_contents = (contents == undefined ? DevQuizSelectUI.quiz_contents : contents);
 
     this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
     this.cur_page = 0;
     this.total_page = 0;
     this.displayContents(this.cur_page);
 
-  }
-
-  static loadLocalDirectoryQuiz(content_path) 
-  {
-    let file_list = fs.readdirSync(content_path);
-
-    let quiz_contents = [];
-    file_list.forEach(file => {
-
-      let quiz_content = DevQuizSelectUI.parseContentInfoFromDirName(file);
-
-      // 하위 컨텐츠 있으면 추가 파싱 진행
-      const file_path = content_path + file;
-      const file_path_dir = file_path + "/"
-      quiz_content['content_path'] = file_path;
-
-      const is_quiz = quiz_content['is_quiz'];
-
-      if(is_quiz == false)
-      {
-        const stat = fs.lstatSync(file_path);
-        if(!stat.isFile()) //폴더면 하위 디렉터리 읽어옴
-        {
-          quiz_content['sub_contents'] = DevQuizSelectUI.loadLocalDirectoryQuiz(file_path_dir);
-        }
-      }
-      else
-      {
-        //퀴즈면 info.txt 읽어옴
-        const content_path_dir = content_path + "/";
-        const quiz_list = fs.readdirSync(content_path_dir);
-
-        let quiz_size = 0;
-        quiz_list.forEach(quiz_file => {
-
-          if(quiz_file.includes("info.txt") == false)
-          {
-            quiz_size += 1;
-            return;
-          }
-
-          //info.txt 파싱... 난 왜 이런 방식을 사용했던걸까..?
-          const info_txt_path = content_path_dir + quiz_file;
-          const info_data = fs.readFileSync(info_txt_path, 'utf8');
-
-          let winner_nickname_tmp = info_data.split('&topNickname: ');
-          if(winner_nickname_tmp.length > 1)
-          {
-            quiz_content['winner_nickname'] = winner_nickname_tmp[1].split("&");
-          }
-
-          let typeName_tmp = info_data.split('&topNickname: ');
-          if(typeName_tmp.length > 1)
-          {
-            quiz_content['type_name'] = typeName_tmp[1].split("&");
-          }
-
-        });
-
-        //아이콘으로 퀴즈 타입 가져오기... 예전에 자신을 원망하자
-        const quiz_icon = quiz_content['icon'];
-
-        if(quiz_icon == text_contents.icon.ICON_TYPE_SONG)
-            quiz_content['quiz_type'] = GAME_TYPE.SONG
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE)
-            quiz_content['quiz_type'] = GAME_TYPE.PICTURE
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE_LONG)
-            quiz_content['quiz_type'] = GAME_TYPE.PICTURE_LONG
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_OX)
-            quiz_content['quiz_type'] = GAME_TYPE.OX
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_INTRO)
-            quiz_content['quiz_type'] = GAME_TYPE.INTRO
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_QNA)
-            quiz_content['quiz_type'] = GAME_TYPE.QNA
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_SCRIPT)
-            quiz_content['quiz_type'] = GAME_TYPE.SCRIPT
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_SELECT)
-            quiz_content['quiz_type'] = GAME_TYPE.SELECT
-        else if(quiz_icon == text_contents.icon.ICON_TYPE_MULTIPLAY)
-            quiz_content['quiz_type'] = GAME_TYPE.MULTIPLAY
-        else quiz_content['quiz_type'] = GAME_TYPE.SONG
-
-
-        // 퀴즈 수
-        quiz_content['quiz_size'] = quiz_size;
-
-      }
-
-      quiz_contents.push(quiz_content);
-
-    })
-
-    return quiz_contents;
-  }
-
-  static parseContentInfoFromDirName(file_name)
-  {
-    let content = {};
-
-    content['name'] = file_name.split("&")[0];
-
-    let icon = file_name.split("icon="); //ICON 만 파싱
-    if(icon.length > 1) //icon= 이 있다면
-      content['icon'] = icon[1].split("&")[0];
-    else 
-    {
-      content['icon'] = text_contents.icon.ICON_QUIZ_DEFAULT;
-    }
-
-    const is_quiz = file_name.includes("&quiz") ? true : false;
-    content['is_quiz'] = is_quiz;
-
-    content['sub_contents'] = undefined;
-
-    return content;
   }
 
   displayContents(page_num)
@@ -468,22 +374,22 @@ class DevQuizSelectUI extends QuizbotUI
     }
 
     const content = this.cur_contents[index];
-    if(content['is_quiz'] == true)
+    if(content['is_quiz'] == true) //퀴즈 content 를 선택했을 경우
     {
       //어차피 여기서 만드는 quiz info 는 내가 하드코딩해도 되네
       let quiz_info = {};
       quiz_info['title']  = content['name'];
-
       quiz_info['description'] = content['description']; //TODO description은 quizinfo.txt 에서 읽어오는걸로
-      quiz_info['author'] = content['제육보끔#1916'];
-      quiz_info['thumbnail'] = content['https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg']; //썸네일은 그냥 quizbot으로 해두자
+
+      quiz_info['author'] = '제육보끔#1916';
+      quiz_info['thumbnail'] = 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg'; //썸네일은 그냥 quizbot으로 해두자
 
       quiz_info['quiz_size'] = content['quiz_size']; 
-
+      quiz_info['repeat_count'] = content['repeat_count']; 
       quiz_info['winner_nickname'] = content['winner_nickname'];
+      quiz_info['quiz_path'] = content['content_path'];//dev quiz는 quiz_path 필요
+      quiz_info['quiz_type'] = content['quiz_type'];
 
-      quiz_info['quiz_path'] = content['content_path'];//dev quiz는 path 필요
-      quiz_info['quiz_type'] = content['quiz_type'];//얘만 quiz_path 필요
       return new QuizInfoUI(quiz_info);
     }
 
@@ -550,13 +456,24 @@ class QuizInfoUI extends QuizbotUI
       const owner = interaction.member; //주최자
       const quiz_info = this.quiz_info;
 
-      if(!owner.voice.channel) //음성 채널 참가 중인 사람만 시작 가능
+      const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
+      if(check_ready == undefined)
       {
-          //TODO 음성 채널 들어가서 하라고 알림
-          return;
-      }  
+        //TODO 잘못됏다는 메시지
+        return;
+      }
 
-      return new QuizPlayUI(guild, owner, quiz_info);
+      if(check_ready['result'] == false)
+      {
+        //check_ready['reason'] 떄문에 준비안됐다는 메시지
+        return;
+      }
+
+      const quiz_play_ui = new QuizPlayUI();
+      
+      quiz_system.startQuiz(guild, owner, quiz_info, quiz_play_ui); //퀴즈 시작
+
+      return quiz_play_ui;
     }
 
     if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
@@ -575,70 +492,59 @@ class QuizInfoUI extends QuizbotUI
 class QuizPlayUI extends QuizbotUI
 {
 
-  constructor(guild, owner, quiz_info)
+  constructor()
   {
     super();
 
-    this.quiz_info = quiz_info;
-    this.guild = guild;
-    this.owner = owner;
-
     this.embed = {
       color: 0x87CEEB,
-      title: quiz_info['title'],
-      description: quiz_info['description'],
+      title: '',
+      description: '',
       thumbnail: { //퀴즈 섬네일 표시
-        url: quiz_info['thumbnail'],
+        url: '',
       },
       footer: { //퀴즈 제작자 표시
-        text: quiz_info['author'],
-        icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
+        text: '',
       },
     };
 
-    const quiz_info_comp = new ActionRowBuilder()
+    const quiz_play_comp = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-      .setCustomId('start')
+      .setCustomId('hint')
       .setLabel('힌트')
       .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('scoreboard')
+        .setCustomId('skip')
         .setLabel('스킵')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('settings')
+        .setCustomId('quiz_stop')
         .setLabel('그만하기')
         .setStyle(ButtonStyle.Secondary),
     )
-    this.components = [quiz_info_comp]; //여기서는 component를 바꿔서 해주자
 
-    this.startQuiz();
+    this.components = [quiz_play_comp]; //여기서는 component를 바꿔서 사용해주자
   }
 
   onInteractionCreate(interaction)
   {
     if(!interaction.isButton()) return;
 
-    if(interaction.customId == 'start') //시작 버튼 눌렀을 떄
+    if(interaction.customId == 'hint') //힌트 버튼 눌렀을 떄
     {
-      return new QuizPlayUI(quiz_info);
+
     }
 
-    if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
-    {
-      
-    }
-
-    if(interaction.customId == 'settings') //설정 버튼 눌렀을 떄
+    if(interaction.customId == 'skip') //스킵 버튼 눌렀을 떄
     {
       
     }
-  }
 
-  startQuiz()
-  {
-    quiz_machine.startQuiz(this.guild, this.owner, this.quiz_info, this);
+    if(interaction.customId == 'quiz_stop') //종료 버튼 눌렀을 떄
+    {
+      
+    }
   }
 
 }

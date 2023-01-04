@@ -1,8 +1,10 @@
+'use strict';
+
 const { REST, Routes } = require('discord.js');
 const {SlashCommandBuilder} = require("@discordjs/builders");
 
 //명령어 목록
-commands = [
+const commands = [
     new SlashCommandBuilder()
     .setName('퀴즈')
     .setDescription('퀴즈봇의 메인 메뉴를 표시합니다.')
