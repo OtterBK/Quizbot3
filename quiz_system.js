@@ -11,11 +11,11 @@ const text_contents = require('./text_contents.json')[config.language];
 const utility = require('./utility.js');
 const QUIZ_TYPE = require('./QUIZ_TYPE.json');
 
-const LIFE_CYCLE_STATE_TYPE = 
+const CYCLE_TYPE = 
 {
     'UNDEFINED': 'UNDEFINED',
-    'INITIALIZING': 'INITIALIZING', //초기화 state
-    'EXPLAIN': 'EXPLAIN', //게임 설명 state
+    'INITIALIZING': 'INITIALIZING', //초기화 cycle
+    'EXPLAIN': 'EXPLAIN', //게임 설명 cycle
     'PREPARE': 'PREPARE', //문제 제출 준비 중
     'QUESTIONING': 'QUESTIONING', //문제 제출 중
     'CORRECTANSWER': 'CORRECTANSWER', //정답 맞췄을 시
@@ -85,7 +85,7 @@ class QuizSession
         this.voice_connection.subscribe(this.audio_player);
 
         this.lifecycle_map = {};
-        this.current_state = LIFE_CYCLE_STATE_TYPE.UNDEFINED;
+        this.current_cycle_type = CYCLE_TYPE.UNDEFINED;
 
         this.quiz_data = undefined;
         this.game_data = undefined;
@@ -97,49 +97,54 @@ class QuizSession
         //Prepare -> if quiz_finish Ending else -> Questioning
         //Questioning ->
         //(CorrectAnswer 또는 Timeover) -> Questioning
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.INITIALIZING, new Initializing(this));
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.EXPLAIN, new Explain(this));
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.PREPARE, new Prepare(this));
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.QUESTIONING, new Questioning(this));
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.CORRECTANSWER, new CorrectAnswer(this));
-        this.inputLifeCycleStates(LIFE_CYCLE_STATE_TYPE.TIMEOVER, new TimeOver(this));
+        this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new Initializing(this));
+        this.inputLifeCycle(CYCLE_TYPE.EXPLAIN, new Explain(this));
+        this.inputLifeCycle(CYCLE_TYPE.PREPARE, new Prepare(this));
+        this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new Questioning(this));
+        this.inputLifeCycle(CYCLE_TYPE.CORRECTANSWER, new CorrectAnswer(this));
+        this.inputLifeCycle(CYCLE_TYPE.TIMEOVER, new TimeOver(this));
         
 
-        this.stateLoop();
+        this.cycleLoop();
     }
 
-    inputLifeCycleStates(state_type, lifecycle_state)
+    inputLifeCycle(cycle_type, cycle)
     {
-        this.lifecycle_map[state_type] = lifecycle_state;
+        this.lifecycle_map[cycle_type] = cycle;
     }
 
-    stateLoop()
+    cycleLoop()
     {
-        this.goToState(LIFE_CYCLE_STATE_TYPE.INITIALIZING);
+        this.goToCycle(CYCLE_TYPE.INITIALIZING);
     }
 
-    goToState(state_type)
+    getCycle(cycle_type)
     {
-        const target_state = this.lifecycle_map[state_type];
-        if(target_state == undefined)
+        return this.lifecycle_map[cycle_type];
+    }
+
+    goToCycle(cycle_type)
+    {
+        const target_cycle = this.getCycle(cycle_type);
+        if(target_cycle == undefined)
         {
             //TODO initializing 누락 에러
             return;
         }
-        this.current_state = state_type;
-        target_state.do();
+        this.current_cycle_type = cycle_type;
+        target_cycle.do();
     }
 }
 
-//퀴즈 state 용 lifecycle
+//퀴즈 cycle 용 lifecycle
 class QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.UNDEFINED;
+    static cycle_type = CYCLE_TYPE.UNDEFINED;
 
     constructor(quiz_session)
     {
         this.quiz_session = quiz_session;
-        this.next_state = LIFE_CYCLE_STATE_TYPE.UNDEFINED;
+        this.next_cycle_type = CYCLE_TYPE.UNDEFINED;
     }
 
     do()
@@ -147,39 +152,48 @@ class QuizLifecycle
         this._enter();
     }
 
-    async _enter() //처음 state 들어왔을 때
+    async asyncCallCycle(cycle_type) //비동기로 특정 cycle을 호출, PREPARE 같은거
+    {
+        const cycle = this.quiz_session.getCycle(cycle_type);
+        if(cycle != undefined)
+        {
+            cycle.do();
+        }
+    }
+
+    async _enter() //처음 Cycle 들어왔을 때
     {
         if(this.enter != undefined) await this.enter();
         this._act();
     }
 
-    async _act() //state 의 act
+    async _act() //Cycle 의 act
     {
         if(this.act != undefined) await this.act();
         this._exit();
     }
 
-    async _exit() //state 끝낼 때
+    async _exit() //Cycle 끝낼 때
     {
         if(this.exit != undefined) await this.exit();
         //다음 Lifecycle로
-        if(this.next_state == LIFE_CYCLE_STATE_TYPE.UNDEFINED)
+        if(this.next_stat == CYCLE_TYPE.UNDEFINED)
         {
-            //TODO UNDEFINED STATE 에러
+            //TODO UNDEFINED Cycle 에러
             return;
         }        
-        this.quiz_session.goToState(this.next_state);
+        this.quiz_session.goToCycle(this.next_stat);
     }
 }
 
 //처음 초기화 시
 class Initializing extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.INITIALIZING;
+    static cycle_type = CYCLE_TYPE.INITIALIZING;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.EXPLAIN;
+        this.next_stat = CYCLE_TYPE.EXPLAIN;
     }
 
     async act()
@@ -266,18 +280,24 @@ class Initializing extends QuizLifecycle
             'question_num': -1, //현재 내야하는 문제번호
             'scoreboard': {}, //점수표
             'ranking_list': [], //순위표
+            'prepared_quiz_queue': [], //PREPARE Cycle을 거친 퀴즈 큐
        };
+    }
+
+    async exit()
+    {
+        this.asyncCallCycle(CYCLE_TYPE.PREPARE); //미리 문제 준비
     }
 }
 
 //게임 방식 설명하는 단계
 class Explain extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.EXPLAIN;
+    static cycle_type = CYCLE_TYPE.EXPLAIN;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.PREPARE;
+        this.next_stat = CYCLE_TYPE.QUESTIONING;
     }
 
     async act()
@@ -289,11 +309,11 @@ class Explain extends QuizLifecycle
 //퀴즈 내기 전, 퀴즈 준비
 class Prepare extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.PREPARE;
+    static cycle_type = CYCLE_TYPE.PREPARE;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.QUESTIONING;
+        this.next_stat = CYCLE_TYPE.UNDEFINED;
     }
 
     async enter()
@@ -313,32 +333,59 @@ class Prepare extends QuizLifecycle
 
         if(question_num >= quiz_size) //모든 퀴즈 제출됐음
         {
-            this.next_state = LIFE_CYCLE_STATE_TYPE.ENDING;
+            this.next_stat = CYCLE_TYPE.ENDING;
             return;
         }
 
         game_data['question_num'] = question_num;
+
+        let target_quiz = quiz_data.quiz_list[question_num];
+        const question = target_quiz['question'];
+        //오디오 길이 미리 파싱
+        const audio_length = await utility.getAudioLength(question) * 1000;
+        target_quiz['audio_length'] = audio_length;
+
+        game_data.prepared_quiz_queue.push(target_quiz);
     }
 }
 
 //퀴즈 내는 단계, 여기가 제일 처리할게 많다.
 class Questioning extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.QUESTIONING;
+    static cycle_type = CYCLE_TYPE.QUESTIONING;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.TIMEOVER;
+        this.next_stat = CYCLE_TYPE.TIMEOVER;
         this.current_quiz = undefined;
+        this.audio_stream = undefined;
+        this.timeover_timer = undefined;
     }
 
     async enter()
     {
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
-        const question_num = game_data['question_num'];
+
+        //아직 prepared queue에 아무것도 없다면
+        let current_check_prepared_queue = 0;
+        while(game_data.prepared_quiz_queue.length == 0)
+        {
+            if(current_check_prepared_queue >= config.max_check_prepared_queue)
+            {
+                //TODO 뭔가 잘못됐다고 알림
+                break;
+            }
+
+            await new Promise((resolve, reject) => setTimeout(() => {
+                ++current_check_prepared_queue;
+                resolve();
+            }, config.prepared_queue_check_interval));
+                
+            console.log("promise finished t0");
+        }
         
-        this.current_quiz = quiz_data.quiz_list[question_num]; //TODO length체크하는 가드 코드 넣기
+        this.current_quiz = game_data.prepared_quiz_queue.shift(); //하나 꺼내오자
     }
 
     async act()
@@ -358,7 +405,7 @@ class Questioning extends QuizLifecycle
         //fateIn, fateOut 구현을 위해 inline volume 사용해야할 듯...
 
         const audio_stream = fs.createReadStream(question, {flags:'r'});
-        const audio_length = (await getAudioDurationInSeconds(audio_stream)) * 1000;
+        this.audio_stream = audio_stream;
 
         if(question.endsWith('.ogg')) //ogg
         {
@@ -388,7 +435,7 @@ class Questioning extends QuizLifecycle
         const fade_in_duration = config.fade_in_duration;
         if(config.use_inline_volume)
         {
-            utility.fade_audio_play(audio_player, resource, 0, 1.0, fade_in_duration);
+            utility.fade_audio_play(audio_player, resource, 0.1, 1.0, fade_in_duration);
         }
         else
         {
@@ -396,8 +443,9 @@ class Questioning extends QuizLifecycle
         }
 
         //제한시간 동안 대기
-        const audio_play_time = 30000; //TODO 서버별 설정값 가져오는 걸로
-        if(audio_play_time < audio_length) 
+        let audio_play_time = 30000; //TODO 서버별 설정값 가져오는 걸로
+        const audio_length = current_quiz['audio_length'];
+        if(audio_length != undefined && audio_play_time < audio_length) 
         {
             audio_play_time = audio_play_time;
         }
@@ -414,7 +462,7 @@ class Questioning extends QuizLifecycle
         if(config.use_inline_volume)
         {
             const fade_out_duration = config.fade_out_duration;
-            const fade_out_start_offset = audio_play_time - fade_out_duration - 500; //해당 지점부터 fade_out 시작, 부드럽게 0.5초 정도 간격두자
+            const fade_out_start_offset = audio_play_time - fade_out_duration - 1000; //해당 지점부터 fade_out 시작, 부드럽게 1초 정도 간격두자
             if(fade_out_start_offset < fade_in_duration)
             {
                 fade_out_start_offset = fade_in_start_time;
@@ -426,38 +474,40 @@ class Questioning extends QuizLifecycle
             }, fade_out_start_offset);
         }
 
+        //일정시간 후에 timeover로
         await new Promise((resolve, reject) => {
-            const timeover_timer = setInterval(() => {
-                current_play_time += interval;
-                
-                const current_time = Date.now();
-                if(current_time >= stop_audio_criteria)
-                {
-                    clearInterval(timeover_timer);
-                    if(current_question_num < game_data['question_num']) //이미 다음 문제로 넘어갔다면, (정답 맞추거나 스킵 등으로)
-                    {
-                        return; //패스~
-                    }
-                }
-    
-                //TODO 여기에 오디오 플레이 진행상황 표시
-                //⏩⏩⏩⏩⬜⬜⬜⬜⬜⬜
-    
-            }, interval);
+            const timeover_timer = setTimeout(() => {
+                resolve();
+            }, audio_play_time);
+            this.timeover_timer = timeover_timer;
         });
 
-        console.log("finish promise");
+        console.log("promise finished t1");
+
+        //타이머가 끝났다
+        if(current_quiz['already_processed'] == true) //그런데 이미 처리된 퀴즈면
+        {
+            this.next_cycle_type = CYCLE_TYPE.CORRECTANSWER; //정답을 맞춘거임
+        }
+
+    }
+
+    exit()
+    {
+        this.audio_stream.close();
+        this.asyncCallCycle(CYCLE_TYPE.PREPARE); //다음 문제 미리 준비
+        return true;
     }
 }
 
 //문제 못 맞춰서 Timeover 일 떄
 class TimeOver extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.TIMEOVER;
+    static cycle_type = CYCLE_TYPE.TIMEOVER;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.PREPARE;
+        this.next_stat = CYCLE_TYPE.QUESTIONING;
     }
 
     async act()
@@ -471,7 +521,7 @@ class TimeOver extends QuizLifecycle
         const wait_time = 6500; //정답 얼마동안 보여줄 지
         await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
-                utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, wait_time);
+                resolve();
             }, wait_time);
         });
     }
@@ -480,11 +530,11 @@ class TimeOver extends QuizLifecycle
 //Questioning 상태에서 정답 맞췄을 때
 class CorrectAnswer extends QuizLifecycle
 {
-    static state_type = LIFE_CYCLE_STATE_TYPE.CORRECTANSWER;
+    static cycle_type = CYCLE_TYPE.CORRECTANSWER;
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_state = LIFE_CYCLE_STATE_TYPE.PREPARE;
+        this.next_stat = CYCLE_TYPE.QUESTIONING;
     }
 
     async act()
@@ -502,7 +552,7 @@ class CorrectAnswer extends QuizLifecycle
         const wait_time = 6500; //정답 얼마동안 보여줄 지
         await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
-                utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, wait_time);
+                resolve();
             }, wait_time);
         });
     }

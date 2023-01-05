@@ -1,7 +1,9 @@
 //외부 modules
 const fs = require('fs');
+const { getAudioDurationInSeconds } = require('get-audio-duration')
 
 //로컬 modules
+const { config } = require('./GAME_CONFIG.js');
 const QUIZ_TYPE = require('./QUIZ_TYPE.json');
 const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
 
@@ -152,7 +154,7 @@ exports.parseContentInfoFromDirName = (dir_name) =>
 
 exports.fade_audio_play = async (audio_player, audio_resource, from, to, duration) =>
 {
-  const interval = 100; //ms단위
+  const interval = config.fade_interval; //ms단위
 
   let current_time = 0;
   let current_volume = from;
@@ -195,4 +197,18 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
     }
   
   }, interval);
+}
+
+exports.getAudioLength = async (audio_file_path) => 
+{
+  //filepath 말고 stream 으로 알아내는 방법이 있는데,
+  //해당 모듈에서 계속 No Duration Found 문제가 발생한다.
+  //filepath 로 duration 가져오는데 보통 100ms 걸린다
+  return await getAudioDurationInSeconds(audio_file_path);
+}
+
+exports.getBlobLength = () => 
+{
+  // https://www.npmjs.com/package/get-blob-duration
+  // https://www.npmjs.com/package/ffprobe-duration
 }
