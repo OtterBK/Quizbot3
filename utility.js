@@ -150,7 +150,7 @@ exports.parseContentInfoFromDirName = (dir_name) =>
   return content;
 }
 
-exports.fade_audio_play = (audio_player, audio_resource, from, to, duration) =>
+exports.fade_audio_play = async (audio_player, audio_resource, from, to, duration) =>
 {
   const interval = 100; //ms단위
 
@@ -174,7 +174,7 @@ exports.fade_audio_play = (audio_player, audio_resource, from, to, duration) =>
     {
       if(is_fade_in == false)
       {
-        audio_player.play(audio_resource);
+        audio_player.stop();
       }
       clearInterval(timer_id);
       return;
