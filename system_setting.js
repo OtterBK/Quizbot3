@@ -13,6 +13,9 @@ exports.SYSTEM_CONFIG = {
 
     ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
     ui_holder_aging_manager_interval: 60, //체크 주기(s)
+
+    correct_answer_cycle_wait: 6500, //정답 맞췄을 시, 얼마나 대기할 지
+    timeover_cycle_wait: 6500, //타임오버 시, 얼마나 대기할 지
 }
 
 exports.CUSTOM_EVENT_TYPE = {

@@ -9,6 +9,7 @@ const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioRe
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('./utility.js');
+const { config } = require('process');
 
 const CYCLE_TYPE = 
 {
@@ -95,8 +96,8 @@ class QuizSession
         this.lifecycle_map = {};
         this.current_cycle_type = CYCLE_TYPE.UNDEFINED;
 
-        this.quiz_data = undefined;
-        this.game_data = undefined;
+        this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
+        this.game_data = undefined; //얘는 자주 바뀐다.
 
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
@@ -166,7 +167,7 @@ class QuizLifecycle
     constructor(quiz_session)
     {
         this.quiz_session = quiz_session;
-        this.next_cycle_type = CYCLE_TYPE.UNDEFINED;
+        this.next_cycle = CYCLE_TYPE.UNDEFINED;
     }
 
     do()
@@ -319,6 +320,8 @@ class Initializing extends QuizLifecycle
                             return;
                         similar_answer += split_answer.substring(0,1);
                     });
+
+                    similar_answer = similar_answer.toLowerCase();
                 }
 
                 if(similar_answer != '')
@@ -327,7 +330,7 @@ class Initializing extends QuizLifecycle
                         answers.push(similar_answer);
                 }
                 
-                const answer = answer_row.replace(/ /g,""); // /문자/gi 로 replace하면 replaceAll 로 동작, g = 전역검색 i = 대소문자 미구분
+                const answer = answer_row.replace(/ /g,"").toLowerCase(); // /문자/gi 로 replace하면 replaceAll 로 동작, g = 전역검색 i = 대소문자 미구분
                 if(answers.includes(answer) == false)
                         answers.push(answer);
                });
@@ -396,8 +399,7 @@ class Prepare extends QuizLifecycle
 
     async enter()
     {
-        let audio_player = this.quiz_session.audio_player;
-        audio_player.stop(); //무조건 stop 상태에서 시작
+
     }
 
     async act()
@@ -437,37 +439,73 @@ class Prepare extends QuizLifecycle
     {
         const question = target_quiz['question'];
 
-        //오디오 길이 미리 파싱
-        const audio_length = await utility.getAudioLength(question) * 1000;
-        target_quiz['audio_length'] = audio_length;
+        //오디오 정보 가져오기
+        const audio_play_time = 20000; //TODO 서버 설정 값 사용하자
 
+        //오디오 길이 먼저 넣어주고~
+        const audio_info = await utility.getAudioInfo(question);
+        const audio_length = (audio_info.format.duration ?? (await getAudioDurationInSeconds(question))) * 1000;
+        target_quiz['audio_length'] = audio_length < audio_play_time ? audio_length : audio_play_time;
+
+        //노래 재생 시작 지점 파싱
+        const audio_byte_size = audio_info.format.size; //오디오 bytes 사이즈
+        const audio_bitrate = audio_info.format.bit_rate; //오디오 비트레이트
+        const audio_byterate = audio_bitrate / 8; //초당 재생 bytes
+
+        //오디오 자르기 기능
+        /**
+        mp3 타입아니면 시작을 첨부터 해야함, 별 짓을 다했는데 mp3아니면 몇몇 노래들이 깨짐
+        wav 파일 기준으로 앞 44byte를 metadata로 하여서 별도의 stream으로 만들고 무작위 구간으로 생성한 file_stream으로 생성해서 테스트 해봤는데
+        metadata를 아예 안붙이면 play 조차 안됨, 아마 CreateAudioResource 할 때 변환이 안되는 듯
+        어떤건 잘되고 어떤건 잘 안됨, mp3의 경우는 metadata 안 붙여도 잘돼서 그냥 mp3만 지원하자 
+        **/
+        const audio_format = audio_info.format.format_name;
+        const do_begin_start = audio_format === 'mp3' ? false : true;
+        
+        let audio_start_point = undefined;
+        let audio_end_point = undefined;
+
+        //TODO 나중에 여유 있을 때 랜덤 재생 구간을 최대한 중간 쪽으로 잡도록 만들자
+        const audio_play_time_sec = audio_play_time / 1000; //계산하기 쉽게 초로 환산 ㄱㄱ
+        const audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_byterate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+        const audio_min_start_point = 2.5 * audio_byterate;  //앞에도 2.5초 정도 자르고 싶음
+
+        if((audio_max_start_point > audio_min_start_point)) //충분히 재생할 수 있는 start point가 있다면
+        {
+            audio_start_point = do_begin_start ? 0 : parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); //mp3타입만 랜덤 start point 지원
+            audio_end_point = parseInt(audio_start_point + (audio_play_time_sec * audio_byterate));
+        }
+        
         //오디오 스트림 미리 생성
-        const audio_stream = fs.createReadStream(question, {flags:'r'});
+        let audio_stream_for_close = undefined;
+        let audio_stream = undefined;
+
+        console.log(`audio cut start: ${audio_start_point/audio_byterate} end: ${audio_end_point/audio_byterate}`);
+        audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point ?? Infinity});
+        audio_stream_for_close = [audio_stream];
 
         let resource = undefined;
+        let inputType = StreamType.WebmOpus;
         if(question.endsWith('.ogg')) //ogg
         {
-            resource = createAudioResource(audio_stream, {
-                inputType: StreamType.OggOpus,
-                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            });
+            inputType = StreamType.OggOpus;
         }
-        // else if(question.endsWith('webm')) //webm
-        //굳이 webm 또는 ogg 파일이 아니더라도 Opuse 형식으로 변환하는 것이 더 좋은 성능을 나타낸다고함
+
+        //굳이 webm 또는 ogg 파일이 아니더라도 Opus 형식으로 변환하는 것이 더 좋은 성능을 나타낸다고함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
-        else 
+        if(config.use_inline_volume == false || true) //Inline volume 옵션 켜면 의미 없음
         {
             resource = createAudioResource(audio_stream, {
-                inputType: StreamType.WebmOpus,
+                inputType: inputType,
                 inlineVolume: SYSTEM_CONFIG.use_inline_volume,
             });
         }
-        // else //mp3 or wav
-        // {
-        //     resource = createAudioResource(audio_stream, {
-        //         inputType: StreamType.Arbitrary,
-        //     });
-        // }
+        else
+        {
+            resource = createAudioResource(audio_stream, {
+                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
+            });
+        }
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
@@ -479,7 +517,7 @@ class Prepare extends QuizLifecycle
         }
 
         target_quiz['audio_resource'] = resource;
-        target_quiz['audio_stream'] = audio_stream;
+        target_quiz['audio_stream_for_close'] = audio_stream_for_close;
     }
 }
 
@@ -491,12 +529,16 @@ class Questioning extends QuizLifecycle
     {
         super(quiz_session);
         this.next_cycle = CYCLE_TYPE.TIMEOVER;
-        this.current_quiz = undefined;
-        this.audio_stream = undefined;
-        this.timeover_timer = undefined;
-        this.skip_prepare_cycle = false;
-        this.progress_bar_timer = undefined;
-        this.answers = undefined;
+
+        this.current_quiz = undefined; //현재 진행 중인 퀴즈
+
+        this.timeover_timer = undefined; //타임오버 timer id
+        this.timeover_resolve = undefined; //정답 맞췄을 시 강제로 타임오버 대기 취소
+        this.fade_out_timer = undefined;
+
+        this.skip_prepare_cycle = false; //마지막 문제라면 더 이상 prepare 할 필요없음
+        this.progress_bar_timer = undefined; //진행 bar
+        this.answers = undefined; //문제 정답 목록
     }
 
     async enter()
@@ -509,6 +551,23 @@ class Questioning extends QuizLifecycle
             this.next_cycle = CYCLE_TYPE.ENDING;
             this.skip_prepare_cycle = true;
             return; //더 이상 진행할 게 없다.
+        }
+
+        //이전 퀴즈 resource 해제
+        const previous_quiz = game_data['processing_quiz'];
+        if(previous_quiz != undefined)
+        {
+            const audio_stream_for_close = previous_quiz['audio_stream_for_close'];
+            if(audio_stream_for_close != undefined)
+            {
+                audio_stream_for_close.forEach((audio_stream) => audio_stream.close());
+            }
+
+            const fade_out_timer = previous_quiz['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
+            if(fade_out_timer != undefined)
+            {
+                clearTimeout(fade_out_timer);
+            }
         }
 
         //아직 prepared queue에 아무것도 없다면
@@ -529,6 +588,7 @@ class Questioning extends QuizLifecycle
         }
         
         this.current_quiz = game_data.prepared_quiz_queue.shift(); //하나 꺼내오자
+        this.quiz_session.audio_player.stop(); //시작 전엔 audio stop 걸고 가자
     }
 
     async act()
@@ -542,6 +602,8 @@ class Questioning extends QuizLifecycle
             return;
         }
 
+        game_data['processing_quiz'] = this.current_quiz; //현재 제출 중인 퀴즈
+
         this.answers = current_quiz['answers'];
         
         let audio_player = this.quiz_session.audio_player;
@@ -553,36 +615,23 @@ class Questioning extends QuizLifecycle
         //주의! inline volume 옵션 사용 시, 성능 떨어짐
         //fateIn, fateOut 구현을 위해 inline volume 사용해야할 듯...
 
-        this.audio_stream = current_quiz['audio_stream'];
         const resource = current_quiz['audio_resource'];
         
         //비동기로 오디오 재생 시켜주고
         const fade_in_duration = SYSTEM_CONFIG.fade_in_duration;
+        let fade_in_end_time = undefined; 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
+            fade_in_end_time = Date.now() + fade_in_duration; 
             utility.fade_audio_play(audio_player, resource, 0.1, 1.0, fade_in_duration);
         }
         else
         {
-            audio_player.play(resource); //TODO 엥? 이거 async 아닌 것 같은데... 한번 확인해볼 것,  async 아니면 setTimeout으로 별도 호출하자
+            audio_player.play(resource); 
         }
 
         //제한시간 동안 대기
-        let audio_play_time = 30000; //TODO 서버별 설정값 가져오는 걸로
-        const audio_length = current_quiz['audio_length'];
-        if(audio_length != undefined && audio_play_time < audio_length) 
-        {
-            audio_play_time = audio_play_time;
-        }
-            
-        const interval_amount = 10; //10% 씩 총 10번 호출해서 진행상황을 100%로 할 거임
-        const stop_audio_criteria = Date.now() + audio_play_time; //노래 언제 stop 할지
-
-        const interval = (audio_play_time / interval_amount) - 100; //함수 오버헤드 대충 고려해서 -100ms정도?
-
-        let current_play_time = 0;
-        const current_question_num = game_data['question_num']; //현재 question number 기억
-
+        let audio_play_time = current_quiz['audio_length'] ?? 20000; //TODO 서버별 설정값 가져오는 걸로
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
@@ -598,6 +647,8 @@ class Questioning extends QuizLifecycle
                 console.log("timeout_log_start_fade_out");
                 utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
             }, fade_out_start_offset);
+
+            this.fade_out_timer = fade_out_timer;
         }
 
         //진행 상황 bar, 10%마다 호출하자
@@ -631,35 +682,56 @@ class Questioning extends QuizLifecycle
 
         this.progress_bar_timer = progress_bar_timer;
 
-        //일정시간 후에 timeover로
-        const timeover_timer = new Promise((resolve, reject) => {
-            setTimeout(() => {
+        let is_timeover = false;
+        const timeover_promise = new Promise(async (resolve, reject) => {
+
+            this.timeover_resolve = resolve; //정답 맞췄을 시, 이 resolve를 호출해서 promise 취소할거임
+            this.timeover_timer = await setTimeout(() => {
+
                 console.log("timeout_log_timeover_timer");
+                is_timeover = true; 
                 resolve('done timeover timer');
-            }, audio_play_time)
-        })
-        .then()
+
+            }, audio_play_time);
+        });
+
+        await Promise.race([timeover_promise]); //race로 돌려서 Promise가 끝나는걸 기다림
+
+        //타이머가 끝났다.
+        if(is_timeover == false && this.current_quiz['answer_user'] != undefined) //그런데 타임오버도 아니고 정답자도 있는거다
         {
-            //타이머가 끝났다
-            if(current_quiz['answer_user'] == undefined) //정답을 맞춘 사람이 없다면
+            this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+
+            if(SYSTEM_CONFIG.use_inline_volume)
             {
-                this.next_cycle_type = CYCLE_TYPE.TIMEOVER; //타임오버로 ㄱㄱ
-                super.act(); //어쩔 수 없다. 직접 next  ㄱㄱ
+                let fade_out_duration = SYSTEM_CONFIG.fade_out_duration;
+                const fade_in_left_time = (Date.now() - (fade_in_end_time ?? 0)) * -1;
+                if(fade_in_left_time > 0) //아직 fade_in이 안끝났다면
+                {
+                    fade_out_duration = SYSTEM_CONFIG.correct_answer_cycle_wait - fade_in_left_time - 1000; //fadeout duration 재계산, 1000ms는 padding
+                    console.log(`fade_in_left_time: ${fade_in_left_time}`);
+                    console.log(`fade_out_duration: ${fade_out_duration}`);
+                    if(fade_out_duration > 1000) //남은 시간이 너무 짧으면 걍 패스
+                    {
+                        this.current_quiz['fade_out_timer'] = setTimeout(() => {
+                            utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
+                        }, fade_in_left_time); //fade_in 끝나면 호출되도록
+                    }
+                }
+                else
+                {
+                    utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
+                }
             }
-        };
-        this.timeover_timer = timeover_timer;
-
-        return false; //next 수행은 여기서 직접 하겠다고 전달
-
+        }
+        else //타임오버거나 정답자 없다면
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+        }
     }
 
     exit()
     {
-        if(this.audio_stream != undefined)
-        {
-            this.audio_stream.close();
-        }
-
         if(this.skip_prepare_cycle == false)
         {
             this.asyncCallCycle(CYCLE_TYPE.PREPARE); //다음 문제 미리 준비
@@ -667,7 +739,7 @@ class Questioning extends QuizLifecycle
 
         if(this.progress_bar_timer != undefined)
         {
-            clearTimeout(this.progress_bar_timer);
+            clearInterval(this.progress_bar_timer);
         }
     }
 
@@ -683,9 +755,12 @@ class Questioning extends QuizLifecycle
         {
             this.current_quiz['answer_user'] = member;
             
-            clearInterval(this.timeover_timer); //타임오버 타이머 중기
-            this.next_cycle_type = CYCLE_TYPE.CORRECTANSWER;
-            super.act(); //직접 next ㄱㄱ
+            clearTimeout(this.timeover_timer); //타임오버 타이머 중지
+            if(this.fade_out_timer != undefined)
+            {
+                clearTimeout(this.fade_out_timer); //fadeout timer 중지
+            }
+            this.timeover_resolve('Submitted correct Answer'); //Promise await 취소
         }
     }
 
@@ -694,10 +769,11 @@ class Questioning extends QuizLifecycle
     {
         if(interaction.commandName === '답') {
     
-            let submit_answer = interaction.options.getString('답안');
-            submit_answer = submit_answer.trim();
+            let submit_answer = interaction.options.getString('답안') ?? '';
+            if(submit_answer == '') return;
+            submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
             
-            if(this.answers.includes(submit_answer))
+            if(this.answers.includes(submit_answer) || true)
             {
                 this.submittedCorrectAnswer(interaction.member);
             }
@@ -717,15 +793,16 @@ class TimeOver extends QuizLifecycle
         this.next_cycle = CYCLE_TYPE.QUESTIONING;
     }
 
+    async enter()
+    {
+
+    }
+
     async act()
     {
-        //다음에 문제낼 퀴즈 꺼내기
-        let quiz_data = this.quiz_session.quiz_data;
-        let game_data = this.quiz_session.game_data;
-
         //TODO 타입오버는 정답 표시
 
-        const wait_time = 6500; //정답 얼마동안 보여줄 지
+        const wait_time = SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 보여줄 지
         await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 console.log("timeout_log_timeover_wait");
@@ -745,19 +822,16 @@ class CorrectAnswer extends QuizLifecycle
         this.next_cycle = CYCLE_TYPE.QUESTIONING;
     }
 
+    async enter()
+    {
+
+    }
+
     async act()
     {
-        //다음에 문제낼 퀴즈 꺼내기
-        let quiz_data = this.quiz_session.quiz_data;
-        let game_data = this.quiz_session.game_data;
+        //TODO 정답자 표시
 
-        //바로 페이드 아웃 실행 해주고
-        const fade_out_duration = SYSTEM_CONFIG.fade_out_duration;
-        utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
-
-        //TODO 정답 표시
-
-        const wait_time = 6500; //정답 얼마동안 보여줄 지
+        const wait_time = SYSTEM_CONFIG.correct_answer_cycle_wait; //정답 얼마동안 보여줄 지
         await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 console.log("timeout_log_correct_answer_wait");
@@ -765,6 +839,12 @@ class CorrectAnswer extends QuizLifecycle
             }, wait_time);
         });
     }
+
+    async exit()
+    {
+
+    }
+
 }
 
 //점수 공개

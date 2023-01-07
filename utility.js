@@ -1,6 +1,7 @@
 //외부 modules
 const fs = require('fs');
 const { getAudioDurationInSeconds } = require('get-audio-duration')
+const ffprobe = require('node-ffprobe'); //원래라면 module.exports.sync 를 true 셋해서 불러와야 doProbeSync로 가져오는데... 그냥 모듈 수정해서 하드코딩으로 가져오게함
 
 //로컬 modules
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
@@ -95,7 +96,7 @@ exports.loadLocalDirectoryQuiz = (contents_path) =>
     quiz_contents.push(quiz_content);
 
   })
-
+  
   return quiz_contents;
 }
 
@@ -176,7 +177,7 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
     {
       if(is_fade_in == false)
       {
-        audio_player.stop();
+        // audio_player.stop();
       }
       clearInterval(timer_id);
       console.log("finished fade " + (is_fade_in ? "in" : "out"));
@@ -198,6 +199,8 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
     }
   
   }, interval);
+
+  return timer_id;
 }
 
 exports.getAudioLength = async (audio_file_path) => 
@@ -212,4 +215,31 @@ exports.getBlobLength = () =>
 {
   // https://www.npmjs.com/package/get-blob-duration
   // https://www.npmjs.com/package/ffprobe-duration
+}
+
+exports.getAudioInfo = async (file_path) => 
+{
+  return ffprobe(file_path);
+}
+
+exports.getRandom = (min, max) => 
+{
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+//Deprecated
+exports.getSizeOfMetadata = (file_type) => 
+{
+  //그냥 꼼수로 가져오자... byte 단위다
+  switch(file_type)
+  {
+    case "mp3":
+      return 12288; //AI가 10kb ~ 12kb 정도라 했음
+    case "ogg":
+      return 144; //보통 142
+    case "wav":
+      return 44; //44고정
+    
+    default: return undefined;
+  }
 }
