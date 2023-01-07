@@ -8,10 +8,10 @@ const fs = require('fs');
 const { FORMERR } = require('dns');
 
 //로컬 modules
-const { config } = require('./GAME_CONFIG.js');
-const text_contents = require('./text_contents.json')[config.language]; 
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
+
+const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
-const QUIZ_TYPE = require('./QUIZ_TYPE.json');
 const utility = require('./utility.js');
 
 
@@ -68,15 +68,49 @@ let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있�
 /** exports **/
 //main embed 인스턴스 반환
 exports.createUIHolder = (interaction) => {
-  return new UIHolder(interaction);
+  const uiHolder = new UIHolder(interaction);
+  uiHolder_map[interaction.guild.id] = uiHolder;
+
+  return uiHolder;
 };
 
-//uiHolder_map 반환
-exports.getUIHolderMap = () => {
-  return uiHolder_map;
-};
+exports.getUIHolder = (guild_id) => {
+  if(uiHolder_map.hasOwnProperty(guild_id) == false)
+  {
+    return undefined;
+  }
 
+  return uiHolder_map[guild_id];
+}
 
+exports.startUIHolderAgingManager = () => 
+{
+  return uiHolderAgingManager();
+}
+
+/** UI 관련 함수들 **/
+
+//UI holder Aging Manager
+function uiHolderAgingManager()
+{
+  const uiholder_aging_for_oldkey_value = SYSTEM_CONFIG.ui_holder_aging_manager_criteria * 1000; //last updated time이 일정 값 이전인 ui는 삭제할거임
+  const uiholder_aging_manager = setInterval(()=>{
+  const criteria_value = Date.now() - uiholder_aging_for_oldkey_value; //이거보다 이전에 update 된 것은 삭제
+
+  const keys = Object.keys(uiHolder_map);
+    keys.forEach((key) => {
+      const value = uiHolder_map[key];
+      if(value.last_update_time < criteria_value)
+      {
+        delete uiHolder_map[key]; //삭제~
+      }
+    })
+  }, SYSTEM_CONFIG.ui_holder_aging_manager_interval * 1000); //체크 주기
+
+  return uiholder_aging_manager;
+}
+
+/** UI 프레임 관련 **/
 // UI들 표시해주는 홀더
 class UIHolder 
 {
@@ -113,7 +147,7 @@ class UIHolder
   on(event_name, event_object)
   {
 
-    if(event_name == "interactionCreate")
+    if(event_name == CUSTOM_EVENT_TYPE.interactionCreate)
     {
       let interaction = event_object;
       if(interaction.isButton() && interaction.customId == "back" && this.prev_ui_stack.length > 0) //뒤로가기 버튼 처리
@@ -140,7 +174,12 @@ class UIHolder
   updateUI()
   {
     this.last_update_time = Date.now();
-    this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
+    try{
+      this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
+    }catch(except)
+    {
+      console.log("Interaction Update Fail");
+    }
   }
 
 }
@@ -160,7 +199,7 @@ class QuizbotUI {
   {
     switch(event_name) 
     {
-      case "interactionCreate":
+      case CUSTOM_EVENT_TYPE.interactionCreate:
         return this.onInteractionCreate(event_object);
     }
   }
@@ -498,13 +537,13 @@ class QuizPlayUI extends QuizbotUI
 
     this.embed = {
       color: 0x87CEEB,
-      title: '',
-      description: '',
+      title: '제목칸',
+      description: '설명칸',
       thumbnail: { //퀴즈 섬네일 표시
         url: '',
       },
       footer: { //퀴즈 제작자 표시
-        text: '',
+        text: '현재 퀴즈가 몇번째인지',
       },
     };
 
@@ -529,22 +568,7 @@ class QuizPlayUI extends QuizbotUI
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton()) return;
-
-    if(interaction.customId == 'hint') //힌트 버튼 눌렀을 떄
-    {
-
-    }
-
-    if(interaction.customId == 'skip') //스킵 버튼 눌렀을 떄
-    {
-      
-    }
-
-    if(interaction.customId == 'quiz_stop') //종료 버튼 눌렀을 떄
-    {
-      
-    }
+    return; //QuizPlayUI 에서는 이벤트 핸들링을 하지 않음
   }
 
 }

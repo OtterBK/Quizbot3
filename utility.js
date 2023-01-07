@@ -3,8 +3,8 @@ const fs = require('fs');
 const { getAudioDurationInSeconds } = require('get-audio-duration')
 
 //로컬 modules
-const { config } = require('./GAME_CONFIG.js');
-const QUIZ_TYPE = require('./QUIZ_TYPE.json');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
+
 const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
 
 exports.loadLocalDirectoryQuiz = (contents_path) =>
@@ -154,7 +154,7 @@ exports.parseContentInfoFromDirName = (dir_name) =>
 
 exports.fade_audio_play = async (audio_player, audio_resource, from, to, duration) =>
 {
-  const interval = config.fade_interval; //ms단위
+  const interval = SYSTEM_CONFIG.fade_interval; //ms단위
 
   let current_time = 0;
   let current_volume = from;
@@ -179,6 +179,7 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
         audio_player.stop();
       }
       clearInterval(timer_id);
+      console.log("finished fade " + (is_fade_in ? "in" : "out"));
       return;
     }
 

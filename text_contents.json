@@ -78,6 +78,9 @@
             "ICON_TROPHY": "🏆",
             "ICON_NET": "🙋‍♂️",
 
+            "ICON_PROGRESS_PROGRESSED": "⏩",
+            "ICON_PROGRESS_WATING": "⬜",
+
             "CLOCK_0": "🕛",
             "CLOCK_1": "🕐",
             "CLOCK_2": "🕑",
