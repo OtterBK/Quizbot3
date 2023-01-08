@@ -1,0 +1,204 @@
+{
+    "kor":
+    {
+        "icon": {
+            "ICON_NUM_0": "0️⃣",
+            "ICON_NUM_1": "1️⃣",
+            "ICON_NUM_2": "2️⃣",
+            "ICON_NUM_3": "3️⃣",
+            "ICON_NUM_4": "4️⃣",
+            "ICON_NUM_5": "5️⃣",
+            "ICON_NUM_6": "6️⃣",
+            "ICON_NUM_7": "7️⃣",
+            "ICON_NUM_8": "8️⃣",
+            "ICON_NUM_9": "9️⃣",
+            "PAGE_PREV": "◀️",
+            "PAGE_NEXT": "▶️",
+            "PAGE_PARENT": "↩️",
+            
+            "PLAY_LEFT": "⏪",
+            "PLAY_PAUSE_AND_RESUME": "⏯️",
+            "PLAY_STOP": "⏹️",
+            "PLAY_RIGHT": "⏩",
+            "PLAY_SUB_FAST": "⬅️",
+            "PLAY_SUB_SLOW": "➡️",
+            "PLAY_AUDIO_FAST": "◀️",
+            "PLAY_AUDIO_SLOW": "▶️",
+        
+            "ICON_FOLDER": "📁",
+            "ICON_SEARCH": "🔍",
+            "ICON_QUIZBOT": "🔔",
+            "ICON_LOCALPLAY": "🕹",
+            "ICON_MULTIPLAY": "🌏",
+            "ICON_SETTING": "⚙️",
+            "ICON_INFO": "📒",
+            "ICON_PAGE": "🅿️",
+            "ICON_QUIZ_DEFAULT": "❓",
+            "ICON_WARN": "⚠️",
+            "ICON_BOX": "📦",
+            "ICON_HINT": "💡",
+            "ICON_SKIP": "⏩",
+            "ICON_STOP": "⏹️",
+            "ICON_RULE": "📝",
+            "ICON_TIP": "🔖",
+            "ICON_SOON": "☑️",
+            "ICON_SPEAKER_LOW": "🔉",
+            "ICON_SPEAKER_HIGH": "🔊",
+            "ICON_KEYBOARD": "⌨️",
+            "ICON_SELECTOR": "📋",
+            "ICON_OXQUIZ": "⭕❌",
+            "ICON_RESET": "⛔",
+            "ICON_VERSION": "📌",
+            "ICON_HELP": "❔",
+            "ICON_POINT": "☝️",
+            "ICON_COLLECT": "💯",
+            "ICON_ALARM": "❗",
+            "ICON_NOTICE": "🔶",
+            "ICON_LIST": "📄",
+            "ICON_PEN": "✏️",
+            "ICON_SONG": "🎵",
+            "ICON_REPEAT": "🔁",
+            "ICON_HUMAN": ["👮‍♀️","🕵️‍♀️","🕵️‍♂️","💂‍♂️","💂‍♀️","👷‍♀️","👷‍♂️","👩‍⚕️","👨‍⚕️","👩‍🎓","👨‍🎓","👩‍🏫","👨‍🏫","👩‍⚖️","👨‍⚖️","👩‍🌾","👨‍🌾","👩‍🍳","👨‍🍳","👩‍🔧","👩‍🏭","👨‍🔧","👨‍🏭","👩‍💼","👨‍💼","👩‍🔬","👨‍🔬","👩‍💻","👨‍💻","👩‍🎤","👨‍🎤","👩‍🎨","👨‍🎨","👩‍✈️","👨‍✈️","👩‍🚀","👨‍🚀","👩‍🚒","👨‍🚒","🧕","👰","🤵","🤱","🤰","🦸‍♀️","🦸‍♂️","🦹‍♀️","🦹‍♂️","🧙‍♀️","🧙‍♂️","🧚‍♀️","🧚‍♂️","🧛‍♀️","🧛‍♂️","🧜‍♀️","🧝‍♀️","🧝‍♂️","🧟‍♀️","🧟‍♂️"],
+            "ICON_POINT_TO_LEFT": "👈",
+            "ICON_POINT_TO_RIGHT": "👉",
+            "ICON_WRONG": ["😡","🤮", "😅","🤬","🥵","🥶","😕","☹️","🤨","😐","😦","🤕"],
+            "ICON_MEDAL": ["🏅", "🥇", "🥈", "🥉"],
+            "ICON_MEDAL_GOLD": "🥇",
+            "ICON_MEDAL_SILVER": "🥈",
+            "ICON_MEDAL_BRONZE": "🥉",
+            "ICON_BLIND": "◼",
+            "ICON_PHONE": "📱",
+            "ICON_MAIL": "📧",
+            "ICON_GIT": "🌐",
+            "ICON_FIX": "🛠️",
+            "ICON_GOOD": "👍",
+            "ICON_PATCHNOTE": "📗",
+            "ICON_BOOK_RED": "📕",
+            "ICON_NOTE": "📜",
+            "ICON_CHECK": "✅",
+            "ICON_CHAT": "🗨",
+            "ICON_FIGHT": "🥊",
+            "ICON_TROPHY": "🏆",
+            "ICON_NET": "🙋‍♂️",
+            "ICON_GUILD": "💻",
+
+
+            "ICON_PROGRESS_PROGRESSED": "⏩",
+            "ICON_PROGRESS_WATING": "⬜",
+
+            "CLOCK_0": "🕛",
+            "CLOCK_1": "🕐",
+            "CLOCK_2": "🕑",
+            "CLOCK_3": "🕒",
+            "CLOCK_4": "🕓",
+            "CLOCK_5": "🕔",
+            "CLOCK_6": "🕕",
+            "CLOCK_7": "🕖",
+            "CLOCK_8": "🕗",
+            "CLOCK_9": "🕘",
+            "CLOCK_10": "🕙",
+            "CLOCK_11": "🕚",
+            "CLOCK_12": "🕛",
+        
+            "ICON_TYPE": "📚",
+            "ICON_TYPE_SONG": "🎧",
+            "ICON_TYPE_SCRIPT": "🎙️",
+            "ICON_TYPE_SELECT": "✔️",
+            "ICON_TYPE_PICTURE": "🖼",
+            "ICON_TYPE_OX": "⭕",
+            "ICON_TYPE_QNA": "👨‍🎓",
+            "ICON_TYPE_INTRO": "🎶",
+            "ICON_TYPE_MULTIPLAY": "🛰",
+            "ICON_TYPE_PICTURE_LONG": "🃏",
+            "ALPHABET": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"
+                , "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+            "NUMBER": [ "0️⃣", "1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"],
+            "OX": ["⭕", "❌"] 
+        },
+        "main_menu":
+        {
+            "title": "🔔 퀴즈봇 [3]",
+            "url": "",
+            "thumbnail": {
+                "url": "https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg"
+            },
+            "description": 
+                "🔹서버원들과 함께 다양한 퀴즈를 즐겨보세요!\n\n\n1️⃣)\u1CBC\u1CBC**서버원과 게임하기**\n\n2️⃣)\u1CBC\u1CBC**~~다른 서버와 경쟁하기~~**\n\n3️⃣)\u1CBC\u1CBC**퀴즈 만들기**\n\n4️⃣)\u1CBC\u1CBC**게임 설정**\n\n5️⃣)\u1CBC\u1CBC**공지/패치노트**\n\n\n" ,
+            "total_server": "서버수",
+            "playing_server": "게임중",
+            "competitive_server": "경쟁중"
+        },
+        "select_quiz_type":
+        {
+            "title": "📗 퀴즈 유형 선택",
+            "url": "",
+            "thumbnail": {
+                "url": ""
+            },
+            "description": 
+                "🔹어떤 종류의 퀴즈를 플레이할까요?\n\n\n1️⃣)\u1CBC\u1CBC**개발자 퀴즈**\n🔸 \u1CBC\u1CBC개발자가 만들어 둔 퀴즈입니다.\n\n\n2️⃣)\u1CBC\u1CBC**유저 제작 퀴즈**\n🔸 \u1CBC\u1CBC유저님들이 직접 만든 퀴즈입니다.\n\n\n"
+        },
+        "dev_select_category":
+        {
+            "title": "📗 퀴즈 종류 선택",
+            "url": "",
+            "thumbnail": {
+                "url": ""
+            },
+            "description": 
+                "🔹어떤 퀴즈를 플레이할까요?\n\n\n"
+        },
+        "dev_quiz_info_ui":
+        {
+            "description": 
+                "\u1CBC\n🏷 퀴즈 유형: **${quiz_type_name}**\n📦 문제 개수: **${quiz_size}개**\n\n\n📖 퀴즈 설명:\n${quiz_description}\n\u1CBC\n\u1CBC\n⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\u1CBC\n"
+        },
+        "alert_quiz_start_ui":
+        {
+            "title": 
+                "[ 🎮 **퀴즈 스타트~!** ]",
+            "description": 
+                "\u1CBC\n\u1CBC\n🏷 퀴즈 이름:\u1CBC**[ ${quiz_name} ]**\n\n📦 문제 개수:\u1CBC**[ ${quiz_size}개 ]**\n\n👾 주최자 \u1CBC:\u1CBC**[ ${quiz_owner} ]**\n\n\n"
+        },
+        "quiz_explain":
+        {
+            "title": "📝\u1CBC퀴즈 플레이 방법",
+            "short_answer": [ 
+                "🔖\u1CBC**[ ⌨️ 주관식 퀴즈 정답 제출 방법 ]**\n\u1CBC\n__**/답 <답안>**__\n현재 버전에서는 Discord 정책 상, 명령어로 제출 해야합니다.😥\n(빠른 시일내에 퀴즈봇2에서 사용하던 방식으로 변경하겠습니다.)\n\u1CBC\n\u1CBC\n",
+                "🔖\u1CBC**[ ⌨️ 주관식 퀴즈 정답 작성 요령 ]**\n\u1CBC\n정답은 공백 없이 입력하여도 상관 없습니다.\n특수문자는 입력하지마세요.\n대소문자는 구분할 필요 없습니다.\n줄임말도 정답으로 인정되긴 하나 정확하지 않습니다.\n정답이 영어인 경우에는 발음을 제출해도 정답 인정이 되긴합니다.\n여러 시리즈가 있는 경우에는 시리즈명을 포함해야 정답으로 인정됩니다.\n\u1CBC\n\u1CBC\n",
+                "🔖\u1CBC**[ ❗ 주의 ]**\n\u1CBC\n노래 음량이 일정하지 않습니다. \n봇의 음량를 조금 더 크게 설정해주세요.\u1CBC🔉 => 🔊\n\u1CBC\n\u1CBC\n",
+                "☑️\u1CBC**이제 퀴즈를 시작합니다!**\n"
+            ]
+        },
+        "quiz_play_ui":
+        {
+            "footer": "📦 문제 ${quiz_question_num} / ${quiz_size}\u1CBC| 💡 힌트 ${option_hint_type} \u1CBC ⏭ 스킵 ${option_skip_type}",
+            "description": "\u1CBC\n\u1CBC\n📦\u1CBC**${quiz_question_num}번째 문제입니다.**\u1CBC\n\u1CBC\n"
+        },
+        "timeover_ui":
+        {
+            "title": "[ 😡 **정답 공개** ]",
+            "description": "\u1CBC\n\u1CBC\n📄\u1CBC**정답 목록**\n${question_answers}\n\u1CBC\n${question_author}\n\u1CBC\n",
+            "footer_for_end": "🔶 이제 곧 순위가 공개됩니다.",
+            "footer_for_continue": "🔶 곧 다음 문제로 진행됩니다."
+        },
+        "correct_answer_ui":
+        {
+            "title": "[ 💯 **정답!!!** ]",
+            "description": "\u1CBC\n\u1CBC\n😆\u1CBC정답자: **[ ${answer_username} ]**\n\u1CBC\n📄\u1CBC**정답 목록**\n${question_answers}\n\u1CBC\n${question_author}\u1CBC\n",
+            "footer_for_end": "🔶 이제 곧 순위가 공개됩니다.",
+            "footer_for_continue": "🔶 곧 다음 문제로 진행됩니다."
+        },
+        "scoreboard":
+        {
+            "title": "🧮\u1CBC점수판",
+            "point_name": "점"
+        },
+        "ending_ui":
+        {
+            "title": "[ 🧮 **순위 발표** ]",
+            "nobody_answer": "**헉! 😅 정답자가 아무도 없습니다... \n많이 어려우셨나요...? 😢**\n\u1CBC\n\u1CBC\n",
+            "winner_user_message": "**🏆 최고의 __${winner_nickname}__ ${winner_username}!**\u1CBC\n"
+        }
+    }
+}
