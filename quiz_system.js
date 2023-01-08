@@ -4,9 +4,10 @@
 const fs = require('fs');
 const { getAudioDurationInSeconds } = require('get-audio-duration');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType } = require('@discordjs/voice');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors } = require('discord.js');
 
 //로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE } = require('./system_setting.js');
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('./utility.js');
 const { config } = require('process');
@@ -64,40 +65,114 @@ exports.getQuizSession = (guild_id) => {
     return guild_session_map[guild_id];
 }
 
-exports.startQuiz = (guild, owner, quiz_info, quiz_play_ui) =>
+exports.startQuiz = (guild, owner, channel, quiz_info) =>
 {
-    const quiz_session = new QuizSession(guild, owner, quiz_info, quiz_play_ui);
+    const quiz_session = new QuizSession(guild, owner, channel, quiz_info);
     guild_session_map[guild.id] = quiz_session;
 
     return quiz_session;
 }
 
+exports.getLocalQuizSessionCount = () => {
+    return Object.keys(guild_session_map).length;
+}
+
+exports.getMultiplayQuizSessionCount = () => {
+    return 0; //TODO 나중에 멀티플레이 만들면 수정
+}
+
+
+/***************************/
+
+//퀴즈 플레이에 사용될 UI
+class QuizPlayUI
+{
+  constructor(channel)
+  {
+    this.channel = channel;
+    this.ui_instance = undefined;
+
+    this.embed = {
+      color: 0xFED049,
+      title: '초기화 중입니다.',
+      description: '잠시만 기다려주세요...',
+    };
+
+    this.quiz_play_comp = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+      .setCustomId('hint')
+      .setLabel('힌트')
+      .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('skip')
+        .setLabel('스킵')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('quiz_stop')
+        .setLabel('그만하기')
+        .setStyle(ButtonStyle.Danger),
+    )
+
+    this.components = [ ];
+  }
+
+  async send(previous_delete)
+  {
+    if(previous_delete == true && this.ui_instance != undefined)
+    {
+        this.ui_instance.delete() //이전 UI는 삭제
+        .catch(err => {
+            console.log(`Failed Delete QuizPlayUI: ${err.message}`);
+        });
+    }
+    await this.channel.send({embeds: [ this.embed ], components: this.components}) //await로 대기
+    .then((ui_instance) => {
+        this.ui_instance = ui_instance;
+    })
+    .catch(err => {
+        console.log(`Failed Send QuizPlayUI: ${err.message}`);
+    });
+  }
+
+  async update()
+  {
+    if(this.ui_instance != undefined)
+    {
+        this.ui_instance.edit({embeds: [ this.embed ], components: this.components})
+        .catch(err => {
+            console.log(`Failed Update QuizPlayUI: ${err.message}`);
+        });
+    }
+  }
+
+}
+
+
 //퀴즈 게임용 세션
 class QuizSession
 {
-    constructor(guild, owner, quiz_info, quiz_play_ui)
+    constructor(guild, owner, channel, quiz_info)
     {
         this.guild = guild;
         this.owner = owner;
+        this.channel = channel;
+        this.quiz_info = quiz_info;
         this.voice_channel = owner.voice.channel;
 
         this.guild_id = guild.id;
-        this.quiz_info = quiz_info;
-        this.quiz_ui = quiz_play_ui;
+        this.quiz_ui = undefined; //직접 새로 UI만들자
 
-        this.voice_connection = joinVoiceChannel({
-            channelId: this.voice_channel.id,
-            guildId: this.guild.id,
-            adapterCreator: this.guild.voiceAdapterCreator,
-        }); //보이스 커넥션
-        this.audio_player = createAudioPlayer();
-        this.voice_connection.subscribe(this.audio_player);
+        this.voice_connection = undefined;
+        this.audio_player = undefined;
 
         this.lifecycle_map = {};
         this.current_cycle_type = CYCLE_TYPE.UNDEFINED;
 
         this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
         this.game_data = undefined; //얘는 자주 바뀐다.
+
+        this.scoreboard = new Map(); //scoreboard 
 
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
@@ -112,6 +187,8 @@ class QuizSession
         this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new Questioning(this));
         this.inputLifeCycle(CYCLE_TYPE.CORRECTANSWER, new CorrectAnswer(this));
         this.inputLifeCycle(CYCLE_TYPE.TIMEOVER, new TimeOver(this));
+        this.inputLifeCycle(CYCLE_TYPE.ENDING, new Ending(this));
+        this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this));
         
 
         this.cycleLoop();
@@ -122,7 +199,7 @@ class QuizSession
         this.lifecycle_map[cycle_type] = cycle;
     }
 
-    cycleLoop()
+    cycleLoop() //비동기로 처리해주자
     {
         this.goToCycle(CYCLE_TYPE.INITIALIZING);
     }
@@ -148,6 +225,7 @@ class QuizSession
         target_cycle.do();
     }
 
+    /** 세션 이벤트 핸들링 **/
     on(event_name, event_object)
     {
         const current_cycle = this.getCycle(this.current_cycle_type)
@@ -220,6 +298,47 @@ class QuizLifecycle
         this.quiz_session.goToCycle(this.next_cycle);
     }
 
+    //공통 함수
+    //스코어보드 fields 가져오기
+    getScoreboardFields()
+    {
+        let scoreboard = this.quiz_session.scoreboard;
+        let scoreboard_fields = [];
+        
+        if(scoreboard.size > 0)
+        {
+            scoreboard = utility.sortMapByValue(scoreboard); //우선 정렬 1번함
+            this.quiz_session.scoreboard = scoreboard;
+
+            scoreboard_fields.push(
+                {
+                    name: text_contents.scoreboard.title,
+                    value: '\u1CBC\n',
+                },
+                // {
+                //     name: '\u200b',
+                //     value: '\u200b',
+                //     inline: false,
+                // },
+            )
+
+            const show_count = SYSTEM_CONFIG.scoreboard_show_max == -1 ? scoreboard.size : SYSTEM_CONFIG.scoreboard_show_max;
+
+            const iter = scoreboard.entries();
+            for(let i = 0; i < show_count; ++i)
+            {
+                const [member, score] = iter.next().value;
+                scoreboard_fields.push({
+                    name: member.displayName,
+                    value: `${score}${text_contents.scoreboard.point_name}`,
+                    inline: true
+                });
+            }
+        }
+
+        return scoreboard_fields;
+    }
+
     //이벤트 처리(비동기로 해도 무방)
     async on(event_name, event_object)
     {
@@ -247,122 +366,145 @@ class Initializing extends QuizLifecycle
         this.next_cycle = CYCLE_TYPE.EXPLAIN;
     }
 
+    async enter()
+    {
+        const voice_channel = this.quiz_session.voice_channel;
+        const guild = this.quiz_session.guild;
+
+        const voice_connection = joinVoiceChannel({
+            channelId: voice_channel.id,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+        }); //보이스 커넥션
+
+        const audio_player = createAudioPlayer();
+        voice_connection.subscribe(audio_player);
+
+        this.quiz_session.voice_connection = voice_connection;
+        this.quiz_session.audio_player = audio_player;
+    }
+
     async act()
     {
-       //우선 quiz_info 에서 필요한 내용만 좀 뽑아보자
-       const quiz_info = this.quiz_session.quiz_info;
+        let quiz_ui = new QuizPlayUI(this.quiz_session.channel);
+        await quiz_ui.send(true); //처음에는 기다려줘야한다. 안그러면 explain 단계에서 update할 ui가 없어서 안됨
+        this.quiz_session.quiz_ui = quiz_ui;
 
-       let quiz_data = {};
-       quiz_data['title'] = quiz_info['title'];
-       quiz_data['description'] = quiz_info['description'];
-       quiz_data['author'] = quiz_info['author'];
-       quiz_data['quiz_type'] = quiz_info['quiz_type'];
-       quiz_data['quiz_size'] = quiz_info['quiz_size'];
-       quiz_data['thumbnail'] = quiz_info['thumbnail'];
-       quiz_data['winner_nickname'] = quiz_info['winner_nickname'];
 
-       //실제 퀴즈들 로드
-       let quiz_path = quiz_info['quiz_path']; //Dev 퀴즈, 개발자 퀴즈면은 quiz_path 값이 있다.
-       let quiz_id = quiz_info['quiz_id']; //유저 제작 퀴즈면 quiz_id 값이 있다.
-       if(quiz_path == undefined && quiz_id == undefined) //엥? 근데 둘다 없다?
-       {
-           //TODO 뭔가가...잘못됐다는 메시지
-           return;
-       }
+        //우선 quiz_info 에서 필요한 내용만 좀 뽑아보자
+        const quiz_info = this.quiz_session.quiz_info;
 
-       let quiz_list = [];
-       if(quiz_path != undefined) //Dev 퀴즈일 경우
-       {
-           //TODO 아 인트로 퀴즈도 있고 그림퀴즈도 있고 쨋든 종류가 많은데, 너무 예전이라 기억이 안난다. 우선 노래 퀴즈 중점으로 만들고 고치자
-           const quiz_folder_list = fs.readdirSync(quiz_path); //TODO 여기도 그냥 정적으로 읽어올까..?
-           
-           quiz_folder_list.forEach(quiz_folder_name => {
-               
-               if(quiz_folder_name.includes(".txt")) return;
+        let quiz_data = {};
+        quiz_data['title'] = quiz_info['title'];
+        quiz_data['description'] = quiz_info['description'];
+        quiz_data['author'] = quiz_info['author'];
+        quiz_data['quiz_type'] = quiz_info['quiz_type'];
+        quiz_data['quiz_size'] = quiz_info['quiz_size'];
+        quiz_data['thumbnail'] = quiz_info['thumbnail'];
+        quiz_data['winner_nickname'] = quiz_info['winner_nickname'];
 
-               let quiz = {};
+        //실제 퀴즈들 로드
+        let quiz_path = quiz_info['quiz_path']; //Dev 퀴즈, 개발자 퀴즈면은 quiz_path 값이 있다.
+        let quiz_id = quiz_info['quiz_id']; //유저 제작 퀴즈면 quiz_id 값이 있다.
+        if(quiz_path == undefined && quiz_id == undefined) //엥? 근데 둘다 없다?
+        {
+            //TODO 뭔가가...잘못됐다는 메시지
+            return;
+        }
 
-               quiz['type'] = quiz_data['quiz_type'];
-
-               let author_string = undefined;
-
-               let try_parse_author =  quiz_folder_name.split("&^"); //가수는 &^로 끊었다.
-               if(try_parse_author.length > 1) //가수 데이터가 있다면 넣어주기
-               {
-                author_string = try_parse_author[1];
-
-                let authors = [];
-                author_string.split("&^").forEach((author_row) => {
-                    const author = author_row.trim();
-                    authors.push(author);
-                })
-
-                quiz['author'] = authors;
-               }
-
-               //정답 키워드 파싱
-               let answer_string = try_parse_author[0];
-               answer_string = quiz_folder_name.split("&^")[0];
-               let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
-
-               let answers = [];
-               answers_row.forEach((answer_row) => {
-
-                answer_row = answer_row.trim()
-
-                //유사 정답 추측
-                let similar_answer = '';
-                const words = answer_row.split(" ");
-                if(words.length > 1)
-                {
-                    words.forEach((split_answer) => {
-                        if(split_answer.length == 0 || split_answer == ' ')
-                            return;
-                        similar_answer += split_answer.substring(0,1);
-                    });
-
-                    similar_answer = similar_answer.toLowerCase();
-                }
-
-                if(similar_answer != '')
-                {
-                    if(answers.includes(similar_answer) == false)
-                        answers.push(similar_answer);
-                }
+        let quiz_list = [];
+        if(quiz_path != undefined) //Dev 퀴즈일 경우
+        {
+            //TODO 아 인트로 퀴즈도 있고 그림퀴즈도 있고 쨋든 종류가 많은데, 너무 예전이라 기억이 안난다. 우선 노래 퀴즈 중점으로 만들고 고치자
+            const quiz_folder_list = fs.readdirSync(quiz_path); //TODO 여기도 그냥 정적으로 읽어올까..?
+            
+            quiz_folder_list.forEach(quiz_folder_name => {
                 
-                const answer = answer_row.replace(/ /g,"").toLowerCase(); // /문자/gi 로 replace하면 replaceAll 로 동작, g = 전역검색 i = 대소문자 미구분
-                if(answers.includes(answer) == false)
-                        answers.push(answer);
-               });
+                if(quiz_folder_name.includes(".txt")) return;
 
-               quiz['answers'] = answers;
-               
-               const quiz_folder_path = quiz_path + "/" + quiz_folder_name + "/";
-               const quiz_file_list = fs.readdirSync(quiz_folder_path);
-               quiz_file_list.forEach(quiz_folder_filename => {
-                   if(quiz_folder_filename.includes("&^")) //TODO 내가 정답 우선순위를 폴더명 기준으로 했는지, 노래파일 기준으로 했는지 기억이 안난다. 확인하고 처리할 것
-                   {
+                let quiz = {};
 
-                   }
-                   quiz['question'] = quiz_folder_path + "/" + quiz_folder_filename;
-               });
+                quiz['type'] = quiz_data['quiz_type'];
 
-               quiz_list.push(quiz);
-           });
-       }
+                let author_string = undefined;
 
-       quiz_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
-       quiz_data['quiz_list'] = quiz_list;
-       quiz_data['quiz_size'] = quiz_list.length; //퀴즈 수 재정의 하자
+                let try_parse_author =  quiz_folder_name.split("&^"); //가수는 &^로 끊었다.
+                if(try_parse_author.length > 1) //가수 데이터가 있다면 넣어주기
+                {
+                    author_string = try_parse_author[1];
 
-       this.quiz_session.quiz_data = quiz_data;
+                    let authors = [];
+                    author_string.split("&^").forEach((author_row) => {
+                        const author = author_row.trim();
+                        authors.push(author);
+                    })
 
-       this.quiz_session.game_data = {
-            'question_num': -1, //현재 내야하는 문제번호
-            'scoreboard': {}, //점수표
-            'ranking_list': [], //순위표
-            'prepared_quiz_queue': [], //PREPARE Cycle을 거친 퀴즈 큐
-       };
+                    quiz['author'] = authors;
+                }
+
+                //정답 키워드 파싱
+                let answer_string = try_parse_author[0];
+                answer_string = quiz_folder_name.split("&^")[0];
+                let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
+
+                let answers = [];
+                answers_row.forEach((answer_row) => {
+
+                    answer_row = answer_row.trim()
+
+                    //유사 정답 추측
+                    let similar_answer = '';
+                    const words = answer_row.split(" ");
+                    if(words.length > 1)
+                    {
+                        words.forEach((split_answer) => {
+                            if(split_answer.length == 0 || split_answer == ' ')
+                                return;
+                            similar_answer += split_answer.substring(0,1);
+                        });
+
+                        similar_answer = similar_answer.toLowerCase();
+                    }
+
+                    if(similar_answer != '')
+                    {
+                        if(answers.includes(similar_answer) == false)
+                            answers.push(similar_answer);
+                    }
+                    
+                    const answer = answer_row.replace(/ /g,"").toLowerCase(); // /문자/gi 로 replace하면 replaceAll 로 동작, g = 전역검색 i = 대소문자 미구분
+                    if(answers.includes(answer) == false)
+                            answers.push(answer);
+                });
+
+                quiz['answers'] = answers;
+                
+                const quiz_folder_path = quiz_path + "/" + quiz_folder_name + "/";
+                const quiz_file_list = fs.readdirSync(quiz_folder_path);
+                quiz_file_list.forEach(quiz_folder_filename => {
+                    if(quiz_folder_filename.includes("&^")) //TODO 내가 정답 우선순위를 폴더명 기준으로 했는지, 노래파일 기준으로 했는지 기억이 안난다. 확인하고 처리할 것
+                    {
+
+                    }
+                    quiz['question'] = quiz_folder_path + "/" + quiz_folder_filename;
+                });
+
+                quiz_list.push(quiz);
+            });
+        }
+
+        quiz_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
+        quiz_data['quiz_list'] = quiz_list;
+        quiz_data['quiz_size'] = quiz_list.length; //퀴즈 수 재정의 하자
+
+        this.quiz_session.quiz_data = quiz_data;
+
+        this.quiz_session.game_data = {
+                'question_num': -1, //현재 내야하는 문제번호
+                'scoreboard': {}, //점수표
+                'ranking_list': [], //순위표
+                'prepared_quiz_queue': [], //PREPARE Cycle을 거친 퀴즈 큐
+        };
     }
 
     async exit()
@@ -383,7 +525,36 @@ class Explain extends QuizLifecycle
 
     async act()
     {
-        //TODO 퀴즈 설명
+        const quiz_data = this.quiz_session.quiz_data;
+        const quiz_type = ['quiz_type'];
+        let quiz_ui = this.quiz_session.quiz_ui;
+
+        quiz_ui.embed.color = 0xFED049,
+
+        quiz_ui.embed.title = text_contents.quiz_explain.title;
+        quiz_ui.embed.description = '\u1CBC\n\u1CBC\n';
+
+        quiz_ui.components = [];
+
+        const explain_type = EXPLAIN_TYPE.ShortAnswerType;
+        //TODO 퀴즈 타입에 따라 설명 다르게
+
+        const explain_list = text_contents.quiz_explain[explain_type];
+        for(let i = 0; i < explain_list.length; ++i)
+        {
+            const explain = explain_list[i];
+            quiz_ui.embed.description += explain;
+            utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.PLING);
+            quiz_ui.update();
+            
+            await new Promise((resolve, reject) =>
+            {
+                setTimeout(() => {
+                    //그냥 sleep용
+                    resolve();
+                },SYSTEM_CONFIG.explain_wait);
+            });
+        }
     }
 }
 
@@ -427,7 +598,12 @@ class Prepare extends QuizLifecycle
             || quiz_type == QUIZ_TYPE.INTRO
         )   
         {
-            await this.prepareAudio(target_quiz);
+            try{
+                await this.prepareAudio(target_quiz);
+            }catch(error)
+            {
+                console.log(`Failed Prepare Audio[${target_quiz['question']}]: ${error.message}`);
+            }
         }
 
         game_data.prepared_quiz_queue.push(target_quiz);
@@ -482,7 +658,10 @@ class Prepare extends QuizLifecycle
 
         console.log(`audio cut start: ${audio_start_point/audio_byterate} end: ${audio_end_point/audio_byterate}`);
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point ?? Infinity});
-        audio_stream_for_close = [audio_stream];
+        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
+        {
+            audio_stream_for_close = [audio_stream];
+        }
 
         let resource = undefined;
         let inputType = StreamType.WebmOpus;
@@ -550,17 +729,26 @@ class Questioning extends QuizLifecycle
         {
             this.next_cycle = CYCLE_TYPE.ENDING;
             this.skip_prepare_cycle = true;
+            this.current_quiz = undefined;
+            console.log("finished quiz");
             return; //더 이상 진행할 게 없다.
         }
+
+        //진행 UI 관련
+        let quiz_ui = await this.createUI();
+        const essential_term = Date.now() + 3000; //최소 문제 제출까지 3초간의 텀은 주자
 
         //이전 퀴즈 resource 해제
         const previous_quiz = game_data['processing_quiz'];
         if(previous_quiz != undefined)
         {
-            const audio_stream_for_close = previous_quiz['audio_stream_for_close'];
-            if(audio_stream_for_close != undefined)
+            if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 STREAM 명시적으로 닫음
             {
-                audio_stream_for_close.forEach((audio_stream) => audio_stream.close());
+                const audio_stream_for_close = previous_quiz['audio_stream_for_close'];
+                if(audio_stream_for_close != undefined)
+                {
+                    audio_stream_for_close.forEach((audio_stream) => audio_stream.close());
+                }
             }
 
             const fade_out_timer = previous_quiz['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
@@ -589,15 +777,30 @@ class Questioning extends QuizLifecycle
         
         this.current_quiz = game_data.prepared_quiz_queue.shift(); //하나 꺼내오자
         this.quiz_session.audio_player.stop(); //시작 전엔 audio stop 걸고 가자
+        utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.ROUND_ALARM);
+        
+
+        //이제 문제 준비가 끝났다. 마지막으로 최소 텀 지키고 ㄱㄱ
+        const left_term = essential_term - Date.now();
+        if(left_term < 0) 
+        {
+            return;
+        }
+        await new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve();
+            }, left_term);
+        });
     }
 
     async act()
     {
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
+        let quiz_ui = this.quiz_session.quiz_ui;
 
         const current_quiz = this.current_quiz;
-        if(current_quiz == undefined) //제출할 퀴즈가 없으면 패스
+        if(current_quiz == undefined || this.next_cycle == CYCLE_TYPE.ENDING) //제출할 퀴즈가 없으면 패스
         {
             return;
         }
@@ -611,10 +814,8 @@ class Questioning extends QuizLifecycle
         const question = current_quiz['question'];
 
         console.log(`questioning ${question}`);
-        
-        //주의! inline volume 옵션 사용 시, 성능 떨어짐
-        //fateIn, fateOut 구현을 위해 inline volume 사용해야할 듯...
 
+        //오디오 재생 부
         const resource = current_quiz['audio_resource'];
         
         //비동기로 오디오 재생 시켜주고
@@ -651,36 +852,7 @@ class Questioning extends QuizLifecycle
             this.fade_out_timer = fade_out_timer;
         }
 
-        //진행 상황 bar, 10%마다 호출하자
-        const progress_max_percentage = 10;
-        const progress_bar_interval = audio_play_time / progress_max_percentage;
-        let progress_percentage = 0;
-        const progress_bar_timer = setInterval(() => {
-
-            console.log("timeout_log_progress_bar");
-
-            ++progress_percentage
-            if(progress_percentage == progress_max_percentage)
-            {
-                clearInterval(this.progress_bar_timer);
-            }
-
-            let progress_bar_string = '';
-            for(let i = 0; i < progress_max_percentage; i++)
-            {
-                if(i < progress_percentage)
-                {
-                    progress_bar_string += text_contents.icon.ICON_PROGRESS_PROGRESSED;
-                }
-                else
-                {
-                    progress_bar_string += text_contents.icon.ICON_PROGRESS_WATING;
-                }
-            }
-
-        }, progress_bar_interval);
-
-        this.progress_bar_timer = progress_bar_timer;
+        this.startProgressBar(audio_play_time);
 
         let is_timeover = false;
         const timeover_promise = new Promise(async (resolve, reject) => {
@@ -743,8 +915,92 @@ class Questioning extends QuizLifecycle
         }
     }
 
+    //UI관련
+    async createUI()
+    {
+        let quiz_info = this.quiz_session.quiz_info;
+        let quiz_data = this.quiz_session.quiz_data;
+        let game_data = this.quiz_session.game_data;
+        const quiz_ui = this.quiz_session.quiz_ui;
+
+        quiz_ui.embed.color = 0xFED049;
+
+        quiz_ui.embed.title = `[\u1CBC${quiz_info['icon']}${quiz_data['title']}\u1CBC]`;
+        
+        let footer_message = text_contents.quiz_play_ui.footer;
+        footer_message = footer_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
+        footer_message = footer_message.replace("${quiz_size}", `${(quiz_data['quiz_size'])}`);
+        footer_message = footer_message.replace("${option_hint_type}", `투표`); //TODO 옵션 만들면 적용
+        footer_message = footer_message.replace("${option_skip_type}", `투표`);
+        quiz_ui.embed.footer = {
+            "text": footer_message,
+        }
+        let description_message = text_contents.quiz_play_ui.description;
+        description_message = description_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
+        quiz_ui.embed.description = description_message;
+
+        quiz_ui.components = [quiz_ui.quiz_play_comp];
+
+        quiz_ui.embed.fields = [];
+
+        await quiz_ui.send(false);
+
+        return quiz_ui;
+    }
+
+    async startProgressBar(audio_play_time)
+    {
+        //진행 상황 bar, 10%마다 호출하자
+        const progress_max_percentage = 10;
+        const progress_bar_interval = audio_play_time / progress_max_percentage;
+        let progress_percentage = 0; //시작은 0부터
+        
+        let quiz_ui = this.quiz_session.quiz_ui;
+
+        let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
+        quiz_ui.embed.description = `\u1CBC\n\u1CBC\n🕛\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+        quiz_ui.update(); // 우선 한 번은 그냥 시작해주고~
+
+        const progress_bar_timer = setInterval(() => {
+
+            console.log("timeout_log_progress_bar");
+
+            ++progress_percentage
+
+            let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
+
+            quiz_ui.embed.description = `\u1CBC\n\u1CBC\n🕛\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+            quiz_ui.update();
+
+        }, progress_bar_interval);
+
+        this.progress_bar_timer = progress_bar_timer;
+    }
+
+    getProgressBarString(progress_percentage, progress_max_percentage)
+    {
+        if(progress_percentage == progress_max_percentage)
+        {
+            clearInterval(this.progress_bar_timer);
+        }
+
+        let progress_bar_string = '';
+        for(let i = 0; i < progress_max_percentage; i++)
+        {
+            if(i <= progress_percentage)
+            {
+                progress_bar_string += text_contents.icon.ICON_PROGRESS_PROGRESSED;
+            }
+            else
+            {
+                progress_bar_string += text_contents.icon.ICON_PROGRESS_WATING;
+            }
+        }
+        return progress_bar_string;
+    }
+
     //정답 맞췄을 때
-    submittedCorrectAnswer(member)
+    async submittedCorrectAnswer(member)
     {
         if(this.current_quiz['answer_user'] != undefined) //이미 맞춘사람 있다면 패스
         {
@@ -761,6 +1017,18 @@ class Questioning extends QuizLifecycle
                 clearTimeout(this.fade_out_timer); //fadeout timer 중지
             }
             this.timeover_resolve('Submitted correct Answer'); //Promise await 취소
+
+            const score = undefined;
+            let scoreboard = this.quiz_session.scoreboard;
+            if(scoreboard.has(member))
+            {
+                const prev_score = scoreboard.get(member);
+                scoreboard.set(member, prev_score + 1); //1점 추가~
+            }
+            else
+            {
+                scoreboard.set(member, 1); //1점 등록~
+            }
         }
     }
 
@@ -773,9 +1041,22 @@ class Questioning extends QuizLifecycle
             if(submit_answer == '') return;
             submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
             
-            if(this.answers.includes(submit_answer) || true)
+            if(this.answers.includes(submit_answer))
             {
                 this.submittedCorrectAnswer(interaction.member);
+                let message = "```" + interaction.member.displayName + ": [" + submit_answer + "]... 정답입니다!```"
+                interaction.reply({content: message})
+                .catch(error => {
+                    console.log(`Failed to replay to correct submit ${error}`);
+                });
+            }
+            else
+            {
+                let message = "```" + interaction.member.displayName + ": [" + submit_answer + "]... 땡입니다!```"
+                interaction.reply({content: message})
+                .catch(error => {
+                    console.log(`Failed to replay to wrong submit ${error}`);
+                });;
             }
         
             return;
@@ -795,13 +1076,58 @@ class TimeOver extends QuizLifecycle
 
     async enter()
     {
+        //정답 표시
+        const quiz_data = this.quiz_session.quiz_data;
+        const game_data = this.quiz_session.game_data;
+        const processing_quiz = game_data['processing_quiz'];
 
+        let quiz_ui = this.quiz_session.quiz_ui;
+
+        quiz_ui.embed.color = 0X850000;
+
+        quiz_ui.embed.title = text_contents.timeover_ui.title;
+
+        let description_message = text_contents.timeover_ui.description;
+        let answer_list_message = '';
+        const answers = processing_quiz['answers'];
+        answers.forEach((answer) => {
+            answer_list_message += answer + "\n";
+        });
+        let author_list_message = '';
+        const author_list = processing_quiz['author'];
+        author_list.forEach((author) => {
+            author_list_message += author + "\n";
+        });
+        description_message = description_message.replace('${question_answers}', answer_list_message);
+        description_message = description_message.replace('${question_author}', author_list_message);
+        quiz_ui.embed.description = description_message;
+
+        const is_last_question = game_data['question_num'] >= quiz_data['quiz_size'];
+        if(is_last_question)
+        {
+            quiz_ui.embed.footer =  {
+                "text": text_contents.timeover_ui.footer_for_end
+            }
+        }
+        else
+        {
+            quiz_ui.embed.footer = {
+                "text": text_contents.timeover_ui.footer_for_continue
+            }
+        }
+
+        quiz_ui.components = [];
+
+        const scoreboard_fields = this.getScoreboardFields();
+
+        quiz_ui.embed.fields = scoreboard_fields;
+
+        quiz_ui.send(true);
     }
 
     async act()
     {
-        //TODO 타입오버는 정답 표시
-
+        utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.FAIL);
         const wait_time = SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 보여줄 지
         await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
@@ -824,7 +1150,60 @@ class CorrectAnswer extends QuizLifecycle
 
     async enter()
     {
+        //정답자 표시
+        const quiz_data = this.quiz_session.quiz_data;
+        const game_data = this.quiz_session.game_data;
+        const processing_quiz = game_data['processing_quiz'];
+        const answer_user = processing_quiz['answer_user'];
+        let answer_user_nickname = "???";
+        if(answer_user != undefined)
+        {
+            answer_user_nickname = answer_user.displayName;
+        }
 
+        let quiz_ui = this.quiz_session.quiz_ui;
+
+        quiz_ui.embed.color = 0x54B435;
+
+        quiz_ui.embed.title = text_contents.correct_answer_ui.title;
+
+        let description_message = text_contents.correct_answer_ui.description;
+        let answer_list_message = '';
+        const answers = processing_quiz['answers'];
+        answers.forEach((answer) => {
+            answer_list_message += answer + "\n";
+        });
+        let author_list_message = '';
+        const author_list = processing_quiz['author'];
+        author_list.forEach((author) => {
+            author_list_message += author + "\n";
+        });
+        description_message = description_message.replace('${answer_username}', answer_user_nickname); //정답 ui은 이거 추가됏음
+        description_message = description_message.replace('${question_answers}', answer_list_message);
+        description_message = description_message.replace('${question_author}', author_list_message);
+        quiz_ui.embed.description = description_message;
+
+        const is_last_question = game_data['question_num'] >= quiz_data['quiz_size'];
+        if(is_last_question)
+        {
+            quiz_ui.embed.footer =  {
+                "text": text_contents.correct_answer_ui.footer_for_end
+            }
+        }
+        else
+        {
+            quiz_ui.embed.footer = {
+                "text": text_contents.correct_answer_ui.footer_for_continue
+            }
+        }
+
+        quiz_ui.components = [];
+
+        const scoreboard_fields = this.getScoreboardFields();
+
+        quiz_ui.embed.fields = scoreboard_fields;
+
+        quiz_ui.send(true);
     }
 
     async act()
@@ -854,12 +1233,98 @@ class Ending extends QuizLifecycle
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_cycle = CYCLE_TYPE.ENDING;
+        this.next_cycle = CYCLE_TYPE.FINISH;
     }
 
     async act()
     {
+        const quiz_info = this.quiz_session.quiz_info;
+        const quiz_data = this.quiz_session.quiz_data;
+        const quiz_type = ['quiz_type'];
+        let quiz_ui = this.quiz_session.quiz_ui;
 
+        quiz_ui.embed.color = 0xFED049,
+
+        quiz_ui.embed.title = text_contents.ending_ui.title;
+        quiz_ui.embed.description = `${quiz_info['icon']}${quiz_data['title']}\n\u1CBC\n\u1CBC\n`;
+        quiz_ui.embed.footer = undefined //footer 없앰
+
+        quiz_ui.embed.fields = [ //페이크 필드
+            {
+                name: '\u1CBC\n',
+                value: '\u1CBC\n',
+            },
+        ];
+
+        utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.BELL);
+
+        await quiz_ui.send(false);
+
+        await utility.sleep(SYSTEM_CONFIG.ending_wait);
+
+        let scoreboard = this.quiz_session.scoreboard;
+        if(scoreboard.size == 0) //정답자가 없다면
+        {
+            quiz_ui.embed.description += text_contents.ending_ui.nobody_answer;
+            utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.FAIL);
+            quiz_ui.update();
+            await utility.sleep(SYSTEM_CONFIG.ending_wait); 
+        }
+        else
+        {
+            scoreboard = utility.sortMapByValue(scoreboard); //정렬 해주고
+            let iter = scoreboard.entries();
+            
+            let winner_member = undefined;
+            for(let i = 0; i < scoreboard.size; ++i)
+            {
+                const [member, score] = iter.next().value;
+
+                let medal = '🧐';
+                switch(i)
+                {
+                    case 0: {
+                        winner_member = member;
+                        medal = text_contents.icon.ICON_MEDAL_GOLD; 
+                        break;
+                    }
+                    case 1: medal = text_contents.icon.ICON_MEDAL_SILVER; break;
+                    case 2: medal = text_contents.icon.ICON_MEDAL_BRONZE; break;
+                }
+
+                if(i == 3) //3등과 간격 벌려서
+                {
+                    quiz_ui.embed.description += `\u1CBC\n\u1CBC\n`;
+                }
+                quiz_ui.embed.description += `${medal} ${member.displayName} \u1CBC\u1CBC ${score}${text_contents.scoreboard.point_name}\n`;
+                if(i < 3) //3등까지는 하나씩 보여줌
+                {
+                    quiz_ui.embed.description += `\u1CBC\n`; //3등까지는 간격도 늘려줌
+                    utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.SCORE_ALARM);
+                    quiz_ui.update();
+                    await utility.sleep(SYSTEM_CONFIG.ending_wait);
+                    continue;
+                }
+            }
+
+            if(scoreboard.size > 3) //나머지 더 보여줄 사람 있다면
+            {
+                utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.SCORE_ALARM);
+                quiz_ui.update();
+                await utility.sleep(SYSTEM_CONFIG.ending_wait);
+            }
+
+            //1등 칭호 보여줌
+            quiz_ui.embed.description += `\u1CBC\n\u1CBC\n`;
+            let top_score_description_message = text_contents.ending_ui.winner_user_message;
+            top_score_description_message = top_score_description_message.replace('${winner_nickname}', quiz_info['winner_nickname']);
+            top_score_description_message = top_score_description_message.replace('${winner_username}', winner_member.displayName);
+            quiz_ui.embed.description += top_score_description_message;
+        }
+        
+        utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.ENDING);
+        quiz_ui.update();
+        await utility.sleep(SYSTEM_CONFIG.ending_wait); 
     }
 }
 

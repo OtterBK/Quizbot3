@@ -14,6 +14,7 @@ const { CUSTOM_EVENT_TYPE } = require('./system_setting.js');
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
 const quiz_system = require('./quiz_system.js');
+const utility = require('./utility.js');
 
 /** global 변수 **/
 
@@ -24,8 +25,10 @@ client.on('ready', () => {
   console.log(`Initializing Quizbot...`);
 
   ///////////
-  console.log(`Starting UI Holder Aging Manager`)
+  console.log(`Starting UI Holder Aging Manager`);
   quizbot_ui.startUIHolderAgingManager();
+  console.log(`Starting GuildCount Manager`);
+  quizbot_ui.startGuildsCountManager(client);
 
   ///////////
   console.log(`Register commands...`);

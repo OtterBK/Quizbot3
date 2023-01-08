@@ -64,6 +64,7 @@ const control_btn_row = new ActionRowBuilder()
 
 /** global 변수 **/
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
+let guilds_count = 0; //봇이 참가 중인 guilds 수
 
 /** exports **/
 //main embed 인스턴스 반환
@@ -88,6 +89,11 @@ exports.startUIHolderAgingManager = () =>
   return uiHolderAgingManager();
 }
 
+exports.startGuildsCountManager = (client) => 
+{
+  return guildsCountManager(client);
+}
+
 /** UI 관련 함수들 **/
 
 //UI holder Aging Manager
@@ -110,6 +116,19 @@ function uiHolderAgingManager()
   return uiholder_aging_manager;
 }
 
+function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
+{
+  const guilds_count_manager_interval = SYSTEM_CONFIG.guilds_count_manager_interval * 1000; //last updated time이 일정 값 이전인 ui는 삭제할거임
+
+  guilds_count = client.guilds.cache.size; //처음에 한번 체크
+
+  const guilds_count_manager = setInterval(()=>{
+    guilds_count = client.guilds.cache.size;
+  }, guilds_count_manager_interval);
+
+  return guilds_count_manager;
+}
+
 /** UI 프레임 관련 **/
 // UI들 표시해주는 홀더
 class UIHolder 
@@ -122,10 +141,11 @@ class UIHolder
     this.guild_id = interaction.guild.id;
     this.ui = new MainUI();
 
+    this.initialized = false;
     this.prev_ui_stack = []; //뒤로가기용 UI스택
 
     this.last_update_time = Date.now(); //uiholder aging manager에서 삭제 기준이될 값
-    this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
+    this.updateUI();
   }
 
   getUI()
@@ -174,11 +194,21 @@ class UIHolder
   updateUI()
   {
     this.last_update_time = Date.now();
-    try{
-      this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()} );
-    }catch(except)
+
+    if(this.initialized == false)
     {
-      console.log("Interaction Update Fail");
+      this.initialized = true;
+      this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
+      .catch((err) => {
+        console.log(`UpdateUI failed: ${err.message}`);
+      });
+    }
+    else
+    {
+      this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
+      .catch((err) => {
+        console.log(`UpdateUI failed: ${err.message}`);
+      });
     }
   }
 
@@ -253,17 +283,17 @@ class MainUI extends QuizbotUI
         },
         {
           name: text_contents.main_menu.total_server,
-          value: '💻 30', //TODO 플레이어 수 제대로 표시할 것
+          value: `${text_contents.icon.ICON_GUILD} ${guilds_count}`, //TODO 플레이어 수 제대로 표시할 것
           inline: true,
         },
         {
           name: text_contents.main_menu.playing_server,
-          value: '🕹 10',
+          value: `${text_contents.icon.ICON_LOCALPLAY} ${quiz_system.getLocalQuizSessionCount()}`,
           inline: true,
         },
         {
           name: text_contents.main_menu.competitive_server,
-          value: '🌎 20',
+          value: `${text_contents.icon.ICON_MULTIPLAY} ${quiz_system.getMultiplayQuizSessionCount()}`,
           inline: true,
         },
       ],
@@ -373,10 +403,17 @@ class DevQuizSelectUI extends QuizbotUI
     {
       const cur_content = page_contents[i];
       let message = text_contents.icon["ICON_NUM_"+(i+1)];
-      contents_message += message + ")\u1CBC\u1CBC" + cur_content.icon + " " + cur_content.name + "\n\n";
+      contents_message += `${message}${")\u1CBC\u1CBC"}${cur_content.icon} ${cur_content.name}\n\n`;
     }
 
-    this.embed.description = contents_message;
+    // contents_message += "\u1CBC\u1CBC\n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
+    this.embed.description = contents_message + "\u1CBC\n";
+
+    let page_message = `${text_contents.icon.ICON_PAGE} ${page_num + 1} / ${total_page}`;
+    // page_message += `| ${text_contents.icon.ICON_FOLDER} ${page_num + 1}`;
+    this.embed.footer = { 
+      text: page_message,
+    };
   }
 
   onInteractionCreate(interaction)
@@ -394,7 +431,7 @@ class DevQuizSelectUI extends QuizbotUI
     
     if(interaction.customId == 'next')
     {
-      if(this.cur_page >= this.total_page) return;
+      if(this.cur_page >= this.total_page - 1) return;
 
       this.cur_page += 1;
       this.displayContents(this.cur_page);
@@ -418,9 +455,13 @@ class DevQuizSelectUI extends QuizbotUI
       //어차피 여기서 만드는 quiz info 는 내가 하드코딩해도 되네
       let quiz_info = {};
       quiz_info['title']  = content['name'];
-      quiz_info['description'] = content['description']; //TODO description은 quizinfo.txt 에서 읽어오는걸로
+      quiz_info['icon'] = content['icon'];
+
+      quiz_info['type_name'] = content['type_name']; 
+      quiz_info['description'] = content['description']; 
 
       quiz_info['author'] = '제육보끔#1916';
+      quiz_info['author_icon'] = 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png';
       quiz_info['thumbnail'] = 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg'; //썸네일은 그냥 quizbot으로 해두자
 
       quiz_info['quiz_size'] = content['quiz_size']; 
@@ -452,23 +493,30 @@ class QuizInfoUI extends QuizbotUI
 
     this.embed = {
       color: 0x87CEEB,
-      title: quiz_info['title'],
-      description: quiz_info['description'],
+      title: `${quiz_info['icon']}${quiz_info['title']}`,
+      description: '',
       thumbnail: { //퀴즈 섬네일 표시
-        url: quiz_info['thumbnail'],
+        url: quiz_info['thumbnail'] ?? '',
       },
       footer: { //퀴즈 제작자 표시
-        text: quiz_info['author'],
-        icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
+        text: quiz_info['author'] ?? '',
+        icon_url: quiz_info['author_icon'] ?? '',
       },
     };
+
+    let description = text_contents.dev_quiz_info_ui.description;
+    description = description.replace('${quiz_type_name}', `${quiz_info['type_name']}`);
+    description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
+    description = description.replace('${quiz_description}', `${quiz_info['description']}`);
+
+    this.embed.description = description;
 
     const quiz_info_comp = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
       .setCustomId('start')
       .setLabel('시작')
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId('scoreboard')
         .setLabel('순위표')
@@ -493,6 +541,7 @@ class QuizInfoUI extends QuizbotUI
     {
       const guild = interaction.guild;
       const owner = interaction.member; //주최자
+      const channel = interaction.channel;
       const quiz_info = this.quiz_info;
 
       const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
@@ -507,12 +556,10 @@ class QuizInfoUI extends QuizbotUI
         //check_ready['reason'] 떄문에 준비안됐다는 메시지
         return;
       }
-
-      const quiz_play_ui = new QuizPlayUI();
       
-      quiz_system.startQuiz(guild, owner, quiz_info, quiz_play_ui); //퀴즈 시작
+      quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
 
-      return quiz_play_ui;
+      return new AlertQuizStartUI(quiz_info, owner); //명시적으로 -1 넘겨서 uiholder 종료
     }
 
     if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
@@ -527,48 +574,37 @@ class QuizInfoUI extends QuizbotUI
   }
 }
 
-//Quiz 플레이 UI
-class QuizPlayUI extends QuizbotUI
+//Quiz 시작 알림 UI
+class AlertQuizStartUI extends QuizbotUI
 {
 
-  constructor()
+  constructor(quiz_info, owner)
   {
     super();
 
     this.embed = {
       color: 0x87CEEB,
-      title: '제목칸',
-      description: '설명칸',
+      title: text_contents.alert_quiz_start_ui.title,
+      description: '',
       thumbnail: { //퀴즈 섬네일 표시
         url: '',
       },
-      footer: { //퀴즈 제작자 표시
-        text: '현재 퀴즈가 몇번째인지',
-      },
+      timestamp: new Date().toISOString(),
     };
 
-    const quiz_play_comp = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-      .setCustomId('hint')
-      .setLabel('힌트')
-      .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId('skip')
-        .setLabel('스킵')
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId('quiz_stop')
-        .setLabel('그만하기')
-        .setStyle(ButtonStyle.Secondary),
-    )
+    let description = text_contents.alert_quiz_start_ui.description;
+    description = description.replace('${quiz_name}', `${quiz_info['title']}`);
+    description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
+    description = description.replace('${quiz_owner}', `${owner.displayName}`);
 
-    this.components = [quiz_play_comp]; //여기서는 component를 바꿔서 사용해주자
+    this.embed.description = description;
+
+    this.components = []; //여기서는 component를 싹 없앤다
   }
 
   onInteractionCreate(interaction)
   {
-    return; //QuizPlayUI 에서는 이벤트 핸들링을 하지 않음
+    return; //AlertQuizStartUI 에서는 이벤트 핸들링을 하지 않음
   }
 
 }

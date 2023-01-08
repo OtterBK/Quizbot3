@@ -1,11 +1,11 @@
 //외부 modules
 const fs = require('fs');
 const { getAudioDurationInSeconds } = require('get-audio-duration')
+const { createAudioResource, StreamType } = require('@discordjs/voice');
 const ffprobe = require('node-ffprobe'); //원래라면 module.exports.sync 를 true 셋해서 불러와야 doProbeSync로 가져오는데... 그냥 모듈 수정해서 하드코딩으로 가져오게함
 
 //로컬 modules
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
-
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('./system_setting.js');
 const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
 
 exports.loadLocalDirectoryQuiz = (contents_path) =>
@@ -243,3 +243,39 @@ exports.getSizeOfMetadata = (file_type) =>
     default: return undefined;
   }
 }
+
+exports.sleep = (duration) => 
+{
+  return new Promise((resolve, reject) =>
+  {
+      setTimeout(() => { resolve(); }, duration);
+  });
+}
+
+exports.sortDictByValue = (dict_obj) => {
+  const sorted_array = Object.keys(dict_obj).map(k => ([k, dict_obj[k]])).sort((a, b) => (b[1] - a[1]));
+  let sorted_dict = {};
+  sorted_array.forEach(iter => {
+    sorted_dict[iter[0]] = iter[1];
+  });
+
+  return sorted_dict;
+}
+
+exports.sortMapByValue = (map_obj) => {
+  return new Map([...map_obj.entries()].sort((a, b) => b[1] - a[1]));
+}
+
+exports.playBGM = async (audio_player, bgm_type) => {
+
+  if(audio_player == undefined) return;
+
+  const bgm_file_path = SYSTEM_CONFIG.bgm_path + bgm_type;
+
+  const bgm_resource = createAudioResource(bgm_file_path, {
+    inputType: StreamType.WebmOpus,
+    inlineVolume: false,
+  });
+  audio_player.play(bgm_resource);
+}
+
