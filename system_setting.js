@@ -27,6 +27,9 @@ exports.SYSTEM_CONFIG = {
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, 대부분의 상황에서는 false로 하면됨
 
     bgm_path: './resources/bgm/', //BGM 파일 위치
+
+    hint_percentage: 4, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
+    hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
 }
 
 exports.CUSTOM_EVENT_TYPE = {
@@ -64,4 +67,16 @@ exports.BGM_TYPE = {
     ROUND_ALARM: "ROUND_ALARM.mp3",
     SCORE_ALARM: "SCORE_ALARM.mp3",
     SUCCESS: "SUCCESS.mp3",
+}
+
+exports.OPTION_TYPE = {
+    HINT_TYPE: {
+        AUTO: "자동",
+        VOTE: "투표",
+        OWNER: "주최자",
+    },
+    SKIP_TYPE: {
+        VOTE: "투표",
+        OWNER: "주최자",
+    },
 }

@@ -7,7 +7,7 @@ const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioRe
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors } = require('discord.js');
 
 //로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, OPTION_TYPE } = require('./system_setting.js');
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('./utility.js');
 const { config } = require('process');
@@ -171,6 +171,7 @@ class QuizSession
 
         this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
         this.game_data = undefined; //얘는 자주 바뀐다.
+        this.option_data = undefined; //옵션
 
         this.scoreboard = new Map(); //scoreboard 
 
@@ -382,6 +383,11 @@ class Initializing extends QuizLifecycle
 
         this.quiz_session.voice_connection = voice_connection;
         this.quiz_session.audio_player = audio_player;
+        
+        //옵션 로드
+        this.loadOptionData.then((option_data) => {
+            this.quiz_session.option_data = option_data;
+        });
     }
 
     async act()
@@ -425,6 +431,8 @@ class Initializing extends QuizLifecycle
                 let quiz = {};
 
                 quiz['type'] = quiz_data['quiz_type'];
+                quiz['hint_used'] = false;
+                quiz['skip_used'] = false;
 
                 let author_string = undefined;
 
@@ -442,15 +450,46 @@ class Initializing extends QuizLifecycle
                     quiz['author'] = authors;
                 }
 
-                //정답 키워드 파싱
+                //정답 키워드와 힌트 파싱
                 let answer_string = try_parse_author[0];
                 answer_string = quiz_folder_name.split("&^")[0];
                 let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
 
                 let answers = [];
+                let hint = undefined;
+                let similar_answers = []; //유사 정답은 마지막에 넣어주자
                 answers_row.forEach((answer_row) => {
 
-                    answer_row = answer_row.trim()
+                    answer_row = answer_row.trim();
+                    if(hint == undefined) //힌트가 아직 없다? 그럼 이 answer로 hint 만들자
+                    {
+                        const hintLen = Math.ceil(answer_row.length / SYSTEM_CONFIG.hint_percentage); //표시할 힌트 글자 수
+                        let hint_index = [];
+                        let success_count = 0;
+                        for(let i = 0; i < SYSTEM_CONFIG.hint_max_try; ++i)
+                        {
+                            const rd_index = utility.getRandom(0, answer_row.length - 1); //자 랜덤 index를 가져와보자
+                            if(hint_index.includes(rd_index) == true || answer_row.indexOf(rd_index) === ' ') //원래 단어의 맨 앞글자는 hint에서 제외하려 했는데 그냥 해도 될 것 같다.
+                            {
+                                continue;
+                            }
+                            hint_index.push(rd_index);
+                            if(++success_count >= hintLen) break;
+                        }
+
+                        const hint_row = answer_row;
+                        hint = '';
+                        for(let i = 0; i < hint_row.length; ++i)
+                        {
+                            const chr = hint_row.indexOf(i);
+                            if(hint_index.includes(i) == true || chr === ' ')
+                            {
+                                hint += chr;
+                                continue;
+                            }
+                            hint += '◼';
+                        }
+                    }
 
                     //유사 정답 추측
                     let similar_answer = '';
@@ -468,13 +507,23 @@ class Initializing extends QuizLifecycle
 
                     if(similar_answer != '')
                     {
-                        if(answers.includes(similar_answer) == false)
-                            answers.push(similar_answer);
+                        if(answers.includes(similar_answer) == false && similar_answers.includes(similar_answer) == false)
+                            similar_answers.push(similar_answer);
                     }
                     
                     const answer = answer_row.replace(/ /g,"").toLowerCase(); // /문자/gi 로 replace하면 replaceAll 로 동작, g = 전역검색 i = 대소문자 미구분
                     if(answers.includes(answer) == false)
                             answers.push(answer);
+                });
+
+                quiz['hint'] = hint ?? 'Unknown Hint';
+                if(hint == undefined)
+                {
+                    console.log(`Unknown hint from answer: ${answers}`);
+                }
+
+                similar_answers.forEach((similar_answer) => { //유사 정답도 넣어주자
+                    answers.push(similar_answer);
                 });
 
                 quiz['answers'] = answers;
@@ -510,6 +559,21 @@ class Initializing extends QuizLifecycle
     async exit()
     {
         this.asyncCallCycle(CYCLE_TYPE.PREPARE); //미리 문제 준비
+    }
+
+    async loadOptionData()
+    {
+        //TODO 우선 하드코딩 해둠
+        let option_data = {
+            hint: {
+                type: OPTION_TYPE.HINT_TYPE.AUTO,
+            },
+            skip: {
+                type: OPTION_TYPE.SKIP_TYPE.VOTE,
+            }
+        }
+
+        return option_data;
     }
 }
 
@@ -616,7 +680,7 @@ class Prepare extends QuizLifecycle
         const question = target_quiz['question'];
 
         //오디오 정보 가져오기
-        const audio_play_time = 20000; //TODO 서버 설정 값 사용하자
+        const audio_play_time = 35000; //TODO 서버 설정 값 사용하자
 
         //오디오 길이 먼저 넣어주고~
         const audio_info = await utility.getAudioInfo(question);
@@ -711,6 +775,7 @@ class Questioning extends QuizLifecycle
 
         this.current_quiz = undefined; //현재 진행 중인 퀴즈
 
+        this.hint_timer = undefined; //자동 힌트 타이머
         this.timeover_timer = undefined; //타임오버 timer id
         this.timeover_resolve = undefined; //정답 맞췄을 시 강제로 타임오버 대기 취소
         this.fade_out_timer = undefined;
@@ -797,6 +862,7 @@ class Questioning extends QuizLifecycle
     {
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
+        const option_data = this.quiz_session.option_data;
         let quiz_ui = this.quiz_session.quiz_ui;
 
         const current_quiz = this.current_quiz;
@@ -832,7 +898,7 @@ class Questioning extends QuizLifecycle
         }
 
         //제한시간 동안 대기
-        let audio_play_time = current_quiz['audio_length'] ?? 20000; //TODO 서버별 설정값 가져오는 걸로
+        let audio_play_time = current_quiz['audio_length'] ?? 35000; //TODO 서버별 설정값 가져오는 걸로
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
@@ -852,7 +918,17 @@ class Questioning extends QuizLifecycle
             this.fade_out_timer = fade_out_timer;
         }
 
-        this.startProgressBar(audio_play_time);
+        if(option_data.hint.type == OPTION_TYPE.HINT_TYPE.AUTO) //자동 힌트 사용 중이라면
+        {
+            const hint_timer_wait = audio_play_time / 2; //절반 지나면 힌트 표시할거임
+            const hint_timer = setTimeout(() => {
+                console.log("timeout_log_hint_timer");
+                this.showHint(current_quiz); //현재 퀴즈 hint 표시
+            }, hint_timer_wait);
+            this.hint_timer = hint_timer;
+        }
+
+        this.startProgressBar(audio_play_time); //진행bar시작
 
         let is_timeover = false;
         const timeover_promise = new Promise(async (resolve, reject) => {
@@ -921,6 +997,7 @@ class Questioning extends QuizLifecycle
         let quiz_info = this.quiz_session.quiz_info;
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
+        let option_data = this.quiz_session.game_data;
         const quiz_ui = this.quiz_session.quiz_ui;
 
         quiz_ui.embed.color = 0xFED049;
@@ -929,9 +1006,9 @@ class Questioning extends QuizLifecycle
         
         let footer_message = text_contents.quiz_play_ui.footer;
         footer_message = footer_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
-        footer_message = footer_message.replace("${quiz_size}", `${(quiz_data['quiz_size'])}`);
-        footer_message = footer_message.replace("${option_hint_type}", `투표`); //TODO 옵션 만들면 적용
-        footer_message = footer_message.replace("${option_skip_type}", `투표`);
+        footer_message = footer_message.replace("${quiz_size}", `${quiz_data['quiz_size']}`);
+        footer_message = footer_message.replace("${option_hint_type}", `${option_data['hint_type']}`); //TODO 옵션 만들면 적용
+        footer_message = footer_message.replace("${option_skip_type}", `${option_data['skip_type']}`);
         quiz_ui.embed.footer = {
             "text": footer_message,
         }
@@ -946,6 +1023,15 @@ class Questioning extends QuizLifecycle
         await quiz_ui.send(false);
 
         return quiz_ui;
+    }
+
+    async showHint(quiz)
+    {
+        const hint = quiz['hint'];
+        const channel = this.quiz_session.channel;
+        const hint_message = '```' + `${text_contents.icon.ICON_HINT} 힌트 공개: ${hint}` + '```'
+        quiz['hint_used'] = true;
+        channel.send({content: hint_message});
     }
 
     async startProgressBar(audio_play_time)
@@ -1035,6 +1121,19 @@ class Questioning extends QuizLifecycle
     /** 이벤트 핸들러 **/
     onInteractionCreate(interaction)
     {
+        if(interaction.isChatInputCommand())
+        {
+            this.handleChatInputCommand(interaction);
+        }
+
+        if(interaction.isButton())
+        {
+            this.buttonCommand(interaction);
+        }
+    }
+
+    async handleChatInputCommand(interaction)
+    {
         if(interaction.commandName === '답') {
     
             let submit_answer = interaction.options.getString('답안') ?? '';
@@ -1044,7 +1143,7 @@ class Questioning extends QuizLifecycle
             if(this.answers.includes(submit_answer))
             {
                 this.submittedCorrectAnswer(interaction.member);
-                let message = "```" + interaction.member.displayName + ": [" + submit_answer + "]... 정답입니다!```"
+                let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
                 interaction.reply({content: message})
                 .catch(error => {
                     console.log(`Failed to replay to correct submit ${error}`);
@@ -1052,7 +1151,7 @@ class Questioning extends QuizLifecycle
             }
             else
             {
-                let message = "```" + interaction.member.displayName + ": [" + submit_answer + "]... 땡입니다!```"
+                let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 오답입니다!` + "```"
                 interaction.reply({content: message})
                 .catch(error => {
                     console.log(`Failed to replay to wrong submit ${error}`);
@@ -1060,6 +1159,28 @@ class Questioning extends QuizLifecycle
             }
         
             return;
+        }
+    }
+
+    async buttonCommand(interaction)
+    {
+        const option_data = this.quiz_session.option_data;
+        if(interaction.customId === 'hint') 
+        {
+            if(option_data.hint.type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
+            {
+                if(interaction.member == this.quiz_session.owner)
+                {
+                    this.showHint(this.current_quiz);
+                    return;
+                }
+                const reject_message = '```' + `${text_contents.option_message.only_owner_can_use_hint}` +'```'
+                interaction.channel.send({content: reject_message});
+            }
+            else if(option_data.hint.type == OPTION_TYPE.HINT_TYPE.VOTE)
+            {
+                //투표 힌트 만드는중
+            }
         }
     }
 }
