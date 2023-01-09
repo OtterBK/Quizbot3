@@ -478,7 +478,7 @@ class QuizLifeCycleScoreboarding extends QuizLifecycle
                 // },
             )
 
-            const show_count = option_data.quiz.score.show_max == -1 ? scoreboard.size : option_data.quiz.score.show_max;
+            const show_count = option_data.quiz.score_show_max == -1 ? scoreboard.size : option_data.quiz.score_show_max;
 
             const iter = scoreboard.entries();
             for(let i = 0; i < show_count; ++i)
@@ -1181,8 +1181,8 @@ class Question extends QuizLifecycle
         let footer_message = text_contents.quiz_play_ui.footer;
         footer_message = footer_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
         footer_message = footer_message.replace("${quiz_size}", `${quiz_data['quiz_size']}`);
-        footer_message = footer_message.replace("${option_hint_type}", `${option_data.quiz.hint.type}`);
-        footer_message = footer_message.replace("${option_skip_type}", `${option_data.quiz.skip.type}`);
+        footer_message = footer_message.replace("${option_hint_type}", `${option_data.quiz.hint_type}`);
+        footer_message = footer_message.replace("${option_skip_type}", `${option_data.quiz.skip_type}`);
         quiz_ui.embed.footer = {
             "text": footer_message,
         }
@@ -1194,7 +1194,7 @@ class Question extends QuizLifecycle
 
         quiz_ui.embed.fields = [];
 
-        quiz_ui.setButtonStatus(0, option_data.quiz.hint.type == OPTION_TYPE.HINT_TYPE.AUTO ? false : true); //버튼 1,2,3 다 활성화
+        quiz_ui.setButtonStatus(0, option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.AUTO ? false : true); //버튼 1,2,3 다 활성화
         quiz_ui.setButtonStatus(1, true); 
         quiz_ui.setButtonStatus(2, true);
 
@@ -1346,7 +1346,7 @@ class Question extends QuizLifecycle
     async checkAutoHint(audio_play_time) 
     {
         const option_data = this.quiz_session.option_data;
-        if(option_data.quiz.hint.type == OPTION_TYPE.HINT_TYPE.AUTO) //자동 힌트 사용 중이라면
+        if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.AUTO) //자동 힌트 사용 중이라면
         {
             const hint_timer_wait = audio_play_time / 2; //절반 지나면 힌트 표시할거임
             const hint_timer = setTimeout(() => {
@@ -1506,7 +1506,7 @@ class Question extends QuizLifecycle
                 return;
             }
 
-            if(option_data.quiz.hint.type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
+            if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
             {
                 if(interaction.member == this.quiz_session.owner)
                 {
@@ -1516,7 +1516,7 @@ class Question extends QuizLifecycle
                 const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_hint}` +'```'
                 interaction.channel.send({content: reject_message});
             }
-            else if(option_data.quiz.hint.type == OPTION_TYPE.HINT_TYPE.VOTE)
+            else if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.VOTE)
             {
                 const voice_channel = this.quiz_session.voice_channel;
                 const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 
@@ -1553,7 +1553,7 @@ class Question extends QuizLifecycle
                 return;
             }
 
-            if(option_data.quiz.skip.type == OPTION_TYPE.SKIP_TYPE.OWNER) //주최자만 skip 사용 가능하면
+            if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.OWNER) //주최자만 skip 사용 가능하면
             {
                 if(interaction.member == this.quiz_session.owner)
                 {
@@ -1563,7 +1563,7 @@ class Question extends QuizLifecycle
                 const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_skip}` +'```'
                 interaction.channel.send({content: reject_message});
             }
-            else if(option_data.quiz.skip.type == OPTION_TYPE.SKIP_TYPE.VOTE)
+            else if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.VOTE)
             {
                 const voice_channel = this.quiz_session.voice_channel;
                 const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 

@@ -19,7 +19,7 @@ const utility = require('./utility.js');
 //#region 사전 정의 UI들
 /** 사전 정의 UI들 */
 //ButtonStyle 바꿀 수도 있으니깐 개별로 넣어놓자
-const select_btn_row = new ActionRowBuilder()
+const select_btn_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
     .setCustomId('1')
@@ -48,7 +48,7 @@ const select_btn_row = new ActionRowBuilder()
     .setStyle(ButtonStyle.Primary),
 )
 
-const control_btn_row = new ActionRowBuilder()
+const control_btn_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
   .setCustomId('prev')
@@ -62,7 +62,61 @@ const control_btn_row = new ActionRowBuilder()
     .setCustomId('next')
     .setLabel('다음 페이지')
     .setStyle(ButtonStyle.Secondary),
+);
+
+const option_control_btn_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('prev')
+  .setLabel('저장')
+  .setStyle(ButtonStyle.Success),
+  new ButtonBuilder()
+    .setCustomId('back')
+    .setLabel('뒤로가기')
+    .setStyle(ButtonStyle.Danger),
+);
+
+const option_component = new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder()
+    .setCustomId('option_select')
+    .setPlaceholder(`${text_contents.server_setting_ui.select_menu.title}`)
+    .addOptions(
+
+      text_contents.server_setting_ui.select_menu.options.map(option_info => {
+        return { label: option_info.label, description: option_info.description, value: option_info.value };
+      })
+
+    ),
 )
+
+const option_value_components = {
+
+  audio_play_time:  createOptionValueComponents('audio_play_time'),
+  hint_type:  createOptionValueComponents('hint_type'),
+  skip_type:  createOptionValueComponents('skip_type'),
+  answer_use_similar:  createOptionValueComponents('answer_use_similar'),
+  score_type:  createOptionValueComponents('score_type'),
+  
+}
+
+function createOptionValueComponents(option_name)
+{
+  return new ActionRowBuilder()
+    .addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('option_value_select')
+        .setPlaceholder(`${text_contents.server_setting_ui.select_menu.option_values.title}`)
+        .addOptions(
+    
+          text_contents.server_setting_ui.select_menu.option_values[option_name].map(option_value_info => {
+            return { label: option_value_info.label, description: option_value_info.description, value: option_value_info.value };
+          })
+    
+        ),
+    );
+}
+
 //#endregion
 
 /** global 변수 **/
@@ -235,8 +289,8 @@ class QuizbotUI {
   constructor()
   {
     this.embed = {};
-    // this.components = [cloneDeep(select_btn_row), cloneDeep(control_btn_row)]; //내가 clonedeep을 왜 해줬었지?
-    this.components = [select_btn_row, control_btn_row]; //이게 기본 component임
+    // this.components = [cloneDeep(select_btn_component), cloneDeep(control_btn_component)]; //내가 clonedeep을 왜 해줬었지?
+    this.components = [select_btn_component, control_btn_component]; //이게 기본 component임
   }
 
   //각 ui 별 on은 필요시 구현
@@ -313,7 +367,7 @@ class MainUI extends QuizbotUI
       // },
     };
 
-    this.components = [select_btn_row]; //MAIN UI에서는 control component는 필요없다.
+    this.components = [select_btn_component]; //MAIN UI에서는 control component는 필요없다.
   }
 
   onInteractionCreate(interaction)
@@ -642,38 +696,24 @@ class ServerSettingUI extends QuizbotUI {
     };
 
     this.option_storage = option_system.getOptionStorage(this.guild_id);
-    this.fillDescription(this.option_storage.getOptionData());
+    this.option_data = this.option_storage.getOptionData();
+    this.fillDescription(this.option_data);
 
-    const option_text_list = text_contents.server_setting_ui.select_menu.options;
+    this.option_component = cloneDeep(option_component); //아예 deep copy해야함
+    this.components = [ this.option_component, option_control_btn_component ];
 
-
-    this.option_component = new ActionRowBuilder()
-    .addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('option_select')
-        .setPlaceholder(`${text_contents.server_setting_ui.select_menu.title}`)
-        .addOptions(
-
-          option_text_list.map(option_info => {
-            return { label: option_info.label, description: option_info.description, value: option_info.value };
-          })
-
-        ),
-    )
-
-    this.components = [ this.option_component, control_btn_row];
-    
+    this.selected_option = undefined;
   }
 
   fillDescription(option_data)
   {
     let description_message = text_contents.server_setting_ui.description;
     description_message = description_message.replace("${audio_play_time}", parseInt(option_data.quiz.audio_play_time / 1000));
-    description_message = description_message.replace("${hint_type}", option_data.quiz.hint.type);
-    description_message = description_message.replace("${skip_type}", option_data.quiz.skip.type);
-    description_message = description_message.replace("${use_answer_similar}", (option_data.quiz.answer.use_similar == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
-    description_message = description_message.replace("${score_type}", option_data.quiz.score.type);
-    description_message = description_message.replace("${score_show_max}", (option_data.quiz.score.show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
+    description_message = description_message.replace("${hint_type}", option_data.quiz.hint_type);
+    description_message = description_message.replace("${skip_type}", option_data.quiz.skip_type);
+    description_message = description_message.replace("${answer_use_similar}", (option_data.quiz.answer_use_similar == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${score_type}", option_data.quiz.score_type);
+    description_message = description_message.replace("${score_show_max}", (option_data.quiz.score_show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
     this.embed.description = description_message;
   }
 
@@ -683,76 +723,52 @@ class ServerSettingUI extends QuizbotUI {
 
     if(interaction.customId == 'option_select') //옵션 선택 시,
     {
-      const selected = interaction.values[0];
-      return new OptionEditUI(this.option_storage, selected);
+      const selected_option = interaction.values[0];
+      this.selected_option = selected_option;
+
+      this.selectDefaultOptionByValue(this.option_component, selected_option);
+
+      this.option_value_component = option_value_components[this.selected_option]; //value 컴포넌트를 보내줌
+      this.components = [ this.option_component, this.option_value_component, option_control_btn_component];
+
+      return this;
     }
+    else if(interaction.customId == 'option_value_select')
+    {
+      const selected_value = interaction.values[0];
+
+      this.selectDefaultOptionByValue(this.option_value_component, selected_value);
+
+      this.option_data.quiz[this.selected_option] = selected_value;
+      this.fillDescription(this.option_data);
+
+      return this;
+    }
+
+  }
+
+  selectDefaultOptionByValue(component, value)
+  {
+    const options = component.components[0].options;
+    for(let index = 0; index < options.length; ++index)
+    {
+      let option = options[index].data;
+      if(option.value == value)
+      {
+        option['default'] = true;
+      }
+      else
+      {
+        option['default'] = false;
+      }
+    }
+
+    return component;
   }
 
   onRefresh()
   {
     this.fillDescription(this.option_storage.getOptionData());
   }
-
-}
-
-class OptionEditUI extends QuizbotUI
-{
-  constructor(option_storage, selected_option)
-  {
-    super();
-
-    this.option_storage = option_storage;
-    this.selected_option = selected_option;
-
-    this.option_detail_info = text_contents.server_setting_ui.option[selected_option];
-
-    this.embed = {
-      color: 0x87CEEB,
-      title: option_detail_info.name,
-      description: '',
-    };
-
-    let description_message = option_detail_info.description;
-
-    this.embed.description = description_message;
-
-    const option_values = option_detail_info.values;
- 
-    this.option_edit_component = new ActionRowBuilder()
-    .addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('option_value_select')
-        .setPlaceholder(`${text_contents.server_setting_ui.select_menu.title}`)
-        .addOptions(
-
-          option_values.map(option_value_info => {
-            return { label: option_value_info.label, value: option_value_info.value };
-          })
-
-        ),
-      new ButtonBuilder()
-        .setCustomId('save_option')
-        .setLabel('저장')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId('cancel_option')
-        .setLabel('취소')
-        .setStyle(ButtonStyle.Danger),
-    )
-
-    this.components = [ this.option_edit_component ];
-
-  }
-
-  onInteractionCreate(interaction)
-  {
-    if(!interaction.isStringSelectMenu() && !interaction.isButton()) return;
-
-    if(interaction.customId == 'option_value_select') //옵션 값 시,
-    {
-      const selected = interaction.values[0];
-    }
-  }
-
 
 }

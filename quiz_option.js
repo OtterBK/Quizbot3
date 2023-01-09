@@ -13,8 +13,8 @@ OPTION_TYPE = {
         OWNER: "주최자",
     },
     SCORE_TYPE: {
-        TIME: "시간별 추가점수",
-        POINT: "문제 당 1점"
+        TIME: "남은 시간 비례",
+        POINT: "고정 점수"
     }
 }
 
@@ -61,19 +61,11 @@ class OptionStorage
         this.option = {
             quiz: {
                 audio_play_time: 40000,
-                hint: {
-                    type: OPTION_TYPE.HINT_TYPE.VOTE,
-                },
-                skip: {
-                    type: OPTION_TYPE.SKIP_TYPE.VOTE,
-                },
-                answer: {
-                    use_similar: true,
-                },
-                score: {
-                    type: OPTION_TYPE.SCORE_TYPE.POINT,
-                    show_max: -1,
-                }
+                hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
+                skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
+                answer_use_similar: true,
+                score_type: OPTION_TYPE.SCORE_TYPE.POINT,
+                score_show_max: -1,
             }
         }
     }

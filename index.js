@@ -71,7 +71,7 @@ client.on('interactionCreate', async interaction => {
   const uiHolder = quizbot_ui.getUIHolder(guildID);
   if(uiHolder != undefined)
   {
-    if(already_deferred == false && interaction.isButton())
+    if(already_deferred == false && (interaction.isButton() || interaction.isStringSelectMenu()))
     {
       already_deferred = true;
       await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
