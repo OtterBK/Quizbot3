@@ -19,16 +19,15 @@ exports.SYSTEM_CONFIG = {
     correct_answer_cycle_wait: 6500, //정답 맞췄을 시, 얼마나 대기할 지
     timeover_cycle_wait: 6500, //타임오버 시, 얼마나 대기할 지
 
-    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
-    ending_wait: 3500, //순위 발표 단계에서 각 설명 텀
-
-    scoreboard_show_max: -1, //스코어보드에 표시할 최대 맴버 수
+    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
+    ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, 대부분의 상황에서는 false로 하면됨
 
     bgm_path: './resources/bgm/', //BGM 파일 위치
+    dev_quiz_path: './resources/quizdata/', //Dev퀴즈 파일 위치
 
-    hint_percentage: 4, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
+    hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
 }
 
@@ -69,14 +68,9 @@ exports.BGM_TYPE = {
     SUCCESS: "SUCCESS.mp3",
 }
 
-exports.OPTION_TYPE = {
-    HINT_TYPE: {
-        AUTO: "자동",
-        VOTE: "투표",
-        OWNER: "주최자",
-    },
-    SKIP_TYPE: {
-        VOTE: "투표",
-        OWNER: "주최자",
-    },
+exports.QUIZ_MAKER_TYPE = {
+    BY_DEVELOPER: '개발자 제작 퀴즈',
+    BY_USER: '유저 제작 퀴즈',
+    UNKNOWN: '알 수 없음',
 }
+

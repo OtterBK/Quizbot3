@@ -1,20 +1,22 @@
 'use strict';
 
-// 필요한 외부 모듈
+//#region 필요한 외부 모듈
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder } = require('discord.js');
 const { interaction } = require('lodash');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
-const { FORMERR } = require('dns');
+//#endregion
 
-//로컬 modules
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE } = require('./system_setting.js');
-
+//#region 로컬 modules
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
+const option_system = require("./quiz_option.js");
+const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('./utility.js');
+//#endregion
 
-
+//#region 사전 정의 UI들
 /** 사전 정의 UI들 */
 //ButtonStyle 바꿀 수도 있으니깐 개별로 넣어놓자
 const select_btn_row = new ActionRowBuilder()
@@ -61,11 +63,13 @@ const control_btn_row = new ActionRowBuilder()
     .setLabel('다음 페이지')
     .setStyle(ButtonStyle.Secondary),
 )
+//#endregion
 
 /** global 변수 **/
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
 let guilds_count = 0; //봇이 참가 중인 guilds 수
 
+//#region exports 정의
 /** exports **/
 //main embed 인스턴스 반환
 exports.createUIHolder = (interaction) => {
@@ -94,8 +98,10 @@ exports.startGuildsCountManager = (client) =>
   return guildsCountManager(client);
 }
 
-/** UI 관련 함수들 **/
+//#endregion
 
+//#region UI 관리 함수들
+/** UI 관련 함수들 **/
 //UI holder Aging Manager
 function uiHolderAgingManager()
 {
@@ -118,7 +124,7 @@ function uiHolderAgingManager()
 
 function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
 {
-  const guilds_count_manager_interval = SYSTEM_CONFIG.guilds_count_manager_interval * 1000; //last updated time이 일정 값 이전인 ui는 삭제할거임
+  const guilds_count_manager_interval = SYSTEM_CONFIG.guilds_count_manager_interval * 1000; //체크 주기
 
   guilds_count = client.guilds.cache.size; //처음에 한번 체크
 
@@ -128,6 +134,8 @@ function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
 
   return guilds_count_manager;
 }
+
+//#endregion
 
 /** UI 프레임 관련 **/
 // UI들 표시해주는 홀더
@@ -173,6 +181,7 @@ class UIHolder
       if(interaction.isButton() && interaction.customId == "back" && this.prev_ui_stack.length > 0) //뒤로가기 버튼 처리
       {
         this.ui = this.prev_ui_stack.pop();
+        if(this.ui.onRefresh != undefined) this.ui.onRefresh();
         this.updateUI();
         return;
       }
@@ -212,6 +221,12 @@ class UIHolder
     }
   }
 
+  //UI가 Refresh 됐을 때(뒤로가기 등)
+  onRefresh()
+  {
+    //보통은 아무것도 하지 않는다.
+  }
+
 }
 
 //QuizBotUI 
@@ -237,15 +252,6 @@ class QuizbotUI {
   onInteractionCreate() //더미용 이벤트 콜백
   {
 
-  }
-
-  update() //UI자체에서 ui holder를 찾아내 업데이트할 수 있는 메서드를 추가는 해뒀다... //TODO 나중에 더 좋은 방법을 생각해보자
-  {
-    if(uiHolder_map.hasOwnProperty(this.guild_id))
-    {
-      const uiHolder = uiHolder_map[this.guild_id];
-      uiHolder.updateUI();
-    }
   }
   
 }
@@ -306,6 +312,8 @@ class MainUI extends QuizbotUI
       //   icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
       // },
     };
+
+    this.components = [select_btn_row]; //MAIN UI에서는 control component는 필요없다.
   }
 
   onInteractionCreate(interaction)
@@ -315,6 +323,11 @@ class MainUI extends QuizbotUI
     if(interaction.customId == '1') //로컬플레이 눌렀을 때
     {
       return new SelectQuizTypeUI();
+    }
+
+    if(interaction.customId == '4') //서버 설정 눌렀을 때
+    {
+      return new ServerSettingUI(interaction.guild.id);
     }
   }
 
@@ -354,7 +367,7 @@ class SelectQuizTypeUI extends QuizbotUI {
 class DevQuizSelectUI extends QuizbotUI  
 {
 
-  static resource_path = process.cwd() + "/resources/quizdata";
+  static resource_path = SYSTEM_CONFIG.dev_quiz_path;
   static quiz_contents = utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자
 
   constructor(contents)
@@ -469,6 +482,7 @@ class DevQuizSelectUI extends QuizbotUI
       quiz_info['winner_nickname'] = content['winner_nickname'];
       quiz_info['quiz_path'] = content['content_path'];//dev quiz는 quiz_path 필요
       quiz_info['quiz_type'] = content['quiz_type'];
+      quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.BY_DEVELOPER;
 
       return new QuizInfoUI(quiz_info);
     }
@@ -504,7 +518,7 @@ class QuizInfoUI extends QuizbotUI
       },
     };
 
-    let description = text_contents.dev_quiz_info_ui.description;
+    let description = text_contents.quiz_info_ui.description;
     description = description.replace('${quiz_type_name}', `${quiz_info['type_name']}`);
     description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
     description = description.replace('${quiz_description}', `${quiz_info['description']}`);
@@ -545,9 +559,12 @@ class QuizInfoUI extends QuizbotUI
       const quiz_info = this.quiz_info;
 
       const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
-      if(check_ready == undefined)
+      if(check_ready == undefined || check_ready.result == false)
       {
-        //TODO 잘못됏다는 메시지
+        const reason = check_ready.reason;
+        let reason_message = text_contents.quiz_info_ui.failed_start;
+        reason_message = reason_message.replace("${reason}", reason);
+        interaction.channel.send({content: reason_message});
         return;
       }
 
@@ -606,5 +623,136 @@ class AlertQuizStartUI extends QuizbotUI
   {
     return; //AlertQuizStartUI 에서는 이벤트 핸들링을 하지 않음
   }
+
+}
+
+//서버 설정 UI
+class ServerSettingUI extends QuizbotUI {
+
+  constructor(guild_id)
+  {
+    super();
+
+    this.guild_id = guild_id;
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: text_contents.server_setting_ui.title,
+      description: text_contents.server_setting_ui.pre_description,
+    };
+
+    this.option_storage = option_system.getOptionStorage(this.guild_id);
+    this.fillDescription(this.option_storage.getOptionData());
+
+    const option_text_list = text_contents.server_setting_ui.select_menu.options;
+
+
+    this.option_component = new ActionRowBuilder()
+    .addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('option_select')
+        .setPlaceholder(`${text_contents.server_setting_ui.select_menu.title}`)
+        .addOptions(
+
+          option_text_list.map(option_info => {
+            return { label: option_info.label, description: option_info.description, value: option_info.value };
+          })
+
+        ),
+    )
+
+    this.components = [ this.option_component, control_btn_row];
+    
+  }
+
+  fillDescription(option_data)
+  {
+    let description_message = text_contents.server_setting_ui.description;
+    description_message = description_message.replace("${audio_play_time}", parseInt(option_data.quiz.audio_play_time / 1000));
+    description_message = description_message.replace("${hint_type}", option_data.quiz.hint.type);
+    description_message = description_message.replace("${skip_type}", option_data.quiz.skip.type);
+    description_message = description_message.replace("${use_answer_similar}", (option_data.quiz.answer.use_similar == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${score_type}", option_data.quiz.score.type);
+    description_message = description_message.replace("${score_show_max}", (option_data.quiz.score.show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
+    this.embed.description = description_message;
+  }
+
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isStringSelectMenu()) return;
+
+    if(interaction.customId == 'option_select') //옵션 선택 시,
+    {
+      const selected = interaction.values[0];
+      return new OptionEditUI(this.option_storage, selected);
+    }
+  }
+
+  onRefresh()
+  {
+    this.fillDescription(this.option_storage.getOptionData());
+  }
+
+}
+
+class OptionEditUI extends QuizbotUI
+{
+  constructor(option_storage, selected_option)
+  {
+    super();
+
+    this.option_storage = option_storage;
+    this.selected_option = selected_option;
+
+    this.option_detail_info = text_contents.server_setting_ui.option[selected_option];
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: option_detail_info.name,
+      description: '',
+    };
+
+    let description_message = option_detail_info.description;
+
+    this.embed.description = description_message;
+
+    const option_values = option_detail_info.values;
+ 
+    this.option_edit_component = new ActionRowBuilder()
+    .addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('option_value_select')
+        .setPlaceholder(`${text_contents.server_setting_ui.select_menu.title}`)
+        .addOptions(
+
+          option_values.map(option_value_info => {
+            return { label: option_value_info.label, value: option_value_info.value };
+          })
+
+        ),
+      new ButtonBuilder()
+        .setCustomId('save_option')
+        .setLabel('저장')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('cancel_option')
+        .setLabel('취소')
+        .setStyle(ButtonStyle.Danger),
+    )
+
+    this.components = [ this.option_edit_component ];
+
+  }
+
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isStringSelectMenu() && !interaction.isButton()) return;
+
+    if(interaction.customId == 'option_value_select') //옵션 값 시,
+    {
+      const selected = interaction.values[0];
+    }
+  }
+
 
 }

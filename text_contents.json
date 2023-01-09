@@ -37,7 +37,7 @@
             "ICON_WARN": "⚠️",
             "ICON_BOX": "📦",
             "ICON_HINT": "💡",
-            "ICON_SKIP": "⏩",
+            "ICON_SKIP": "⏭",
             "ICON_STOP": "⏹️",
             "ICON_RULE": "📝",
             "ICON_TIP": "🔖",
@@ -123,7 +123,7 @@
                 "url": "https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg"
             },
             "description": 
-                "🔹서버원들과 함께 다양한 퀴즈를 즐겨보세요!\n\n\n1️⃣)\u1CBC\u1CBC**서버원과 게임하기**\n\n2️⃣)\u1CBC\u1CBC**~~다른 서버와 경쟁하기~~**\n\n3️⃣)\u1CBC\u1CBC**퀴즈 만들기**\n\n4️⃣)\u1CBC\u1CBC**게임 설정**\n\n5️⃣)\u1CBC\u1CBC**공지/패치노트**\n\n\n" ,
+                "🔹서버원들과 함께 다양한 퀴즈를 즐겨보세요!\n\n\n1️⃣)\u1CBC\u1CBC**서버원과 게임하기**\n\n2️⃣)\u1CBC\u1CBC**~~다른 서버와 경쟁하기~~**\n\n3️⃣)\u1CBC\u1CBC**~~퀴즈 만들기~~**\n\n4️⃣)\u1CBC\u1CBC**~~게임 설정~~**\n\n5️⃣)\u1CBC\u1CBC**~~공지/패치노트~~**\n\n\n" ,
             "total_server": "서버수",
             "playing_server": "게임중",
             "competitive_server": "경쟁중"
@@ -148,10 +148,12 @@
             "description": 
                 "🔹어떤 퀴즈를 플레이할까요?\n\n\n"
         },
-        "dev_quiz_info_ui":
+        "quiz_info_ui":
         {
             "description": 
-                "\u1CBC\n🏷 퀴즈 유형: **${quiz_type_name}**\n📦 문제 개수: **${quiz_size}개**\n\n\n📖 퀴즈 설명:\n${quiz_description}\n\u1CBC\n\u1CBC\n⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\u1CBC\n"
+                "\u1CBC\n🏷 퀴즈 유형: **${quiz_type_name}**\n📦 문제 개수: **${quiz_size}개**\n\n\n📖 퀴즈 설명:\n${quiz_description}\n\u1CBC\n\u1CBC\n⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\u1CBC\n",
+            "failed_start":
+                "```❗ 퀴즈를 시작할 수 없습니다.\n(${reason})```"
         },
         "alert_quiz_start_ui":
         {
@@ -173,7 +175,14 @@
         "quiz_play_ui":
         {
             "footer": "📦 문제 ${quiz_question_num} / ${quiz_size}\u1CBC| 💡 힌트 ${option_hint_type} \u1CBC ⏭ 스킵 ${option_skip_type}",
-            "description": "\u1CBC\n\u1CBC\n📦\u1CBC**${quiz_question_num}번째 문제입니다.**\u1CBC\n\u1CBC\n"
+            "description": "\u1CBC\n\u1CBC\n📦\u1CBC**${quiz_question_num}번째 문제입니다.**\u1CBC\n\u1CBC\n",
+            "show_hint": "```💡 힌트 공개: ${hint}```",
+            "skip": "```⏭ 현재 퀴즈를 건너뜁니다.```",
+            "hint_vote": "```🗳 ${who_voted} 님이 힌트 요청에 투표하셨습니다. ( ${current_vote_count} / ${vote_criteria} )```",
+            "skip_vote": "```🗳 ${who_voted} 님이 건너뛰기에 투표하셨습니다. ( ${current_vote_count} / ${vote_criteria} )```",
+            "only_owner_can_use_hint": "⚠ 해당 서버의 힌트 요청은 주최자만 가능하게 설정되어 있습니다. [서버 설정에서 변경 가능]",
+            "only_owner_can_use_skip": "⚠ 해당 서버의 스킵 요청은 주최자만 가능하게 설정되어 있습니다. [서버 설정에서 변경 가능]",
+            "force_stop": "```⏹ ${who_stopped}님이 퀴즈를 강제 종료하였습니다.```"
         },
         "timeover_ui":
         {
@@ -200,9 +209,30 @@
             "nobody_answer": "**헉! 😅 정답자가 아무도 없습니다... \n많이 어려우셨나요...? 😢**\n\u1CBC\n\u1CBC\n",
             "winner_user_message": "**🏆 최고의 __${winner_nickname}__ ${winner_username}!**\u1CBC\n"
         },
-        "option_message":
+        "reason":
         {
-            "only_owner_can_use_hint": "⚠ 해당 서버의 힌트 요청은 주최자만 가능하게 설정되어 있습니다. [서버 설정에서 변경 가능]"
+            "no_in_voice_channel": "음성 채널에 참가한 상태로 진행해주세요.",
+            "already_ingame": "이미 서버에서 진행 중인 퀴즈가 있습니다.",
+            "can_play": "정상적으로 게임 플레이가 가능합니다."
+        },
+        "server_setting_ui":
+        {
+            "title": "⚙ 서버 옵션 설정",
+            "pre_description": "\u1CBC\n\u1CBC\n옵션 정보를 불러오는 중입니다...\u1CBC\n\u1CBC\n",
+            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC${audio_play_time}초\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC${hint_type}\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC${skip_type}\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC${use_answer_similar}\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC${score_type}\n\u1CBC\n\u1CBC\n",
+
+            "select_menu": {
+                "title": "어떤 옵션을 설정할까요?",
+                "options": [
+                    { "label": "노래 재생 시간", "description": "음악 퀴즈에서 얼마나 음악을 재생할 지 설정합니다.", "value": "audio_play_type" },
+                    { "label": "힌트 요청 방식", "description": "퀴즈 진행 시, 힌트 요청 방식을 설정합니다.", "value": "hint_type" },
+                    { "label": "스킵 요청 방식", "description": "퀴즈 진행 시, 스킵 요청 방식을 설정합니다.", "value": "skip_type" },
+                    { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 생성 여부를 설정합니다.", "value": "use_answer_similar" },
+                    { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" }
+                ]
+            },
+            "use": "사용",
+            "not_use": "사용 안함"
         }
     }
 }
