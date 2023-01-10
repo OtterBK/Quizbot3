@@ -2,7 +2,6 @@
 
 //#region 필요한 외부 모듈
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder } = require('discord.js');
-const { interaction } = require('lodash');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
 //#endregion
@@ -67,8 +66,9 @@ const control_btn_component = new ActionRowBuilder()
 const option_control_btn_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
-  .setCustomId('prev')
+  .setCustomId('save_option_data')
   .setLabel('저장')
+  .setDisabled(true)
   .setStyle(ButtonStyle.Success),
   new ButtonBuilder()
     .setCustomId('back')
@@ -95,7 +95,7 @@ const option_value_components = {
   audio_play_time:  createOptionValueComponents('audio_play_time'),
   hint_type:  createOptionValueComponents('hint_type'),
   skip_type:  createOptionValueComponents('skip_type'),
-  answer_use_similar:  createOptionValueComponents('answer_use_similar'),
+  use_similar_answer:  createOptionValueComponents('use_similar_answer'),
   score_type:  createOptionValueComponents('score_type'),
   
 }
@@ -127,8 +127,14 @@ let guilds_count = 0; //봇이 참가 중인 guilds 수
 /** exports **/
 //main embed 인스턴스 반환
 exports.createUIHolder = (interaction) => {
+  const guild_id = interaction.guild.id;
+  if(uiHolder_map.hasOwnProperty(guild_id))
+  {
+    const prev_uiHolder = uiHolder_map[guild_id];
+    prev_uiHolder.free();
+  }
   const uiHolder = new UIHolder(interaction);
-  uiHolder_map[interaction.guild.id] = uiHolder;
+  uiHolder_map[guild_id] = uiHolder;
 
   return uiHolder;
 };
@@ -168,6 +174,8 @@ function uiHolderAgingManager()
       const value = uiHolder_map[key];
       if(value.last_update_time < criteria_value)
       {
+        const uiHolder = uiHolder_map[key];
+        uiHolder.free();
         delete uiHolder_map[key]; //삭제~
       }
     })
@@ -207,7 +215,20 @@ class UIHolder
     this.prev_ui_stack = []; //뒤로가기용 UI스택
 
     this.last_update_time = Date.now(); //uiholder aging manager에서 삭제 기준이될 값
+
     this.updateUI();
+  }
+
+  free() //자원 정리
+  {
+    const guild_id = this.guild_id;
+
+    this.base_interaction = undefined;
+    this.guild = undefined;
+    this.ui = undefined;
+    this.prev_ui_stack = undefined; //뒤로가기용 UI스택
+
+    console.log(`free uiHolder ${guild_id}`);
   }
 
   getUI()
@@ -235,7 +256,6 @@ class UIHolder
       if(interaction.isButton() && interaction.customId == "back" && this.prev_ui_stack.length > 0) //뒤로가기 버튼 처리
       {
         this.ui = this.prev_ui_stack.pop();
-        if(this.ui.onRefresh != undefined) this.ui.onRefresh();
         this.updateUI();
         return;
       }
@@ -248,6 +268,7 @@ class UIHolder
       {
         this.prev_ui_stack.push(this.ui);
         this.ui = newUI;
+        this.ui.holder = this; //holder도 등록해준다. strong reference cycle 방지를 위해 weak타입으로...하려 했는데 weak이 설치가 안되네, free()를 믿자
       }
       this.updateUI();
     }
@@ -263,7 +284,7 @@ class UIHolder
       this.initialized = true;
       this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        console.log(`UpdateUI failed: ${err.message}`);
+        console.log(`sendUI failed: ${err.message}`);
       });
     }
     else
@@ -273,12 +294,6 @@ class UIHolder
         console.log(`UpdateUI failed: ${err.message}`);
       });
     }
-  }
-
-  //UI가 Refresh 됐을 때(뒤로가기 등)
-  onRefresh()
-  {
-    //보통은 아무것도 하지 않는다.
   }
 
 }
@@ -291,6 +306,7 @@ class QuizbotUI {
     this.embed = {};
     // this.components = [cloneDeep(select_btn_component), cloneDeep(control_btn_component)]; //내가 clonedeep을 왜 해줬었지?
     this.components = [select_btn_component, control_btn_component]; //이게 기본 component임
+    this.holder = undefined; 
   }
 
   //각 ui 별 on은 필요시 구현
@@ -307,6 +323,14 @@ class QuizbotUI {
   {
 
   }
+
+  update()
+  {
+    if(this.holder != undefined)
+    {
+      this.holder.updateUI();
+    }
+  }
   
 }
 
@@ -321,7 +345,7 @@ class MainUI extends QuizbotUI
     this.embed = {
       color: 0x87CEEB,
       title: text_contents.main_menu.title,
-      url: text_contents.main_menu.url,
+      // url: text_contents.main_menu.url,
       author: {
       //   name: '📗 메인메뉴',
       //   icon_url: 'https://i.imgur.com/AfFp7pu.png',
@@ -357,9 +381,9 @@ class MainUI extends QuizbotUI
           inline: true,
         },
       ],
-      image: {
-        url: '',
-      },
+      // image: {
+      //   url: undefined,
+      // },
       // timestamp: new Date().toISOString(),
       // footer: {
       //   text: '제육보끔#1916',
@@ -399,9 +423,6 @@ class SelectQuizTypeUI extends QuizbotUI {
       title: text_contents.select_quiz_type.title,
       url: text_contents.select_quiz_type.url,
       description: text_contents.select_quiz_type.description,
-      thumbnail: {
-        url: text_contents.select_quiz_type.thumbnail.url,
-      },
     };
   }
 
@@ -433,9 +454,6 @@ class DevQuizSelectUI extends QuizbotUI
       title: text_contents.dev_select_category.title,
       url: text_contents.dev_select_category.url,
       description: text_contents.dev_select_category.description,
-      thumbnail: {
-        url: text_contents.dev_select_category.thumbnail.url,
-      },
     };
 
     this.cur_contents = (contents == undefined ? DevQuizSelectUI.quiz_contents : contents);
@@ -470,7 +488,7 @@ class DevQuizSelectUI extends QuizbotUI
     {
       const cur_content = page_contents[i];
       let message = text_contents.icon["ICON_NUM_"+(i+1)];
-      contents_message += `${message}${")\u1CBC\u1CBC"}${cur_content.icon} ${cur_content.name}\n\n`;
+      contents_message += `${message})\u1CBC\u1CBC${cur_content.icon} ${cur_content.name}\n\n`;
     }
 
     // contents_message += "\u1CBC\u1CBC\n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
@@ -561,8 +579,8 @@ class QuizInfoUI extends QuizbotUI
 
     this.embed = {
       color: 0x87CEEB,
-      title: `${quiz_info['icon']}${quiz_info['title']}`,
-      description: '',
+      title: `${quiz_info['icon']} ${quiz_info['title']}`,
+      description: undefined,
       thumbnail: { //퀴즈 섬네일 표시
         url: quiz_info['thumbnail'] ?? '',
       },
@@ -656,9 +674,9 @@ class AlertQuizStartUI extends QuizbotUI
     this.embed = {
       color: 0x87CEEB,
       title: text_contents.alert_quiz_start_ui.title,
-      description: '',
+      description: undefined,
       thumbnail: { //퀴즈 섬네일 표시
-        url: '',
+        url: undefined,
       },
       timestamp: new Date().toISOString(),
     };
@@ -696,13 +714,16 @@ class ServerSettingUI extends QuizbotUI {
     };
 
     this.option_storage = option_system.getOptionStorage(this.guild_id);
-    this.option_data = this.option_storage.getOptionData();
+    this.option_data = cloneDeep(this.option_storage.getOptionData());
     this.fillDescription(this.option_data);
 
     this.option_component = cloneDeep(option_component); //아예 deep copy해야함
-    this.components = [ this.option_component, option_control_btn_component ];
+    this.option_value_components = cloneDeep(option_value_components);
+    this.option_control_btn_component = cloneDeep(option_control_btn_component);
+    this.components = [ this.option_component, this.option_control_btn_component ];
 
     this.selected_option = undefined;
+    this.selected_value = undefined;
   }
 
   fillDescription(option_data)
@@ -711,7 +732,7 @@ class ServerSettingUI extends QuizbotUI {
     description_message = description_message.replace("${audio_play_time}", parseInt(option_data.quiz.audio_play_time / 1000));
     description_message = description_message.replace("${hint_type}", option_data.quiz.hint_type);
     description_message = description_message.replace("${skip_type}", option_data.quiz.skip_type);
-    description_message = description_message.replace("${answer_use_similar}", (option_data.quiz.answer_use_similar == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${use_similar_answer}", (option_data.quiz.use_similar_answer == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
     description_message = description_message.replace("${score_type}", option_data.quiz.score_type);
     description_message = description_message.replace("${score_show_max}", (option_data.quiz.score_show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
     this.embed.description = description_message;
@@ -719,32 +740,74 @@ class ServerSettingUI extends QuizbotUI {
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isStringSelectMenu()) return;
+    if(interaction.isStringSelectMenu()) {
+      if(interaction.customId == 'option_select') //옵션 선택 시,
+      {
+        const selected_option = interaction.values[0];
+        if(this.selected_option == selected_option) return; //바뀐게 없다면 return
+        
+        this.selected_option = selected_option;
+  
+        this.selectDefaultOptionByValue(this.option_component, selected_option);
+  
+        this.option_value_component = this.option_value_components[this.selected_option]; //value 컴포넌트를 보내줌
+        this.components = [ this.option_component, this.option_value_component, this.option_control_btn_component];
 
-    if(interaction.customId == 'option_select') //옵션 선택 시,
-    {
-      const selected_option = interaction.values[0];
-      this.selected_option = selected_option;
+        this.embed.footer = undefined;
+  
+        return this;
+      }
+      else if(interaction.customId == 'option_value_select')
+      {
+        const selected_value = interaction.values[0];
+        
+        this.selected_value = selected_value;
+  
+        this.selectDefaultOptionByValue(this.option_value_component, selected_value);
+  
+        this.option_data.quiz[this.selected_option] = selected_value;
+        this.fillDescription(this.option_data);
+        this.option_control_btn_component.components[0].setDisabled(false); //저장 버튼 활성화
 
-      this.selectDefaultOptionByValue(this.option_component, selected_option);
+        this.embed.footer = undefined;
+  
+        return this;
+      }
+    } else if(interaction.isButton()) {
+      if(interaction.customId == 'save_option_data') //저장 버튼 클릭 시,
+      {
+        this.option_control_btn_component.components[0].setDisabled(true); //저장 버튼 비활성화
 
-      this.option_value_component = option_value_components[this.selected_option]; //value 컴포넌트를 보내줌
-      this.components = [ this.option_component, this.option_value_component, option_control_btn_component];
+        this.option_storage.option = this.option_data;
 
-      return this;
+        this.option_storage.saveOptionToDB()
+        .then((result) => {
+          let result_message = '';
+          if(result == true)
+          {
+            result_message = text_contents.server_setting_ui.save_success;
+          }
+          else
+          {
+            result_message = text_contents.server_setting_ui.save_fail;
+          }
+          this.embed.footer = {
+            "text": result_message
+          }
+
+          this.update();
+        })
+        .catch((error) => {
+          const result_message = text_contents.server_setting_ui.save_fail;
+          this.embed.footer = {
+            "text": result_message
+          }
+          console.log("Failed to save option: " + error.message);
+
+          this.update();
+        });
+      }
     }
-    else if(interaction.customId == 'option_value_select')
-    {
-      const selected_value = interaction.values[0];
-
-      this.selectDefaultOptionByValue(this.option_value_component, selected_value);
-
-      this.option_data.quiz[this.selected_option] = selected_value;
-      this.fillDescription(this.option_data);
-
-      return this;
-    }
-
   }
 
   selectDefaultOptionByValue(component, value)
@@ -764,11 +827,6 @@ class ServerSettingUI extends QuizbotUI {
     }
 
     return component;
-  }
-
-  onRefresh()
-  {
-    this.fillDescription(this.option_storage.getOptionData());
   }
 
 }

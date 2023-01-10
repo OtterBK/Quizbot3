@@ -34,6 +34,8 @@ client.on('ready', () => {
   console.log(`Register commands...`);
   try{
     command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "733548069169397842"); //봇 테스트 서버    
+    command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "726652673817837618"); //니버하우스
+    command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "918841117015941160"); //DAWN
     client.user.setActivity(`/퀴즈 | /quiz `);
   }catch(exc){
     console.log(exc);

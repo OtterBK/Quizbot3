@@ -60,10 +60,10 @@ class OptionStorage
     {
         this.option = {
             quiz: {
-                audio_play_time: 40000,
+                audio_play_time: 30000,
                 hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
                 skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
-                answer_use_similar: true,
+                use_similar_answer: true,
                 score_type: OPTION_TYPE.SCORE_TYPE.POINT,
                 score_show_max: -1,
             }
@@ -79,7 +79,9 @@ class OptionStorage
     async saveOptionToDB()
     {
         //TODO DB에 저장하는 함수, 성공 시 TRUE 반환
-        return false;
+        return new Promise((resolve, reject) => {
+            resolve(false);
+        })
     }
 
     getOptionData()

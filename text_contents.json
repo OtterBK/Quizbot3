@@ -104,12 +104,12 @@
             "ICON_TYPE_SONG": "🎧",
             "ICON_TYPE_SCRIPT": "🎙️",
             "ICON_TYPE_SELECT": "✔️",
-            "ICON_TYPE_PICTURE": "🖼",
+            "ICON_TYPE_IMAGE": "🖼",
             "ICON_TYPE_OX": "⭕",
             "ICON_TYPE_QNA": "👨‍🎓",
             "ICON_TYPE_INTRO": "🎶",
             "ICON_TYPE_MULTIPLAY": "🛰",
-            "ICON_TYPE_PICTURE_LONG": "🃏",
+            "ICON_TYPE_IMAGE_LONG": "🃏",
             "ALPHABET": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"
                 , "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
             "NUMBER": [ "0️⃣", "1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"],
@@ -118,7 +118,6 @@
         "main_menu":
         {
             "title": "🔔 퀴즈봇 [3]",
-            "url": "",
             "thumbnail": {
                 "url": "https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg"
             },
@@ -131,20 +130,12 @@
         "select_quiz_type":
         {
             "title": "📗 퀴즈 유형 선택",
-            "url": "",
-            "thumbnail": {
-                "url": ""
-            },
             "description": 
                 "🔹어떤 종류의 퀴즈를 플레이할까요?\n\n\n1️⃣)\u1CBC\u1CBC**개발자 퀴즈**\n🔸 \u1CBC\u1CBC개발자가 만들어 둔 퀴즈입니다.\n\n\n2️⃣)\u1CBC\u1CBC**유저 제작 퀴즈**\n🔸 \u1CBC\u1CBC유저님들이 직접 만든 퀴즈입니다.\n\n\n"
         },
         "dev_select_category":
         {
             "title": "📗 퀴즈 종류 선택",
-            "url": "",
-            "thumbnail": {
-                "url": ""
-            },
             "description": 
                 "🔹어떤 퀴즈를 플레이할까요?\n\n\n"
         },
@@ -182,7 +173,10 @@
             "skip_vote": "```🗳 ${who_voted} 님이 건너뛰기에 투표하셨습니다. ( ${current_vote_count} / ${vote_criteria} )```",
             "only_owner_can_use_hint": "⚠ 해당 서버의 힌트 요청은 주최자만 가능하게 설정되어 있습니다. [서버 설정에서 변경 가능]",
             "only_owner_can_use_skip": "⚠ 해당 서버의 스킵 요청은 주최자만 가능하게 설정되어 있습니다. [서버 설정에서 변경 가능]",
-            "force_stop": "```⏹ ${who_stopped}님이 퀴즈를 강제 종료하였습니다.```"
+            "only_owner_can_use_stop": "⚠ 퀴즈 강제 종료는 퀴즈 주최자만 가능합니다.",
+            "force_stop": "```⏹ ${who_stopped}님이 퀴즈를 강제 종료하였습니다.```",
+            "initialize_fail": "```❌ [${quiz_title}] 퀴즈 초기화에 실패했습니다.```",
+            "unknown_quiz_type": "```😅 아직 지원하지 않는 퀴즈 유형입니다.```"
         },
         "timeover_ui":
         {
@@ -219,7 +213,7 @@
         {
             "title": "⚙ 서버 옵션 설정",
             "pre_description": "\u1CBC\n\u1CBC\n옵션 정보를 불러오는 중입니다...\u1CBC\n\u1CBC\n",
-            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${answer_use_similar}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n\u1CBC\n",
+            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${use_similar_answer}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n\u1CBC\n",
 
             "select_menu": {
                 "title": "어떤 옵션을 설정할까요?",
@@ -227,7 +221,7 @@
                     { "label": "노래 재생 시간", "description": "음악 퀴즈에서 얼마동안 음악을 재생할 지 설정합니다.", "value": "audio_play_time" },
                     { "label": "힌트 요청 방식", "description": "퀴즈 진행 시, 힌트 요청 방식을 설정합니다.", "value": "hint_type" },
                     { "label": "스킵 요청 방식", "description": "퀴즈 진행 시, 스킵 요청 방식을 설정합니다.", "value": "skip_type" },
-                    { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 생성 여부를 설정합니다.", "value": "answer_use_similar" },
+                    { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 생성 여부를 설정합니다.", "value": "use_similar_answer" },
                     { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" }
                 ],
                 "option_values": {
@@ -253,7 +247,7 @@
                         { "label": "투표", "description": "절반이 찬성할 시 스킵합니다.", "value": "투표" },
                         { "label": "주최자", "description": "퀴즈를 시작한 주최자만 스킵이 가능합니다.", "value": "주최자" }
                     ],
-                    "answer_use_similar": [
+                    "use_similar_answer": [
                         { "label": "사용", "description": "퀴즈 시작 시, 유사 정답을 생성합니다.", "value": "true" },
                         { "label": "사용 안함", "description": "퀴즈 시작 시, 유사 정답을 생성하지 않습니다.", "value": "false" }
                     ],
@@ -263,6 +257,8 @@
                     ]
                 }
             },
+            "save_success": "✅ 옵션을 저장하였습니다.",
+            "save_fail": "🛑 옵션 저장에 실패했습니다.",
             "use": "사용",
             "not_use": "사용 안함",
             "score_infinity": "모두 표시"
