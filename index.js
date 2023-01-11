@@ -47,9 +47,12 @@ client.on('ready', () => {
   
   ///////////
   logger.info(`Register commands...`);
-  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "733548069169397842"); //봇 테스트 서버    
-  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "726652673817837618"); //니버하우스
-  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "918841117015941160"); //DAWN
+
+  command_register.registerGlobalCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID);
+
+  client.guilds.cache.forEach(guild => {
+    if(guild != undefined) command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, guild.id);
+  });
 
   ///////////
   logger.info(`Setting bot Status...`);

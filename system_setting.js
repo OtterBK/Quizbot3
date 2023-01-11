@@ -37,6 +37,9 @@ exports.SYSTEM_CONFIG = {
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
 
     pg_max_pool_size: 10, //Postgresql max pool 개수
+
+    log_max_files: 10, //log로 남길 파일 최대 수
+    log_max_size: '100m' //각 log 파일 최대 크기
 }
 
 exports.CUSTOM_EVENT_TYPE = {
