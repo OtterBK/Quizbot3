@@ -17,13 +17,17 @@ const pool = new pg.Pool({
   max: SYSTEM_CONFIG.pg_max_pool_size,
 });
 
+is_initialized = false;
+
 exports.initialize = async () => {
     return await pool.connect(err => {
         if (err) {
           logger.error(`Failed to connect db err: ${err}`);
+          is_initialized = false;
           return true;
         } else {
           logger.info(`Connected to db!`);
+          is_initialized = true;
           return false;
         }
     });
@@ -57,6 +61,13 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
 
 function sendQuery(query_string)
 {
+  if(is_initialized == false)
+  {
+    return new Promise((resolve, reject) => {
+      resolve(undefined);
+    });
+  }
+
   return pool.query(query_string)
   .then((result) =>
   {

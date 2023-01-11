@@ -24,7 +24,7 @@ exports.SYSTEM_CONFIG = {
     graceful_timeover_max_try: 10, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
+    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, 대부분의 상황에서는 false로 하면됨
@@ -37,6 +37,9 @@ exports.SYSTEM_CONFIG = {
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
 
     pg_max_pool_size: 10, //Postgresql max pool 개수
+
+    log_max_files: 10, //log로 남길 파일 최대 수
+    log_max_size: '100m' //각 log 파일 최대 크기
 }
 
 exports.CUSTOM_EVENT_TYPE = {

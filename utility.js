@@ -27,17 +27,19 @@ exports.loadLocalDirectoryQuiz = (contents_path) =>
   let quiz_contents = [];
   content_list.forEach(content_name => {
 
-    let quiz_content = this.parseContentInfoFromDirName(content_name);
-
-    // 하위 컨텐츠 있으면 추가 파싱 진행
     const content_path = `${contents_path}/${content_name}`;
+
+    const stat = fs.lstatSync(content_path);
+    if(stat.isDirectory() == false) return; //폴더만 load함
+
+    let quiz_content = this.parseContentInfoFromDirName(content_name);
     quiz_content['content_path'] = content_path;
 
+    // 하위 컨텐츠 있으면 추가 파싱 진행
     const is_quiz = quiz_content['is_quiz'];
 
     if(is_quiz == false)
     {
-      const stat = fs.lstatSync(content_path);
       if(!stat.isFile()) //퀴즈가 아닌데 폴더 타입이면 하위 디렉터리 읽어옴
       {
         quiz_content['sub_contents'] = this.loadLocalDirectoryQuiz(content_path);

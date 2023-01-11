@@ -1270,8 +1270,12 @@ class Prepare extends QuizLifecycle
         if(ignore_option_audio_play_time == false && use_random_start == true)
         {
             //노래 재생 시작 지점 파싱
-            const audio_byte_size = (audio_info.format.bitsPerSample * audio_info.format.numberOfSamples) / 8; //오디오 bytes 사이즈
-            const audio_bitrate = audio_info.format.bitrate; //초당 재생 bit, (여기서는 byte로 계산돼서 초당 재생 byte)
+            const audio_format = audio_info.format.container;
+            const do_begin_start = audio_format == 'MPEG' ? false : true;
+
+            const audio_bitrate = audio_info.format.bitrate; //초당 재생 bit
+            const audio_byterate = audio_bitrate / (audio_format == 'MPEG' ? 8 : 1);  //이상하게 WAVE 타입은 bitrate가 그대로 byterate다...
+            const audio_byte_size = (audio_byterate * audio_info.format.duration); //오디오 bytes 사이즈
 
             //오디오 자르기 기능
             /**
@@ -1280,18 +1284,16 @@ class Prepare extends QuizLifecycle
             metadata를 아예 안붙이면 play 조차 안됨, 아마 CreateAudioResource 할 때 변환이 안되는 듯
             어떤건 잘되고 어떤건 잘 안됨, mp3의 경우는 metadata 안 붙여도 잘돼서 그냥 mp3만 지원하자 
             **/
-            const audio_format = audio_info.format.format_name;
-            const do_begin_start = audio_format === 'mp3' ? false : true;
 
             //TODO 나중에 여유 있을 때 랜덤 재생 구간을 최대한 중간 쪽으로 잡도록 만들자
             const audio_play_time_sec = audio_play_time / 1000; //계산하기 쉽게 초로 환산 ㄱㄱ
-            const audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_bitrate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
-            const audio_min_start_point = 2.5 * audio_bitrate;  //앞에도 2.5초 정도 자르고 싶음
+            const audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_byterate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+            const audio_min_start_point = 2.5 * audio_byterate;  //앞에도 2.5초 정도 자르고 싶음
 
             if((audio_max_start_point > audio_min_start_point)) //충분히 재생할 수 있는 start point가 있다면
             {
                 audio_start_point = do_begin_start ? 0 : parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); //mp3타입만 랜덤 start point 지원
-                audio_end_point = parseInt(audio_start_point + (audio_play_time_sec * audio_bitrate));
+                audio_end_point = parseInt(audio_start_point + (audio_play_time_sec * audio_byterate));
             }
         }
         

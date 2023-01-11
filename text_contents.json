@@ -221,7 +221,7 @@
                     { "label": "노래 재생 시간", "description": "음악 퀴즈에서 얼마동안 음악을 재생할 지 설정합니다.", "value": "audio_play_time" },
                     { "label": "힌트 요청 방식", "description": "퀴즈 진행 시, 힌트 요청 방식을 설정합니다.", "value": "hint_type" },
                     { "label": "스킵 요청 방식", "description": "퀴즈 진행 시, 스킵 요청 방식을 설정합니다.", "value": "skip_type" },
-                    { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 생성 여부를 설정합니다.", "value": "use_similar_answer" },
+                    { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 자동 생성 여부를 설정합니다.", "value": "use_similar_answer" },
                     { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" }
                 ],
                 "option_values": {

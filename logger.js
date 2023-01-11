@@ -44,7 +44,8 @@ const getLogger = (path) => {
                 filename: `%DATE%.log`,
                 zippedArchive: true,	
                 handleExceptions: true,
-                maxFiles: 30,  
+                maxFiles: SYSTEM_CONFIG.log_max_files,
+                maxSize: SYSTEM_CONFIG.log_max_size,
             }),
             // // error 레벨 로그를 저장할 파일 설정
             // new winstonDaily({

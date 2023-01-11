@@ -51,3 +51,11 @@ exports.registerCommands = async (token, clientId, guildId) => {
         .then(() => logger.info('Successfully registered application commands for ' + guildId))
         .catch(err => logger.error(err));
 }
+
+exports.registerGlobalCommands = async (token, clientId) => {
+    const rest = new REST({version: '10'}).setToken(token);
+
+    rest.put(Routes.applicationCommands(clientId), {body: commands})
+        .then(() => logger.info('Successfully registered global application commands'))
+        .catch(err => logger.error(err));
+}
