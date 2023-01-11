@@ -2,6 +2,7 @@
 
 const { REST, Routes } = require('discord.js');
 const {SlashCommandBuilder} = require("@discordjs/builders");
+const logger = require('./logger.js')('Commands');
 
 //명령어 목록
 const commands = [
@@ -47,6 +48,6 @@ exports.registerCommands = async (token, clientId, guildId) => {
     const rest = new REST({version: '10'}).setToken(token);
 
     rest.put(Routes.applicationGuildCommands(clientId, guildId), {body: commands})
-        .then(() => console.log('Successfully registered application commands for ' + guildId))
-        .catch(console.error);
+        .then(() => logger.info('Successfully registered application commands for ' + guildId))
+        .catch(err => logger.error(err));
 }

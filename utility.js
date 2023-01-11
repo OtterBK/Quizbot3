@@ -1,12 +1,24 @@
 //외부 modules
 const fs = require('fs');
-const { getAudioDurationInSeconds } = require('get-audio-duration')
 const { createAudioResource, StreamType } = require('@discordjs/voice');
-const ffprobe = require('node-ffprobe'); //원래라면 module.exports.sync 를 true 셋해서 불러와야 doProbeSync로 가져오는데... 그냥 모듈 수정해서 하드코딩으로 가져오게함
+const mm = require('music-metadata');
 
 //로컬 modules
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('./system_setting.js');
-const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
+const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
+const logger = require('./logger.js')('Utility');
+
+//미리 로드해둘 것들
+let bgm_long_timers = undefined;
+exports.initializeBGM = () =>
+{
+  const long_timer_path = SYSTEM_CONFIG.bgm_path + "/" + BGM_TYPE.COUNTDOWN_LONG;
+  bgm_long_timers = [];
+  long_timer_list = fs.readdirSync(long_timer_path);
+  long_timer_list.forEach((file_name) => {
+    bgm_long_timers.push(long_timer_path + "/" + file_name)
+  });
+}
 
 exports.loadLocalDirectoryQuiz = (contents_path) =>
 {
@@ -104,11 +116,11 @@ exports.getQuizTypeFromIcon = (quiz_icon) => {
     if(quiz_icon == text_contents.icon.ICON_TYPE_SONG)
         return QUIZ_TYPE.SONG
 
-    if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE)
-        return QUIZ_TYPE.PICTURE
+    if(quiz_icon == text_contents.icon.ICON_TYPE_IMAGE)
+        return QUIZ_TYPE.IMAGE
 
-    if(quiz_icon == text_contents.icon.ICON_TYPE_PICTURE_LONG)
-        return QUIZ_TYPE.PICTURE_LONG
+    if(quiz_icon == text_contents.icon.ICON_TYPE_IMAGE_LONG)
+        return QUIZ_TYPE.IMAGE_LONG
 
     if(quiz_icon == text_contents.icon.ICON_TYPE_OX)
         return QUIZ_TYPE.OX
@@ -163,24 +175,29 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
   let gap = to - from; //0 < ? fade_out, 0 > ? fade_in
 
   const is_fade_in = gap >= 0 ? true : false;
-  const change_per = gap / (duration / interval);
 
   if(is_fade_in == true)
   {
-    audio_resource.volume.setVolume(current_volume);
     audio_player.play(audio_resource);
+    if(audio_resource == undefined || audio_resource.volume == undefined) return;
+    audio_resource.volume.setVolume(current_volume);
   }
 
+  const change_per = gap / (duration / interval);
   const timer_id = setInterval(() => {
+
+    if(audio_resource == undefined || audio_resource.volume == undefined) //가드 코드
+    {
+      clearInterval(timer_id);
+    }
 
     if(current_time >= duration)
     {
-      if(is_fade_in == false)
+      if(is_fade_in == false && audio_resource.volume.volume == 0)
       {
-        // audio_player.stop();
+        audio_player.stop();
       }
       clearInterval(timer_id);
-      console.log("finished fade " + (is_fade_in ? "in" : "out"));
       return;
     }
 
@@ -203,23 +220,25 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
   return timer_id;
 }
 
-exports.getAudioLength = async (audio_file_path) => 
-{
-  //filepath 말고 stream 으로 알아내는 방법이 있는데,
-  //해당 모듈에서 계속 No Duration Found 문제가 발생한다.
-  //filepath 로 duration 가져오는데 보통 100ms 걸린다
-  return await getAudioDurationInSeconds(audio_file_path);
-}
-
 exports.getBlobLength = () => 
 {
   // https://www.npmjs.com/package/get-blob-duration
   // https://www.npmjs.com/package/ffprobe-duration
 }
 
-exports.getAudioInfo = async (file_path) => 
+exports.getAudioInfoFromPath = async (file_path) => 
 {
-  return ffprobe(file_path);
+  return await mm.parseFile(file_path);
+}
+
+exports.getAudioInfoFromStream = async (stream) => 
+{
+  return await mm.parseStream(stream, {mimeType: 'audio/mpeg'});
+}
+
+exports.getAudioInfoFromBuffer = async (buffer) => 
+{
+  return await mm.parseBuffer(buffer);
 }
 
 exports.getRandom = (min, max) => 
@@ -270,12 +289,36 @@ exports.playBGM = async (audio_player, bgm_type) => {
 
   if(audio_player == undefined) return;
 
-  const bgm_file_path = SYSTEM_CONFIG.bgm_path + bgm_type;
+  let bgm_file_path = undefined;
+  if(bgm_type == BGM_TYPE.COUNTDOWN_LONG)
+  {
+    if(bgm_long_timers == undefined || bgm_long_timers.length == 0){
+      logger.error("BGM long timer list is empty, check long timer path or InitializeBGM() function has been called");
+      return undefined;
+    }
+    const rd = exports.getRandom(0, bgm_long_timers.length)
+    bgm_file_path = bgm_long_timers[rd];
+  }
+  else
+  {
+    bgm_file_path = SYSTEM_CONFIG.bgm_path + "/" + bgm_type
+  }
+
+  if(bgm_file_path == undefined) return;
 
   const bgm_resource = createAudioResource(bgm_file_path, {
     inputType: StreamType.WebmOpus,
     inlineVolume: false,
   });
   audio_player.play(bgm_resource);
+
+  return bgm_resource;
 }
 
+exports.isImageFile = (file_name) => { //그냥 확장자로 확인해도 된다.
+  if(file_name.endsWith(".png") || file_name.endsWith(".jpg") || file_name.endsWith(".gif") || file_name.endsWith(".PNG") || file_name.endsWith(".webp"))
+  {
+    return true;
+  }
+  return false;
+}
