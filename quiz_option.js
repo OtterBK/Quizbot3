@@ -1,3 +1,9 @@
+//외부 modules
+
+
+//로컬 modules
+const db_manager = require('./db_manager.js');
+const logger = require('./logger.js')('OptionManager');
 
 /** global 변수 **/
 let option_storage_map = {}; //서버별 옵션 값
@@ -58,6 +64,8 @@ class OptionStorage
 {
     constructor(guild_id)
     {
+        this.guild_id = guild_id;
+
         this.option = {
             quiz: {
                 audio_play_time: 30000,
@@ -72,16 +80,58 @@ class OptionStorage
 
     async loadOptionFromDB()
     {
-        //TODO DB에서 옵션 로드하는 함수, 성공 시 TRUE 반환
-        return false;
+        let option_fields = '';
+        Object.keys(this.option.quiz).forEach((field) =>
+        {
+            if(option_fields != '')
+            {
+                option_fields += ', ';
+            }
+            option_fields += `${field}`;
+        });
+
+        const result = await db_manager.selectOption(this.guild_id, option_fields);
+
+        if(result == undefined || result.rowCount == 0)
+        {
+            return false;
+        }
+
+        const result_row = result.rows[0];
+
+        let option_data = {};
+        Object.keys(result_row).forEach((key) => {
+            const value = result_row[key];
+            option_data[key] = value;
+        })
+        this.option.quiz = option_data;
+
+        return true;
     }
 
     async saveOptionToDB()
     {
-        //TODO DB에 저장하는 함수, 성공 시 TRUE 반환
-        return new Promise((resolve, reject) => {
-            resolve(false);
-        })
+        let option_fields = '';
+        let option_values = '';
+        Object.keys(this.option.quiz).forEach((field) =>
+        {
+            if(option_fields != '')
+            {
+                option_fields += ', ';
+            }
+            option_fields += `${field}`;
+        });
+
+        Object.values(this.option.quiz).forEach((value) =>
+        {
+            if(option_values != '')
+            {
+                option_values += ', ';
+            }
+            option_values += `'${`${value}`.trim()}'`;
+        });
+
+        return db_manager.updateOption(this.guild_id, option_fields, option_values);
     }
 
     getOptionData()

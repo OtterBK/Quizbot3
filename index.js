@@ -8,13 +8,16 @@ const client = new Client({ intents: [
 ] });
 
 //로컬 modules
-const BOT_CONFIG = require('./bot_config.json');
+const PRIVATE_CONFIG = require('./private_config.json');
 const { CUSTOM_EVENT_TYPE } = require('./system_setting.js');
 
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
 const quiz_system = require('./quiz_system.js');
+const option_system = require("./quiz_option.js");
 const utility = require('./utility.js');
+const logger = require('./logger.js')('Main');
+const db_manager = require('./db_manager.js');
 
 /** global 변수 **/
 
@@ -22,27 +25,38 @@ const utility = require('./utility.js');
 /**  이벤트 등록  **/
 //봇 최초 실행 이벤트
 client.on('ready', () => {
-  console.log(`Initializing Quizbot...`);
+  logger.info(`Initializing Quizbot...`);
 
   ///////////
-  console.log(`Starting UI Holder Aging Manager`);
+  logger.info(`Initializing BGM Resources...`);
+  utility.initializeBGM();
+
+  logger.info(`Starting GuildCount Manager`);
+  db_manager.initialize(client);
+
+  logger.info(`Starting UI Holder Aging Manager`);
   quizbot_ui.startUIHolderAgingManager();
-  console.log(`Starting GuildCount Manager`);
-  quizbot_ui.startGuildsCountManager(client);
+
+  logger.info(`Starting GuildCount Manager`);
+  quizbot_ui.startGuildsCountManager(client);3
+
+  logger.info(`Loading Option Data from Database...`);
+  client.guilds.cache.forEach(guild => {
+    if(guild != undefined) option_system.loadOptionData(guild.id);
+  });
+  
+  ///////////
+  logger.info(`Register commands...`);
+  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "733548069169397842"); //봇 테스트 서버    
+  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "726652673817837618"); //니버하우스
+  command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, "918841117015941160"); //DAWN
 
   ///////////
-  console.log(`Register commands...`);
-  try{
-    command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "733548069169397842"); //봇 테스트 서버    
-    command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "726652673817837618"); //니버하우스
-    command_register.registerCommands(BOT_CONFIG.BOT_TOKEN, BOT_CONFIG.CLIENT_ID, "918841117015941160"); //DAWN
-    client.user.setActivity(`/퀴즈 | /quiz `);
-  }catch(exc){
-    console.log(exc);
-  }
+  logger.info(`Setting bot Status...`);
+  client.user.setActivity(`/퀴즈 | /quiz `);
 
   ///////////
-  console.log(`Started Quizbot! tag name: ${client.user.tag}!`);
+  logger.info(`Started Quizbot! tag name: ${client.user.tag}!`);
 
 });
 
@@ -85,9 +99,9 @@ client.on('interactionCreate', async interaction => {
 
 //전역 에러 처리
 process.on('uncaughtException', (err) => {
-  console.error(err);
+  logger.error(err);
 });
 
 /** 메인 **/
 //봇 활성화
-client.login(BOT_CONFIG.BOT_TOKEN);
+client.login(PRIVATE_CONFIG.BOT.TOKEN);

@@ -5,7 +5,20 @@ const mm = require('music-metadata');
 
 //로컬 modules
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('./system_setting.js');
-const text_contents = require('./text_contents.json')["kor"]; //한국어로 가져와서 사용
+const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
+const logger = require('./logger.js')('Utility');
+
+//미리 로드해둘 것들
+let bgm_long_timers = undefined;
+exports.initializeBGM = () =>
+{
+  const long_timer_path = SYSTEM_CONFIG.bgm_path + "/" + BGM_TYPE.COUNTDOWN_LONG;
+  bgm_long_timers = [];
+  long_timer_list = fs.readdirSync(long_timer_path);
+  long_timer_list.forEach((file_name) => {
+    bgm_long_timers.push(long_timer_path + "/" + file_name)
+  });
+}
 
 exports.loadLocalDirectoryQuiz = (contents_path) =>
 {
@@ -162,15 +175,21 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
   let gap = to - from; //0 < ? fade_out, 0 > ? fade_in
 
   const is_fade_in = gap >= 0 ? true : false;
-  const change_per = gap / (duration / interval);
 
   if(is_fade_in == true)
   {
-    await audio_resource.volume.setVolume(current_volume);
     audio_player.play(audio_resource);
+    if(audio_resource == undefined || audio_resource.volume == undefined) return;
+    audio_resource.volume.setVolume(current_volume);
   }
 
+  const change_per = gap / (duration / interval);
   const timer_id = setInterval(() => {
+
+    if(audio_resource == undefined || audio_resource.volume == undefined) //가드 코드
+    {
+      clearInterval(timer_id);
+    }
 
     if(current_time >= duration)
     {
@@ -179,7 +198,6 @@ exports.fade_audio_play = async (audio_player, audio_resource, from, to, duratio
         audio_player.stop();
       }
       clearInterval(timer_id);
-      console.log("finished fade " + (is_fade_in ? "in" : "out"));
       return;
     }
 
@@ -271,13 +289,30 @@ exports.playBGM = async (audio_player, bgm_type) => {
 
   if(audio_player == undefined) return;
 
-  const bgm_file_path = SYSTEM_CONFIG.bgm_path + "/" + bgm_type;
+  let bgm_file_path = undefined;
+  if(bgm_type == BGM_TYPE.COUNTDOWN_LONG)
+  {
+    if(bgm_long_timers == undefined || bgm_long_timers.length == 0){
+      logger.error("BGM long timer list is empty, check long timer path or InitializeBGM() function has been called");
+      return undefined;
+    }
+    const rd = exports.getRandom(0, bgm_long_timers.length)
+    bgm_file_path = bgm_long_timers[rd];
+  }
+  else
+  {
+    bgm_file_path = SYSTEM_CONFIG.bgm_path + "/" + bgm_type
+  }
+
+  if(bgm_file_path == undefined) return;
 
   const bgm_resource = createAudioResource(bgm_file_path, {
     inputType: StreamType.WebmOpus,
     inlineVolume: false,
   });
   audio_player.play(bgm_resource);
+
+  return bgm_resource;
 }
 
 exports.isImageFile = (file_name) => { //그냥 확장자로 확인해도 된다.

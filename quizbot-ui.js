@@ -1,7 +1,7 @@
 'use strict';
 
 //#region 필요한 외부 모듈
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes  } = require('discord.js');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
 //#endregion
@@ -13,6 +13,7 @@ const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('./utility.js');
+const logger = require('./logger.js')('QuizUI');
 //#endregion
 
 //#region 사전 정의 UI들
@@ -169,16 +170,23 @@ function uiHolderAgingManager()
   const uiholder_aging_manager = setInterval(()=>{
   const criteria_value = Date.now() - uiholder_aging_for_oldkey_value; //이거보다 이전에 update 된 것은 삭제
 
-  const keys = Object.keys(uiHolder_map);
-    keys.forEach((key) => {
-      const value = uiHolder_map[key];
-      if(value.last_update_time < criteria_value)
-      {
-        const uiHolder = uiHolder_map[key];
-        uiHolder.free();
-        delete uiHolder_map[key]; //삭제~
-      }
-    })
+    let free_count = 0;
+    const keys = Object.keys(uiHolder_map);
+
+    logger.info(`Aginging UI Holder... targets: ${keys.length} ,criteria: ${criteria_value}`);
+
+      keys.forEach((key) => {
+        const value = uiHolder_map[key];
+        if(value.last_update_time < criteria_value)
+        {
+          const uiHolder = uiHolder_map[key];
+          uiHolder.free();
+          ++free_count;
+          delete uiHolder_map[key]; //삭제~
+        }
+      })
+
+      logger.info(`Dong Aginging UI Holder... free count: ${free_count}`);
   }, SYSTEM_CONFIG.ui_holder_aging_manager_interval * 1000); //체크 주기
 
   return uiholder_aging_manager;
@@ -192,6 +200,9 @@ function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
 
   const guilds_count_manager = setInterval(()=>{
     guilds_count = client.guilds.cache.size;
+
+    logger.info(`Calculated guild count: ${guilds_count}`);
+
   }, guilds_count_manager_interval);
 
   return guilds_count_manager;
@@ -228,7 +239,7 @@ class UIHolder
     this.ui = undefined;
     this.prev_ui_stack = undefined; //뒤로가기용 UI스택
 
-    console.log(`free uiHolder ${guild_id}`);
+    logger.info(`Free UI Holder guild_id:${this.guild_id}`);
   }
 
   getUI()
@@ -284,14 +295,22 @@ class UIHolder
       this.initialized = true;
       this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        console.log(`sendUI failed: ${err.message}`);
+        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        {
+          return;
+        }
+        logger.error(`Failed to Reply UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.message}`);
       });
     }
     else
     {
       this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        console.log(`UpdateUI failed: ${err.message}`);
+        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        {
+          return;
+        }
+        logger.error(`Failed to Update UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.message}`);
       });
     }
   }
@@ -316,6 +335,8 @@ class QuizbotUI {
     {
       case CUSTOM_EVENT_TYPE.interactionCreate:
         return this.onInteractionCreate(event_object);
+
+      default: return undefined;
     }
   }
 
@@ -329,6 +350,10 @@ class QuizbotUI {
     if(this.holder != undefined)
     {
       this.holder.updateUI();
+    }
+    else
+    {
+      logger.error(`Failed to self Update UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
     }
   }
   
@@ -456,7 +481,11 @@ class DevQuizSelectUI extends QuizbotUI
       description: text_contents.dev_select_category.description,
     };
 
-    this.cur_contents = (contents == undefined ? DevQuizSelectUI.quiz_contents : contents);
+    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents);
+    if(this.cur_contents == undefined)
+    {
+      logger.error(`Undefined Current Contents on DevQuizSelectUI guild_id:${this.guild_id}, err: ${"Check Value of Resource Path Option"}`);
+    }
 
     this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
     this.cur_page = 0;
@@ -476,11 +505,13 @@ class DevQuizSelectUI extends QuizbotUI
     let from = this.count_per_page * page_num;
     let to = (this.count_per_page * page_num) + this.count_per_page;
     if(to >=  contents.length) 
-      to = contents.length - 1;
+      to = contents.length;
 
     for(let i = from; i < to; i++)
     {
-      page_contents.push(this.cur_contents[i]);
+      const content = this.cur_contents[i];
+      if(content == undefined) continue;
+      page_contents.push(content);
     }
 
     let contents_message = text_contents.dev_select_category.description;
@@ -529,9 +560,9 @@ class DevQuizSelectUI extends QuizbotUI
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
 
-    if(index >= this.cur_contents.length)
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
     {
-      console.log(`${index} is not in this.cur_contents`);
+      return;
     }
 
     const content = this.cur_contents[index];
@@ -603,10 +634,10 @@ class QuizInfoUI extends QuizbotUI
       .setCustomId('start')
       .setLabel('시작')
       .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId('scoreboard')
-        .setLabel('순위표')
-        .setStyle(ButtonStyle.Secondary),
+      // new ButtonBuilder()
+      //   .setCustomId('scoreboard')
+      //   .setLabel('순위표')
+      //   .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('settings')
         .setLabel('설정')
@@ -639,26 +670,20 @@ class QuizInfoUI extends QuizbotUI
         interaction.channel.send({content: reason_message});
         return;
       }
-
-      if(check_ready['result'] == false)
-      {
-        //check_ready['reason'] 떄문에 준비안됐다는 메시지
-        return;
-      }
       
       quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
 
-      return new AlertQuizStartUI(quiz_info, owner); //명시적으로 -1 넘겨서 uiholder 종료
+      return new AlertQuizStartUI(quiz_info, owner); 
     }
 
     if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
     {
-      
+      //TODO 순위표 만들기
     }
 
     if(interaction.customId == 'settings') //설정 버튼 눌렀을 떄
     {
-      
+      return new ServerSettingUI(interaction.guild.id);
     }
   }
 }
@@ -782,30 +807,19 @@ class ServerSettingUI extends QuizbotUI {
 
         this.option_storage.saveOptionToDB()
         .then((result) => {
-          let result_message = '';
-          if(result == true)
+
+          let result_message = text_contents.server_setting_ui.save_fail;
+          if(result != undefined)
           {
-            result_message = text_contents.server_setting_ui.save_success;
+            result_message = text_contents.server_setting_ui.save_success
           }
-          else
-          {
-            result_message = text_contents.server_setting_ui.save_fail;
-          }
+
           this.embed.footer = {
             "text": result_message
           }
 
           this.update();
         })
-        .catch((error) => {
-          const result_message = text_contents.server_setting_ui.save_fail;
-          this.embed.footer = {
-            "text": result_message
-          }
-          console.log("Failed to save option: " + error.message);
-
-          this.update();
-        });
       }
     }
   }
