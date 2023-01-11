@@ -1259,23 +1259,25 @@ class Prepare extends QuizLifecycle
 
         //오디오 정보 가져오기
         const audio_info = await utility.getAudioInfoFromPath(question);
+        const audio_format = audio_info.format.container;
+        const audio_bitrate = audio_info.format.bitrate; //초당 재생 bit
+        const audio_byterate = audio_bitrate / (audio_format == 'MPEG' ? 8 : 1);  //이상하게 WAVE 타입은 bitrate가 그대로 byterate다...
+        const audio_duration = audio_info.format.duration;
+        const audio_byte_size = (audio_byterate * audio_info.format.duration); //오디오 bytes 사이즈
+        
         //오디오 길이 먼저 넣어주고~
         const audio_play_time = option_data.quiz.audio_play_time; 
-        const audio_length = ((audio_info.format.duration) ?? 1000) * 1000; //10000000 -> 무조건 오디오 길이 쓰도록
-        
-        target_quiz['audio_length'] = ignore_option_audio_play_time || (audio_length < audio_play_time) ? audio_length : audio_play_time;
+        let audio_length = (audio_duration == undefined ? audio_play_time : audio_duration * 1000); //10000000 -> 무조건 오디오 길이 쓰도록
+
+        audio_length = (audio_length < audio_play_time) ? audio_length : audio_play_time;
+        target_quiz['audio_length'] = audio_length;
 
         let audio_start_point = undefined;
         let audio_end_point = undefined;
         if(ignore_option_audio_play_time == false && use_random_start == true)
         {
             //노래 재생 시작 지점 파싱
-            const audio_format = audio_info.format.container;
             const do_begin_start = audio_format == 'MPEG' ? false : true;
-
-            const audio_bitrate = audio_info.format.bitrate; //초당 재생 bit
-            const audio_byterate = audio_bitrate / (audio_format == 'MPEG' ? 8 : 1);  //이상하게 WAVE 타입은 bitrate가 그대로 byterate다...
-            const audio_byte_size = (audio_byterate * audio_info.format.duration); //오디오 bytes 사이즈
 
             //오디오 자르기 기능
             /**
@@ -1302,7 +1304,7 @@ class Prepare extends QuizLifecycle
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = Infinity;
+        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : (audio_start_point + ((audio_length / 1000)* audio_byterate)); //엄격하게 잘라야함
 
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});
 
