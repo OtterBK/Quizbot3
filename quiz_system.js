@@ -594,7 +594,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
         {
             if(use_fade_in)
             {
-                utility.fade_audio_play(audio_player, resource, 0, 1.0, fade_in_duration);
+                utility.fade_audio_play(audio_player, resource, 0.1, 1.0, fade_in_duration);
                 return Date.now() + fade_in_duration;  //
             }
             resource.volume.volume = 1.0;
@@ -1249,6 +1249,12 @@ class Prepare extends QuizLifecycle
                     inlineVolume: SYSTEM_CONFIG.use_inline_volume,
                 });
             }
+
+            if(SYSTEM_CONFIG.use_inline_volume)
+            {
+                audio_resource.volume.setVolume(0);
+            }
+
             target_quiz['answer_audio_resource'] = audio_resource;
             //오디오 재생 길이 가져오기
             let audio_play_time = target_quiz['answer_audio_play_time'];
