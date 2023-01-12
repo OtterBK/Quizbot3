@@ -1,10 +1,12 @@
 'use strict';
 
 //외부 modules
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, } = require('discord.js');
 const client = new Client({ intents: [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildVoiceStates,
+  GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.MessageContent,
 ] });
 
 //로컬 modules
@@ -28,8 +30,11 @@ client.on('ready', () => {
   logger.info(`Initializing Quizbot...`);
 
   ///////////
-  logger.info(`Initializing BGM Resources...`);
+  logger.info(`Initializing BGM Resources`);
   utility.initializeBGM();
+
+  logger.info(`Initializing Quiz System`);
+  quiz_system.initialize(client);
 
   logger.info(`Starting GuildCount Manager`);
   db_manager.initialize(client);
@@ -38,7 +43,7 @@ client.on('ready', () => {
   quizbot_ui.startUIHolderAgingManager();
 
   logger.info(`Starting GuildCount Manager`);
-  quizbot_ui.startGuildsCountManager(client);3
+  quizbot_ui.startGuildsCountManager(client);
 
   logger.info(`Loading Option Data from Database...`);
   client.guilds.cache.forEach(guild => {
@@ -64,7 +69,7 @@ client.on('ready', () => {
 });
 
 // 상호작용 이벤트
-client.on('interactionCreate', async interaction => {
+client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
 
   let guildID = interaction.guild.id;
 
@@ -100,9 +105,22 @@ client.on('interactionCreate', async interaction => {
 
 });
 
+//메시지 이벤트
+client.on(CUSTOM_EVENT_TYPE.messageCreate, async interaction => {
+
+  let guildID = interaction.guild.id;
+
+  const quiz_session = quiz_system.getQuizSession(guildID);
+  if(quiz_session != undefined)
+  {
+    quiz_session.on(CUSTOM_EVENT_TYPE.message, interaction);
+  }
+
+});
+
 //전역 에러 처리
 process.on('uncaughtException', (err) => {
-  logger.error(err);
+  logger.error(`Uncaught exception error!!! err: ${err.stack}`);
 });
 
 /** 메인 **/
