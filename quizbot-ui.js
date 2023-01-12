@@ -137,9 +137,6 @@ exports.initialize = (client) => {
       return false;
   }
   bot_client = client;
-
-  root_contents = utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자
-
   return true;
 }
 
@@ -484,7 +481,7 @@ class DevQuizSelectUI extends QuizbotUI
 {
 
   static resource_path = SYSTEM_CONFIG.dev_quiz_path;
-  static quiz_contents = root_contents;
+  static quiz_contents =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
 
   constructor(contents)
   {
