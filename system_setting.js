@@ -24,7 +24,7 @@ exports.SYSTEM_CONFIG = {
     graceful_timeover_max_try: 10, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
+    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, 대부분의 상황에서는 false로 하면됨
@@ -48,14 +48,15 @@ exports.CUSTOM_EVENT_TYPE = {
 }
 
 exports.QUIZ_TYPE = {
-    SONG: "노래",
-    SCRIPT: "대사",
+    SONG: "노래 퀴즈",
+    SCRIPT: "대사 퀴즈",
     // SELECT: "객관식", //안씀
     // TTS: "TTS 사용방식", //안씀
     GLOWLING: "포켓몬 울음소리",
-    IMAGE: "그림",
-    OX: "OX퀴즈",
-    QNA: "텍스트 기반 qna",
+    IMAGE: "그림 퀴즈",
+    OX: "OX 퀴즈",
+    TEXT: "텍스트 퀴즈",
+    TEXT_LONG: "타이머 긴 텍스트 퀴즈",
     // FAST_QNA: "텍스트 기반 qna, 타이머 짧음", //안씀
     INTRO: "인트로 맞추기",
     MULTIPLAY: "멀티플레이",
