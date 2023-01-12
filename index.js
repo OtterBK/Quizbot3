@@ -36,6 +36,9 @@ client.on('ready', () => {
   logger.info(`Initializing Quiz System`);
   quiz_system.initialize(client);
 
+  logger.info(`Initializing Quiz UI`);
+  quizbot_ui.initialize(client);
+
   logger.info(`Starting GuildCount Manager`);
   db_manager.initialize(client);
 

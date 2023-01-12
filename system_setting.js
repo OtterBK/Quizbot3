@@ -70,7 +70,7 @@ exports.EXPLAIN_TYPE = {
 exports.BGM_TYPE = {
     BELL: "bell.mp3",
     COUNTDOWN_10: "countdown10.wav",
-    COUNTDOWN_LONG: "longtimer",
+    COUNTDOWN_LONG: "longTimer",
     ENDING: "ENDING.mp3",
     FAIL: "FAIL.mp3",
     MATCH_FIND: "MATCH_FIND.mp3",

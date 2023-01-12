@@ -22,6 +22,8 @@ exports.initializeBGM = () =>
 
 exports.loadLocalDirectoryQuiz = (contents_path) =>
 {
+  logger.info(`Loading local directory quiz...`);
+  
   let content_list = fs.readdirSync(contents_path);
 
   let quiz_contents = [];
