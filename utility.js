@@ -130,8 +130,8 @@ exports.getQuizTypeFromIcon = (quiz_icon) => {
     if(quiz_icon == text_contents.icon.ICON_TYPE_INTRO)
         return QUIZ_TYPE.INTRO
 
-    if(quiz_icon == text_contents.icon.ICON_TYPE_QNA)
-        return QUIZ_TYPE.QNA
+    if(quiz_icon == text_contents.icon.ICON_TYPE_TEXT)
+        return QUIZ_TYPE.TEXT
 
     if(quiz_icon == text_contents.icon.ICON_TYPE_SCRIPT)
         return QUIZ_TYPE.SCRIPT

@@ -183,7 +183,7 @@ class QuizPlayUI
         this.ui_instance = ui_instance;
     })
     .catch(err => {
-        logger.error(`Failed to Send QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.message}`);
+        logger.error(`Failed to Send QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
     })
     .finally(() => {
         
@@ -203,7 +203,7 @@ class QuizPlayUI
         {
             return;
         }
-        logger.error(`Failed to Delete QuizPlayUI, guild_id:${this.guild_id}, err: ${err.message}`);
+        logger.error(`Failed to Delete QuizPlayUI, guild_id:${this.guild_id}, err: ${err.stack}`);
     });
     this.ui_instance = undefined;
   }
@@ -221,7 +221,7 @@ class QuizPlayUI
         const objects = this.createSendObject();
         await this.ui_instance.edit(objects)
         .catch(err => {
-            logger.error(`Failed to Update QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.message}`);
+            logger.error(`Failed to Update QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
         })
         .finally(() => {
             
@@ -364,6 +364,8 @@ class QuizSession
             case QUIZ_TYPE.INTRO: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionIntro(this)); break;
             case QUIZ_TYPE.SCRIPT: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionIntro(this)); break;
             case QUIZ_TYPE.IMAGE_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionImage(this)); break;
+            case QUIZ_TYPE.TEXT: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionText(this)); break;
+            case QUIZ_TYPE.TEXT_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionText(this)); break;
 
             default: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionUnknown(this));            
         }
@@ -470,7 +472,7 @@ class QuizLifecycle
                 goNext = (await this.enter()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}`);
+                logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -492,7 +494,7 @@ class QuizLifecycle
                 goNext = (await this.act()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}`);
+                logger.error(`Failed act step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -514,7 +516,7 @@ class QuizLifecycle
                 goNext = (await this.exit()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}`);
+                logger.error(`Failed exit step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -727,7 +729,7 @@ class Initialize extends QuizLifecycle
         catch(err)
         {
             this.initialize_success = false;
-            logger.error(`Failed to basic initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_info: ${JSON.stringify(this.quiz_session.quiz_info)}, err: ${err.message}`);
+            logger.error(`Failed to basic initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_info: ${JSON.stringify(this.quiz_session.quiz_info)}, err: ${err.stack}`);
         }
     }
 
@@ -931,6 +933,81 @@ class Initialize extends QuizLifecycle
 
         return hint;
     }
+
+    parseFromQuizTXT(txt_path)
+    {
+        const quiz_info = this.quiz_session.quiz_info;
+        const quiz_data = this.quiz_session.quiz_data;
+
+        //quiz.txt를 찾았다... 이제 이걸 파싱... 난 왜 이런 방식을 사용했던걸까..?
+        const info_txt_path = `${txt_path}`;
+        const info_data = fs.readFileSync(info_txt_path, 'utf8');
+
+        let quiz_list = [];
+        let parsed_quiz = {};
+
+        info_data.split('\n').forEach((line) => {
+            if(line.trim() == '')  //공백 line 만나면 다음 퀴즈다.
+            {
+                if(parsed_quiz['question'] != undefined) //질문 파싱에 성공했다면
+                {
+                    quiz_list.push(parsed_quiz); //파싱한 퀴즈 넣어주자
+                    parsed_quiz = {}; //파싱 퀴즈 초기화 ㄱㄱ
+                }
+                return;
+            } 
+
+            if(line.startsWith('quiz_answer:')) //이게 정답이다
+            {
+                parsed_quiz['answer_string'] = line.replace('quiz_answer:', "").trim();
+                return;
+            }
+
+            if(line.startsWith('desc:'))
+            {
+                parsed_quiz['author'] = line.replace('desc:', "").trim(); //author 로 바로 넣자
+                return;
+            }
+
+            if(parsed_quiz['question'] == undefined) 
+            {
+                parsed_quiz['question'] = line + "\n";
+                return;
+            }
+            parsed_quiz['question'] += line + "\n"; //그 외에는 다 질문으로
+
+        }); //한 줄씩 일어오자
+
+        //이제 파싱한 퀴즈에 추가 설정을 진행한다.
+        quiz_list.forEach((quiz) => {
+            const quiz_type = quiz_data['quiz_type'];
+            quiz['type'] = quiz_type;
+
+            quiz['hint_used'] = false;
+            quiz['skip_used'] = false;
+            quiz['play_bgm_on_question_finish'] = true; //Question cycle 종료 후 bgm 플레이 여부, 텍스트 기반 퀴즈는 true다.
+
+            //정답 키워드 파싱
+            let answer_string = quiz['answer_string'] ?? '';
+            let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
+            const answers = this.makeAnswers(answers_row);
+            quiz['answers'] = answers;
+
+            if(quiz_type != QUIZ_TYPE.OX) //ox 퀴즈는 힌트가 없다
+            {
+                //힌트 만들기
+                let hint = undefined;
+                if(answers_row.length > 0)
+                {
+                    hint = this.makeHint(answers_row[0]) ?? undefined;
+                }
+                quiz['hint'] = hint;
+            }
+            
+        });
+
+        return quiz_list;
+    }
 }
 
 class InitializeDevQuiz extends Initialize
@@ -946,10 +1023,10 @@ class InitializeDevQuiz extends Initialize
         {
             await this.devQuizInitialize();
         }
-        catch(error)
+        catch(err)
         {
             this.initialize_success = false;
-            logger.error(`Failed to dev quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.message}`);
+            logger.error(`Failed to dev quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack}`);
         }
     }
 
@@ -967,12 +1044,26 @@ class InitializeDevQuiz extends Initialize
         const quiz_folder_list = fs.readdirSync(quiz_path); //TODO 여기도 그냥 정적으로 읽어올까..?
                     
         quiz_folder_list.forEach(quiz_folder_name => {
+
+            const quiz_folder_path = quiz_path + "/" + quiz_folder_name;
+            const quiz_type = quiz_data['quiz_type'];
             
-            if(quiz_folder_name.includes(".txt")) return;
+            if(quiz_folder_name.includes("info.txt")) return;
+
+            if(quiz_folder_name.includes("quiz.txt")) //엇 quiz.txt 파일이다.
+            {
+                if(quiz_type != QUIZ_TYPE.TEXT && quiz_type != QUIZ_TYPE.TEXT && quiz_type != QUIZ_TYPE.OX) //그런데 텍스트 기반 퀴즈가 아니다?
+                {
+                    return; //그럼 그냥 return
+                }
+
+                quiz_list = this.parseFromQuizTXT(quiz_folder_path); //quiz.txt 에서 파싱하는 걸로...
+                return;
+            }
 
             //우선 퀴즈 1개 생성
             let quiz = {};
-            quiz['type'] = quiz_data['quiz_type'];
+            quiz['type'] = quiz_type;
             quiz['hint_used'] = false;
             quiz['skip_used'] = false;
             quiz['play_bgm_on_question_finish'] = false; //Question cycle 종료 후 bgm 플레이 여부
@@ -1006,13 +1097,12 @@ class InitializeDevQuiz extends Initialize
             let hint = undefined;
             if(answers_row.length > 0)
             {
-                hint = this.makeHint(answers_row[0]) ?? "No Hint";
+                hint = this.makeHint(answers_row[0]) ?? undefined;
             }
             quiz['hint'] = hint;
 
             //실제 문제로 낼 퀴즈 파일
-            const quiz_type = quiz['type'];
-            const quiz_folder_path = quiz_path + "/" + quiz_folder_name;
+        
             const quiz_file_list = fs.readdirSync(quiz_folder_path);
             quiz_file_list.forEach(quiz_folder_filename => { 
                 const file_path = quiz_folder_path + "/" + quiz_folder_filename;
@@ -1042,12 +1132,15 @@ class InitializeDevQuiz extends Initialize
                         quiz['answer_audio'] = file_path; 
                         quiz['answer_audio_play_time'] = undefined;  //TODO 이거 지정 가능
                     }
-                }
+                } 
                 
             });
 
             //quiz_list에 넣어주기
-            quiz_list.push(quiz);
+            if(quiz != undefined) 
+            {
+                quiz_list.push(quiz);
+            }
         });
 
         quiz_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
@@ -1194,12 +1287,16 @@ class Prepare extends QuizLifecycle
             {
                 await this.prepareImage(target_quiz);
             }
+            else if(quiz_type == QUIZ_TYPE.TEXT || quiz_type == QUIZ_TYPE.OX)
+            {
+                await this.prepareText(target_quiz);
+            }
 
             await this.prepareAnswerAdditionalInfo(target_quiz); //정답 표시 시, 사용할 추가 정보
         }
         catch(err)
         {
-            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session.guild_id}, target_quiz: ${JSON.stringify(target_quiz)}, err: ${err.message}`);
+            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session.guild_id}, target_quiz: ${JSON.stringify(target_quiz)}, err: ${err.stack}`);
         }
 
         this.prepared_quiz = target_quiz;
@@ -1399,6 +1496,12 @@ class Prepare extends QuizLifecycle
         const quiz_type = target_quiz['type'];
         target_quiz['is_long'] = (quiz_type == QUIZ_TYPE.IMAGE_LONG ? true : false);
     }
+
+    async prepareText(target_quiz)
+    {
+        const question = target_quiz['question'];
+        target_quiz['question'] = "\u1CBC\n" + question + "\u1CBC\n"
+    }
 }
 
 //#endregion
@@ -1419,10 +1522,12 @@ class Question extends QuizLifeCycleWithUtility
         this.timeover_timer = undefined; //타임오버 timer id
         this.timeover_resolve = undefined; //정답 맞췄을 시 강제로 타임오버 대기 취소
         this.fade_out_timer = undefined;
+        this.wait_for_answer_timer = undefined; //정답 대기 timer id
         this.already_start_fade_out = false;
 
         this.skip_prepare_cycle = false; //마지막 문제라면 더 이상 prepare 할 필요없음
         this.progress_bar_timer = undefined; //진행 bar
+        this.progress_bar_fixed_text = undefined; //진행 bar 위에 고정할 text, 진행 bar 흐르는 중간에 표시할 수도 있으니 this로 둔다.
         this.answers = undefined; //문제 정답 목록
 
         this.is_timeover = false;
@@ -1446,6 +1551,8 @@ class Question extends QuizLifeCycleWithUtility
 
         this.skip_prepare_cycle = false;
         this.progress_bar_timer = undefined; //진행 bar
+        this.progress_bar_fixed_text = undefined; //진행 bar 위에 고정할 text
+        this.answers = undefined; //문제 정답 목록
 
         this.is_timeover = false;
         this.timeover_wait = undefined;
@@ -1588,7 +1695,7 @@ class Question extends QuizLifeCycleWithUtility
     //힌트 표시
     async showHint(quiz)
     {
-        if(quiz['hint_used'] == true)
+        if(quiz['hint_used'] == true || quiz['hint'] == undefined)
         {
             return;    
         }
@@ -1636,7 +1743,8 @@ class Question extends QuizLifeCycleWithUtility
         let quiz_ui = this.quiz_session.quiz_ui;
 
         let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
-        quiz_ui.embed.description = `\u1CBC\n\u1CBC\n🕛\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+        quiz_ui.embed.description = this.progress_bar_fixed_text ?? '';
+        quiz_ui.embed.description += `\u1CBC\n\u1CBC\n🕛\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
         quiz_ui.update(); // 우선 한 번은 그냥 시작해주고~
 
         const progress_bar_timer = setInterval(() => {
@@ -1645,7 +1753,8 @@ class Question extends QuizLifeCycleWithUtility
 
             let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
 
-            quiz_ui.embed.description = `\u1CBC\n\u1CBC\n⏱\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+            quiz_ui.embed.description = this.progress_bar_fixed_text ?? '';
+            quiz_ui.embed.description += `\u1CBC\n\u1CBC\n⏱\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
             quiz_ui.update();
 
         }, progress_bar_interval);
@@ -1880,7 +1989,7 @@ class Question extends QuizLifeCycleWithUtility
             // let result_message = "```" + `${message.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
             // message.reply({content: result_message})
             // .catch(err => {
-            //     logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.message}`);
+            //     logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
             // });
         }
     }
@@ -1901,7 +2010,7 @@ class Question extends QuizLifeCycleWithUtility
                 let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
                 interaction.reply({content: message})
                 .catch(err => {
-                    logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.message}`);
+                    logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
                 });
             }
             else
@@ -1909,7 +2018,7 @@ class Question extends QuizLifeCycleWithUtility
                 let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 오답입니다!` + "```"
                 interaction.reply({content: message})
                 .catch(error => {
-                    logger.error(`Failed to replay to wrong submit, guild_id:${this.quiz_session.guild_id}, err: ${err.message}`);
+                    logger.error(`Failed to replay to wrong submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
                 });;
             }
         
@@ -1933,7 +2042,7 @@ class Question extends QuizLifeCycleWithUtility
 
         if(interaction.customId === 'hint') 
         {
-            if(current_quiz['hint_used'] == true) //2중 체크
+            if(current_quiz['hint_used'] == true || current_quiz['hint'] == undefined) //2중 체크
             {
                 return;
             }
@@ -2137,7 +2246,7 @@ class QuestionImage extends Question
         quiz_ui.setImage(image_resource);
         await quiz_ui.update(); //대기 해줘야한다. 안그러면 타이밍 이슈 땜에 이미지가 2번 올라간다.
 
-        //10초 카운트다운 BGM 재생
+        //카운트다운 BGM 재생
         const bgm_type = is_long == true ? BGM_TYPE.COUNTDOWN_LONG : BGM_TYPE.COUNTDOWN_10;
         let resource = undefined;
         utility.playBGM(audio_player, bgm_type);
@@ -2244,6 +2353,79 @@ class QuestionIntro extends Question
         else //타임오버거나 정답자 없다면
         {
             current_quiz['play_bgm_on_question_finish'] = true; //탄식을 보내주자~
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+        }
+    }
+}
+
+//Text Type Question
+class QuestionText extends Question
+{
+    static cycle_type = CYCLE_TYPE.QUESTIONING;
+    constructor(quiz_session)
+    {
+        super(quiz_session);
+    }
+
+    async act()
+    {
+        let quiz_data = this.quiz_session.quiz_data;
+        let game_data = this.quiz_session.game_data;
+        const option_data = this.quiz_session.option_data;
+
+        const current_quiz = this.current_quiz;
+        if(current_quiz == undefined || this.next_cycle == CYCLE_TYPE.ENDING) //제출할 퀴즈가 없으면 패스
+        {
+            return;
+        }
+
+        game_data['processing_quiz'] = this.current_quiz; //현재 제출 중인 퀴즈
+
+        this.answers = current_quiz['answers'];
+        const question = current_quiz['question'];
+
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question: ${question.trim()}`);
+
+        //텍스트 퀴즈는 카운트다운 BGM만 틀어준다.
+        const is_long = current_quiz['is_long'] ?? false;
+        const audio_player = this.quiz_session.audio_player;
+        const audio_play_time = is_long ? 20000 : 10000; //10초, 또는 20초 고정이다.
+
+        this.progress_bar_fixed_text = question; //텍스트 퀴즈는 progress bar 위에 붙여주면 된다.
+
+        //카운트다운 BGM 재생
+        const bgm_type = is_long == true ? BGM_TYPE.COUNTDOWN_LONG : BGM_TYPE.COUNTDOWN_10;
+        utility.playBGM(audio_player, bgm_type);
+
+        this.checkAutoHint(audio_play_time); //자동 힌트 체크
+        this.startProgressBar(audio_play_time); //진행 bar 시작
+
+        const timeover_promise = this.createTimeoverTimer(audio_play_time); //audio_play_time 후에 실행되는 타임오버 타이머 만들어서
+        await Promise.race([timeover_promise]); //race로 돌려서 타임오버 타이머가 끝나는걸 기다림
+
+        //어쨋든 타임오버 타이머가 끝났다.
+        if(this.quiz_session.force_stop == true) //그런데 강제종료다
+        {
+            return; //바로 return
+        }
+
+        current_quiz['play_bgm_on_question_finish'] = true; //텍스트 퀴즈는 어찌됐건 다음 스탭에서 bgm 틀어준다
+
+        if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
+        {
+            audio_player.stop(); //BGM 바로 멈춰준다.
+
+            if(this.current_quiz['answer_user'] != undefined) //정답자가 있다?
+            {
+                this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+            }
+            else if(this.current_quiz['skip_used'] == true) //스킵이다?
+            {
+                this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
+            }
+        }
+        else //타임오버거나 정답자 없다면
+        {
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
         }
     }
