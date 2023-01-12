@@ -2,8 +2,8 @@
 
 //#region 외부 모듈 로드
 const fs = require('fs');
-const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState, AudioPlayerPlayingState } = require('@discordjs/voice');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, MessageAttachment } = require('discord.js');
+const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes } = require('discord.js');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -557,6 +557,7 @@ class QuizLifecycle
                 {
                     const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_stop}` +'```'
                     interaction.channel.send({content: reject_message});
+                    return;
                 }
                 this.forceStop();
                 let force_stop_message = text_contents.quiz_play_ui.force_stop;

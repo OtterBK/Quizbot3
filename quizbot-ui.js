@@ -758,10 +758,10 @@ class ServerSettingUI extends QuizbotUI {
     description_message = description_message.replace("${audio_play_time}", parseInt(option_data.quiz.audio_play_time / 1000));
     description_message = description_message.replace("${hint_type}", option_data.quiz.hint_type);
     description_message = description_message.replace("${skip_type}", option_data.quiz.skip_type);
-    description_message = description_message.replace("${use_similar_answer}", (option_data.quiz.use_similar_answer == true ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${use_similar_answer}", (option_data.quiz.use_similar_answer == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
     description_message = description_message.replace("${score_type}", option_data.quiz.score_type);
     description_message = description_message.replace("${score_show_max}", (option_data.quiz.score_show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
-    description_message = description_message.replace("${improved_audio_cut}", option_data.quiz.improved_audio_cut);
+    description_message = description_message.replace("${improved_audio_cut}", (option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
     this.embed.description = description_message;
   }
 
