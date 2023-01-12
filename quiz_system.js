@@ -36,10 +36,24 @@ const CYCLE_TYPE =
 //#region global 변수 정의
 /** global 변수 **/
 let quiz_session_map = {};
+let bot_client = undefined;
+
 //#endregion
 
 //#region exports 정의
 /** exports **/
+
+exports.initialize = (client) =>
+{
+    if(client == undefined)
+    {
+        logger.error(`Failed to Initialize Quiz system. ${'Client is undefined'}`);
+        return false;
+    }
+    bot_client = client;
+    return true;
+}
+
 exports.checkReadyForStartQuiz = (guild, owner) => 
 {
     let result = false;
@@ -552,11 +566,19 @@ class QuizLifecycle
             }
 
             return this.onInteractionCreate(event_object);
+
+        case CUSTOM_EVENT_TYPE.message:
+            return this.onMessageCreate(event_object);
         }
     }
 
     /** 커스텀 이벤트 핸들러 **/
     onInteractionCreate(interaction)
+    {
+
+    }
+
+    onMessageCreate(message)
     {
 
     }
@@ -568,11 +590,11 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
     async startAudio(audio_player, resource, use_fade_in = true)
     {
         const fade_in_duration = SYSTEM_CONFIG.fade_in_duration;
-        if(SYSTEM_CONFIG.use_inline_volume )
+        if(SYSTEM_CONFIG.use_inline_volume)
         {
             if(use_fade_in)
             {
-                utility.fade_audio_play(audio_player, resource, 0.1, 1.0, fade_in_duration);
+                utility.fade_audio_play(audio_player, resource, 0, 1.0, fade_in_duration);
                 return Date.now() + fade_in_duration;  //
             }
             resource.volume.volume = 1.0;
@@ -853,7 +875,7 @@ class Initialize extends QuizLifecycle
                     answers.push(answer);
         });
 
-        if(option_data.quiz.use_similar_answer) //유사 정답 사용 시
+        if(option_data.quiz.use_similar_answer == OPTION_TYPE.ENABLED) //유사 정답 사용 시
         {
             similar_answers.forEach((similar_answer) => { //유사 정답도 넣어주자
                 answers.push(similar_answer);
@@ -1289,11 +1311,28 @@ class Prepare extends QuizLifecycle
 
             //TODO 나중에 여유 있을 때 랜덤 재생 구간을 최대한 중간 쪽으로 잡도록 만들자
             const audio_play_time_sec = audio_play_time / 1000; //계산하기 쉽게 초로 환산 ㄱㄱ
-            const audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_byterate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
-            const audio_min_start_point = 2.5 * audio_byterate;  //앞에도 2.5초 정도 자르고 싶음
+            let audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_byterate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+            let audio_min_start_point = 2.5 * audio_byterate;  //앞에도 2.5초 정도 자르고 싶음
+            const audio_play_time_as_byte = (audio_play_time_sec) * audio_byterate;
 
-            if((audio_max_start_point > audio_min_start_point)) //충분히 재생할 수 있는 start point가 있다면
+            if((audio_max_start_point > audio_min_start_point 
+                && (audio_max_start_point - audio_min_start_point) >= audio_play_time_as_byte)) //충분히 재생할 수 있는 start point가 있다면
             {
+                if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
+                {
+                    const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
+                    const refined_audio_min_start_point = audio_mid_point - (audio_play_time_as_byte / 2) + audio_byterate;
+                    const refined_audio_max_start_point = audio_mid_point + (audio_play_time_as_byte /2) + audio_byterate;
+    
+                    if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point 
+                        && (refined_audio_max_start_point - refined_audio_min_start_point) >= audio_play_time_as_byte) //좁히기 성공이면
+                    {
+                        logger.debug(`Refined audio point, question: ${question}min: ${audio_min_start_point/audio_byterate} -> ${refined_audio_min_start_point/audio_byterate}, max: ${audio_max_start_point/audio_byterate} -> ${refined_audio_max_start_point/audio_byterate}`);
+                        audio_min_start_point = refined_audio_min_start_point;
+                        audio_max_start_point = refined_audio_max_start_point;
+                    }
+                }
+
                 audio_start_point = do_begin_start ? 0 : parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); //mp3타입만 랜덤 start point 지원
                 audio_end_point = parseInt(audio_start_point + (audio_play_time_sec * audio_byterate));
             }
@@ -1306,6 +1345,7 @@ class Prepare extends QuizLifecycle
         if(audio_start_point == undefined) audio_start_point = 0;
         if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : (audio_start_point + ((audio_length / 1000)* audio_byterate)); //엄격하게 잘라야함
 
+        logger.debug(`cut audio, question: ${question}point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});
 
         if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
@@ -1379,6 +1419,8 @@ class Question extends QuizLifeCycleWithUtility
         this.answers = undefined; //문제 정답 목록
 
         this.is_timeover = false;
+        this.timeover_wait = undefined; //타임오버 대기 시간
+        this.timeover_timer_created = undefined; //타임오버 타이머 시작 시간
     }
 
     async enter()
@@ -1386,7 +1428,6 @@ class Question extends QuizLifeCycleWithUtility
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
 
-        
         this.current_quiz = undefined; //현재 진행 중인 퀴즈
 
         this.hint_timer = undefined; //자동 힌트 타이머
@@ -1400,6 +1441,8 @@ class Question extends QuizLifeCycleWithUtility
         this.progress_bar_timer = undefined; //진행 bar
 
         this.is_timeover = false;
+        this.timeover_wait = undefined;
+        this.timeover_timer_created = undefined;
 
         if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
         {
@@ -1514,6 +1557,7 @@ class Question extends QuizLifeCycleWithUtility
         footer_message = footer_message.replace("${quiz_size}", `${quiz_data['quiz_size']}`);
         footer_message = footer_message.replace("${option_hint_type}", `${option_data.quiz.hint_type}`);
         footer_message = footer_message.replace("${option_skip_type}", `${option_data.quiz.skip_type}`);
+        footer_message = footer_message.replace("${option_score_type}", `${option_data.quiz.score_type}`);
         quiz_ui.embed.footer = {
             "text": footer_message,
         }
@@ -1627,6 +1671,8 @@ class Question extends QuizLifeCycleWithUtility
     //정답 맞췄을 때
     async submittedCorrectAnswer(member)
     {
+        const option_data = this.quiz_session.option_data;
+
         if(this.current_quiz['answer_user'] != undefined) //이미 맞춘사람 있다면 패스
         {
             return;
@@ -1638,16 +1684,37 @@ class Question extends QuizLifeCycleWithUtility
 
             this.stopTimeoverTimer(); //맞췄으니 타임오버 타이머 중지!
 
-            const score = undefined;
+            let score = 1;
+            if(option_data.quiz.score_type == OPTION_TYPE.SCORE_TYPE.TIME) //남은 시간 비례 가산점 방식이면
+            {
+                const max_multiple = 10;
+                let multiple = 1;
+                const answer_submitted_time = Date.now();
+                const timeover_start = this.timeover_timer_created;
+                const timeover_wait = this.timeover_wait;
+
+                const time_gap = answer_submitted_time - timeover_start; //맞추기까지 걸린 시간
+                if(time_gap < 0) //음수일리가 없는데...음수면 최대!
+                { 
+                    multiple = max_multiple;
+                }
+                else
+                {
+                    multiple = max_multiple - parseInt(time_gap * max_multiple / timeover_wait);
+                    if(multiple <= 0) multiple = 1;
+                }
+                score *= multiple;
+            }
+
             let scoreboard = this.quiz_session.scoreboard;
             if(scoreboard.has(member))
             {
                 const prev_score = scoreboard.get(member);
-                scoreboard.set(member, prev_score + 1); //1점 추가~
+                scoreboard.set(member, prev_score + score); //점수 추가
             }
             else
             {
-                scoreboard.set(member, 1); //1점 등록~
+                scoreboard.set(member, score); //점수 등록
             }
         }
     }
@@ -1672,7 +1739,7 @@ class Question extends QuizLifeCycleWithUtility
 
         if(this.timeover_resolve != undefined)
         {
-            this.timeover_resolve('force stop timeover timer'); //타임오버 promise await 취소s
+            this.timeover_resolve('force stop timeover timer'); //타임오버 promise await 취소
         }
     }
 
@@ -1684,7 +1751,7 @@ class Question extends QuizLifeCycleWithUtility
         {
             const hint_timer_wait = audio_play_time / 2; //절반 지나면 힌트 표시할거임
             const hint_timer = setTimeout(() => {
-                this.showHint(current_quiz); //현재 퀴즈 hint 표시
+                this.showHint(this.current_quiz); //현재 퀴즈 hint 표시
             }, hint_timer_wait);
             this.hint_timer = hint_timer;
         }   
@@ -1711,6 +1778,8 @@ class Question extends QuizLifeCycleWithUtility
     //타임오버 타이머 생성 및 시작
     async createTimeoverTimer(timeover_wait)
     {
+        this.timeover_wait = timeover_wait;
+        this.timeover_timer_created = Date.now();
         this.is_timeover = false;
         const audio_player = this.quiz_session.audio_player;
         const timeover_promise = new Promise(async (resolve, reject) => {
@@ -1786,9 +1855,34 @@ class Question extends QuizLifeCycleWithUtility
         }
     }
 
+    onMessageCreate(message)
+    {
+        if(message.user == bot_client.user) return;
+
+        if(message.channel != this.quiz_session.channel) return; //퀴즈 진행 중인 채널 아니면 return
+
+        if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
+
+        let submit_answer = message.content ?? '';
+        if(submit_answer == '') return;
+        submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
+        
+        if(this.answers.includes(submit_answer))
+        {
+            this.submittedCorrectAnswer(message.member);
+            // let result_message = "```" + `${message.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
+            // message.reply({content: result_message})
+            // .catch(err => {
+            //     logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.message}`);
+            // });
+        }
+    }
+
     async handleChatInputCommand(interaction)
     {
         if(interaction.commandName === '답') {
+
+            if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
     
             let submit_answer = interaction.options.getString('답안') ?? '';
             if(submit_answer == '') return;

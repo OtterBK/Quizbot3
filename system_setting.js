@@ -44,7 +44,7 @@ exports.SYSTEM_CONFIG = {
 
 exports.CUSTOM_EVENT_TYPE = {
     interactionCreate: "interactionCreate",
-    message: "message"
+    messageCreate: "messageCreate"
 }
 
 exports.QUIZ_TYPE = {

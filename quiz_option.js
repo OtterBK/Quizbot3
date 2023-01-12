@@ -21,7 +21,9 @@ OPTION_TYPE = {
     SCORE_TYPE: {
         TIME: "남은 시간 비례",
         POINT: "고정 점수"
-    }
+    },
+    ENABLED: 'true',
+    DISABLED: 'false',
 }
 
 //#region exports 정의
@@ -71,8 +73,9 @@ class OptionStorage
                 audio_play_time: 30000,
                 hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
                 skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
-                use_similar_answer: true,
+                use_similar_answer: OPTION_TYPE.ENABLED,
                 score_type: OPTION_TYPE.SCORE_TYPE.POINT,
+                improved_audio_cut: OPTION_TYPE.ENABLED,
                 score_show_max: -1,
             }
         }

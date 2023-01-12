@@ -157,7 +157,7 @@
         {
             "title": "📝\u1CBC퀴즈 플레이 방법",
             "short_answer": [ 
-                "🔖\u1CBC**[ ⌨️ 주관식 퀴즈 정답 제출 방법 ]**\n\u1CBC\n__**/답 <답안>**__\n현재 버전에서는 Discord 정책 상, 명령어로 제출 해야합니다.😥\n(빠른 시일내에 퀴즈봇2에서 사용하던 방식으로 변경하겠습니다.)\n\u1CBC\n\u1CBC\n",
+                "🔖\u1CBC**[ ⌨️ 주관식 퀴즈 정답 제출 방법 ]**\n\u1CBC\n**퀴즈가 진행 중인 채팅 채널**에 정답을 입력하시면 됩니다.\n\u1CBC\n\u1CBC\n",
                 "🔖\u1CBC**[ ⌨️ 주관식 퀴즈 정답 작성 요령 ]**\n\u1CBC\n정답은 공백 없이 입력하여도 상관 없습니다.\n특수문자는 입력하지마세요.\n대소문자는 구분할 필요 없습니다.\n줄임말도 정답으로 인정되긴 하나 정확하지 않습니다.\n정답이 영어인 경우에는 발음을 제출해도 정답 인정이 되긴합니다.\n여러 시리즈가 있는 경우에는 시리즈명을 포함해야 정답으로 인정됩니다.\n\u1CBC\n\u1CBC\n",
                 "🔖\u1CBC**[ ❗ 주의 ]**\n\u1CBC\n노래 음량이 일정하지 않습니다. \n봇의 음량를 조금 더 크게 설정해주세요.\u1CBC🔉 => 🔊\n\u1CBC\n\u1CBC\n",
                 "☑️\u1CBC**이제 퀴즈를 시작합니다!**\n"
@@ -213,7 +213,7 @@
         {
             "title": "⚙ 서버 옵션 설정",
             "pre_description": "\u1CBC\n\u1CBC\n옵션 정보를 불러오는 중입니다...\u1CBC\n\u1CBC\n",
-            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${use_similar_answer}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n\u1CBC\n",
+            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${use_similar_answer}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n✂ 정밀한 오디오 자르기\u1CBC:\u1CBC**${improved_audio_cut}**\n\u1CBC\n\u1CBC\n",
 
             "select_menu": {
                 "title": "어떤 옵션을 설정할까요?",
@@ -222,21 +222,22 @@
                     { "label": "힌트 요청 방식", "description": "퀴즈 진행 시, 힌트 요청 방식을 설정합니다.", "value": "hint_type" },
                     { "label": "스킵 요청 방식", "description": "퀴즈 진행 시, 스킵 요청 방식을 설정합니다.", "value": "skip_type" },
                     { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 자동 생성 여부를 설정합니다.", "value": "use_similar_answer" },
-                    { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" }
+                    { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" },
+                    { "label": "정밀한 오디오 자르기", "description": "하이트라이트 부분을 추측하여 노래를 재생합니다.", "value": "improved_audio_cut" }
                 ],
                 "option_values": {
                     "title": "어떤 값으로 설정할까요?",
                     "audio_play_time": [
-                        { "label": "15초", "description": "해당 값으로 설정을 변경합니다.", "value": "15000" },
-                        { "label": "20초", "description": "해당 값으로 설정을 변경합니다.", "value": "20000" },
-                        { "label": "25초", "description": "해당 값으로 설정을 변경합니다.", "value": "25000" },
-                        { "label": "30초", "description": "해당 값으로 설정을 변경합니다.", "value": "30000" },
-                        { "label": "35초", "description": "해당 값으로 설정을 변경합니다.", "value": "35000" },
-                        { "label": "40초", "description": "해당 값으로 설정을 변경합니다.", "value": "40000" },
-                        { "label": "45초", "description": "해당 값으로 설정을 변경합니다.", "value": "45000" },
-                        { "label": "50초", "description": "해당 값으로 설정을 변경합니다.", "value": "50000" },
-                        { "label": "55초", "description": "해당 값으로 설정을 변경합니다.", "value": "55000" },
-                        { "label": "60초", "description": "해당 값으로 설정을 변경합니다.", "value": "60000" }
+                        { "label": "15초", "description": "\u1CBC", "value": "15000" },
+                        { "label": "20초", "description": "\u1CBC", "value": "20000" },
+                        { "label": "25초", "description": "\u1CBC", "value": "25000" },
+                        { "label": "30초", "description": "\u1CBC", "value": "30000" },
+                        { "label": "35초", "description": "\u1CBC", "value": "35000" },
+                        { "label": "40초", "description": "\u1CBC", "value": "40000" },
+                        { "label": "45초", "description": "\u1CBC", "value": "45000" },
+                        { "label": "50초", "description": "\u1CBC", "value": "50000" },
+                        { "label": "55초", "description": "\u1CBC", "value": "55000" },
+                        { "label": "60초", "description": "\u1CBC", "value": "60000" }
                     ],
                     "hint_type": [
                         { "label": "투표", "description": "절반이 찬성할 시 힌트를 표시합니다.", "value": "투표" },
@@ -254,6 +255,10 @@
                     "score_type": [
                         { "label": "고정 점수", "description": "정답을 맞출 때마다 1점씩 얻습니다.", "value": "고정 점수" },
                         { "label": "남은 시간 비례", "description": "정답을 맞췄을 때, 남은 시간에 비례해서 점수를 얻습니다.", "value": "남은 시간 비례" }
+                    ],
+                    "improved_audio_cut": [
+                        { "label": "사용", "description": "최대한 하이라이트 부분을 찾아 오디오를 재생합니다.", "value": "true" },
+                        { "label": "사용 안함", "description": "무작위 지점부터 노래를 재생합니다.", "value": "false" }
                     ]
                 }
             },
