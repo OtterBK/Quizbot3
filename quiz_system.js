@@ -3,7 +3,7 @@
 //#region 외부 모듈 로드
 const fs = require('fs');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes, TeamMemberMembershipState } = require('discord.js');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -142,6 +142,19 @@ class QuizPlayUI
         .setLabel('그만하기')
         // .setEmoji(`${text_contents.icon.ICON_STOP}`)
         .setStyle(ButtonStyle.Danger),
+    )
+
+    
+    this.ox_quiz_comp = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('o')
+        .setEmoji(`${text_contents.icon.ICON_O}`) 
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('x')
+        .setEmoji(`${text_contents.icon.ICON_X}`)
+        .setStyle(ButtonStyle.Secondary),
     )
 
     this.components = [ ];
@@ -341,9 +354,9 @@ class QuizSession
         {
             this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeDevQuiz(this));
         }
-        else if(quiz_maker_type == QUIZ_MAKER_TYPE.BY_USER)
+        else if(quiz_maker_type == QUIZ_MAKER_TYPE.CUSTOM)
         {
-            this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeUserQuiz(this));
+            this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeCustomQuiz(this));
         }
         else
         {
@@ -366,6 +379,8 @@ class QuizSession
             case QUIZ_TYPE.IMAGE_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionImage(this)); break;
             case QUIZ_TYPE.TEXT: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionText(this)); break;
             case QUIZ_TYPE.TEXT_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionText(this)); break;
+            case QUIZ_TYPE.OX: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionOX(this)); break;
+            case QUIZ_TYPE.OX_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionOX(this)); break;
 
             default: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionUnknown(this));            
         }
@@ -965,7 +980,7 @@ class Initialize extends QuizLifecycle
 
             if(line.startsWith('desc:'))
             {
-                parsed_quiz['author'] = line.replace('desc:', "").trim(); //author 로 바로 넣자
+                parsed_quiz['author'] = [ line.replace('desc:', "").trim() ]; //author 로 바로 넣자
                 return;
             }
 
@@ -1149,7 +1164,7 @@ class InitializeDevQuiz extends Initialize
     }
 }
 
-class InitializeUserQuiz extends Initialize
+class InitializeCustomQuiz extends Initialize
 {
     constructor(quiz_session)
     {
@@ -1449,7 +1464,7 @@ class Prepare extends QuizLifecycle
         if(audio_start_point == undefined) audio_start_point = 0;
         if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : (audio_start_point + ((audio_length / 1000)* audio_byterate)); //엄격하게 잘라야함
 
-        logger.debug(`cut audio, question: ${question}point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
+        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});
 
         if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
@@ -1501,6 +1516,8 @@ class Prepare extends QuizLifecycle
     {
         const question = target_quiz['question'];
         target_quiz['question'] = "\u1CBC\n" + question + "\u1CBC\n"
+        const quiz_type = target_quiz['type'];
+        target_quiz['is_long'] = ((quiz_type == QUIZ_TYPE.TEXT_LONG || quiz_type == QUIZ_TYPE.OX_LONG) ? true : false);
     }
 }
 
@@ -1533,6 +1550,9 @@ class Question extends QuizLifeCycleWithUtility
         this.is_timeover = false;
         this.timeover_wait = undefined; //타임오버 대기 시간
         this.timeover_timer_created = undefined; //타임오버 타이머 시작 시간
+
+        this.is_select_quiz = false; //객관식 퀴즈 여부
+        this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
     }
 
     async enter()
@@ -1557,6 +1577,9 @@ class Question extends QuizLifeCycleWithUtility
         this.is_timeover = false;
         this.timeover_wait = undefined;
         this.timeover_timer_created = undefined;
+
+        this.is_select_quiz = false; //객관식 퀴즈 여부
+        this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
 
         if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
         {
@@ -1662,6 +1685,8 @@ class Question extends QuizLifeCycleWithUtility
         const option_data = this.quiz_session.option_data;
         const quiz_ui = this.quiz_session.quiz_ui;
 
+        const quiz_type = quiz_data['quiz_type'];
+
         quiz_ui.embed.color = 0xFED049;
 
         quiz_ui.embed.title = `[\u1CBC${quiz_data['icon']} ${quiz_data['title']}\u1CBC]`;
@@ -1679,7 +1704,12 @@ class Question extends QuizLifeCycleWithUtility
         description_message = description_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
         quiz_ui.embed.description = description_message;
 
-        quiz_ui.components = [quiz_ui.quiz_play_comp];
+        let components = [quiz_ui.quiz_play_comp];
+        if(quiz_type == QUIZ_TYPE.OX || quiz_type == QUIZ_TYPE.OX_LONG) //ox 퀴즈면
+        {
+            components.push(quiz_ui.ox_quiz_comp);
+        }
+        quiz_ui.components = components;
 
         quiz_ui.embed.fields = [];
 
@@ -1789,14 +1819,14 @@ class Question extends QuizLifeCycleWithUtility
     {
         const option_data = this.quiz_session.option_data;
 
-        if(this.current_quiz['answer_user'] != undefined) //이미 맞춘사람 있다면 패스
+        if(this.current_quiz['answer_members'] != undefined) //이미 맞춘사람 있다면 패스
         {
             return;
         }
 
         if(this.timeover_timer != undefined)
         {
-            this.current_quiz['answer_user'] = member;
+            this.current_quiz['answer_members'] = [ member ];
 
             this.stopTimeoverTimer(); //맞췄으니 타임오버 타이머 중지!
 
@@ -1823,15 +1853,7 @@ class Question extends QuizLifeCycleWithUtility
             }
 
             let scoreboard = this.quiz_session.scoreboard;
-            if(scoreboard.has(member))
-            {
-                const prev_score = scoreboard.get(member);
-                scoreboard.set(member, prev_score + score); //점수 추가
-            }
-            else
-            {
-                scoreboard.set(member, score); //점수 등록
-            }
+            scoreboard.set(member, (scoreboard.get(member) ?? 0) + score);
         }
     }
 
@@ -1979,6 +2001,8 @@ class Question extends QuizLifeCycleWithUtility
 
         if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
 
+        if(this.is_select_quiz == true) return; //객관식 퀴즈면 pass
+
         let submit_answer = message.content ?? '';
         if(submit_answer == '') return;
         submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
@@ -1999,6 +2023,8 @@ class Question extends QuizLifeCycleWithUtility
         if(interaction.commandName === '답') {
 
             if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
+
+            if(this.is_select_quiz == true) return; // 객관식 퀴즈면 pass 
     
             let submit_answer = interaction.options.getString('답안') ?? '';
             if(submit_answer == '') return;
@@ -2133,6 +2159,18 @@ class Question extends QuizLifeCycleWithUtility
             }
             return;
         }
+
+        if(this.is_select_quiz == true) //객관식 퀴즈일 경우
+        {
+            const selected_value = interaction.customId;
+            const member = interaction.member
+
+            if(this.selected_answer_map == undefined) 
+            {
+                this.selected_answer_map = new Map();
+            }
+            this.selected_answer_map.set(member, selected_value);
+        }
     }
 }
 
@@ -2188,7 +2226,7 @@ class QuestionSong extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            if(this.current_quiz['answer_user'] != undefined) //정답자가 있다?
+            if(this.current_quiz['answer_members'] != undefined) //정답자가 있다?
             {
                 this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
             }
@@ -2269,7 +2307,7 @@ class QuestionImage extends Question
         {
             audio_player.stop(); //BGM 바로 멈춰준다.
 
-            if(this.current_quiz['answer_user'] != undefined) //정답자가 있다?
+            if(this.current_quiz['answer_members'] != undefined) //정답자가 있다?
             {
                 this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
             }
@@ -2341,7 +2379,7 @@ class QuestionIntro extends Question
             {  
                 current_quiz['play_bgm_on_question_finish'] = true; //브금을 틀거다.
             }
-            if(this.current_quiz['answer_user'] != undefined) //정답자가 있다?
+            if(this.current_quiz['answer_members'] != undefined) //정답자가 있다?
             {
                 this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
             }
@@ -2415,7 +2453,7 @@ class QuestionText extends Question
         {
             audio_player.stop(); //BGM 바로 멈춰준다.
 
-            if(this.current_quiz['answer_user'] != undefined) //정답자가 있다?
+            if(this.current_quiz['answer_members'] != undefined) //정답자가 있다?
             {
                 this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
             }
@@ -2431,6 +2469,102 @@ class QuestionText extends Question
     }
 }
 
+//OX Type Question
+class QuestionOX extends Question
+{
+    static cycle_type = CYCLE_TYPE.QUESTIONING;
+    constructor(quiz_session)
+    {
+        super(quiz_session);
+    }
+
+    async act()
+    {
+        let quiz_data = this.quiz_session.quiz_data;
+        let game_data = this.quiz_session.game_data;
+        const option_data = this.quiz_session.option_data;
+
+        const current_quiz = this.current_quiz;
+        if(current_quiz == undefined || this.next_cycle == CYCLE_TYPE.ENDING) //제출할 퀴즈가 없으면 패스
+        {
+            return;
+        }
+
+        game_data['processing_quiz'] = this.current_quiz; //현재 제출 중인 퀴즈
+
+        this.is_select_quiz = true; //객관식 퀴즈라고 알림
+
+        this.answers = current_quiz['answers'];
+        const question = current_quiz['question'];
+
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question: ${question.trim()}`);
+
+        //OX 퀴즈는 카운트다운 BGM만 틀어준다.
+        const is_long = current_quiz['is_long'] ?? false;
+        const audio_player = this.quiz_session.audio_player;
+        const audio_play_time = is_long ? 20000 : 10000; //10초, 또는 20초 고정이다.
+
+        this.progress_bar_fixed_text = question; //OX 퀴즈는 progress bar 위에 붙여주면 된다.
+
+        //카운트다운 BGM 재생
+        const bgm_type = is_long == true ? BGM_TYPE.COUNTDOWN_LONG : BGM_TYPE.COUNTDOWN_10;
+        utility.playBGM(audio_player, bgm_type);
+
+        this.startProgressBar(audio_play_time); //진행 bar 시작
+
+        const timeover_promise = this.createTimeoverTimer(audio_play_time); //audio_play_time 후에 실행되는 타임오버 타이머 만들어서
+        await Promise.race([timeover_promise]); //race로 돌려서 타임오버 타이머가 끝나는걸 기다림
+
+        //어쨋든 타임오버 타이머가 끝났다.
+        if(this.quiz_session.force_stop == true) //그런데 강제종료다
+        {
+            return; //바로 return
+        }
+
+        current_quiz['play_bgm_on_question_finish'] = true; //OX 퀴즈는 어찌됐건 다음 스탭에서 bgm 틀어준다
+
+        if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
+        {
+            audio_player.stop(); //BGM 바로 멈춰준다.
+
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //ox퀴즈는 스킵만 타임오버가 일찍 끝난다. 그러니 타임오버로~
+        }
+        else //타임오버거나 정답자 없다면
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //우선 타임오버로
+            
+            const selected_answer_map = this.selected_answer_map;
+            if(selected_answer_map != undefined)
+            {
+                const iter = selected_answer_map.entries();
+                let scoreboard = this.quiz_session.scoreboard;
+                const score = 1; //객관식은 1점 고정
+    
+                for(let i = 0; i < selected_answer_map.size; ++i)
+                {
+                    const [member, selected_value] = iter.next().value;
+                    
+                    if(this.answers.includes(selected_value)) //정답 맞춘 사람 1명이라도 있으면 CorrectAnswer
+                    {
+                        this.next_cycle = CYCLE_TYPE.CORRECTANSWER;
+    
+                        scoreboard.set(member, (scoreboard.get(member) ?? 0) + score); //객관식은 타임오버일 때, 점수 계산
+    
+                        const answer_members = current_quiz['answer_members'];
+                        if(answer_members == undefined)
+                        {
+                            current_quiz['answer_members'] = [ member ];
+                        }
+                        else
+                        {
+                            answer_members.push(member);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 //Unknown Type Question
 class QuestionUnknown extends Question
@@ -2476,17 +2610,25 @@ class TimeOver extends QuizLifeCycleWithUtility
 
         quiz_ui.embed.title = text_contents.timeover_ui.title;
 
-        let description_message = text_contents.timeover_ui.description;
         let answer_list_message = '';
         const answers = processing_quiz['answers'] ?? [];
-        answers.forEach((answer) => {
-            answer_list_message += answer + "\n";
-        });
+        if(answers.length > 0)
+        {
+            answers.forEach((answer) => {
+                answer_list_message += answer + "\n";
+            });
+        }
+
         let author_list_message = '';
-        const author_list = processing_quiz['author'] ?? [] ?? [];
-        author_list.forEach((author) => {
-            author_list_message += author + "\n";
-        });
+        const author_list = processing_quiz['author'] ?? [];
+        if(author_list.length > 0)
+        {
+            author_list.forEach((author) => {
+                author_list_message += author + "\n";
+            });
+        }
+
+        let description_message = text_contents.timeover_ui.description;
         description_message = description_message.replace('${question_answers}', answer_list_message);
         description_message = description_message.replace('${question_author}', author_list_message);
         quiz_ui.embed.description = description_message;
@@ -2560,11 +2702,19 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
         const quiz_data = this.quiz_session.quiz_data;
         const game_data = this.quiz_session.game_data;
         const processing_quiz = game_data['processing_quiz'];
-        const answer_user = processing_quiz['answer_user'] ?? [];
-        let answer_user_nickname = "???";
-        if(answer_user != undefined)
+        const answer_members = processing_quiz['answer_members'] ?? [];
+        let answer_members_nickname = "???";
+        if(answer_members != undefined)
         {
-            answer_user_nickname = answer_user.displayName;
+            if(answer_members.length > 1)
+            {
+                answer_members_nickname = "\n";
+            }
+
+            answer_members.forEach(member => 
+            {
+                answer_members_nickname =  `[ ${member.displayName} ]\n`;
+            });
         }
 
         let quiz_ui = this.quiz_session.quiz_ui;
@@ -2573,18 +2723,20 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
 
         quiz_ui.embed.title = text_contents.correct_answer_ui.title;
 
-        let description_message = text_contents.correct_answer_ui.description;
         let answer_list_message = '';
         const answers = processing_quiz['answers'] ?? [];
         answers.forEach((answer) => {
             answer_list_message += answer + "\n";
         });
+
         let author_list_message = '';
         const author_list = processing_quiz['author'] ?? [];
         author_list.forEach((author) => {
             author_list_message += author + "\n";
         });
-        description_message = description_message.replace('${answer_username}', answer_user_nickname); //정답 ui은 이거 추가됏음
+
+        let description_message = text_contents.correct_answer_ui.description;
+        description_message = description_message.replace('${answer_member_name}', answer_members_nickname); //정답 ui은 이거 추가됏음
         description_message = description_message.replace('${question_answers}', answer_list_message);
         description_message = description_message.replace('${question_author}', author_list_message);
         quiz_ui.embed.description = description_message;

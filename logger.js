@@ -40,12 +40,12 @@ const getLogger = (path) => {
             // info 레벨 로그를 저장할 파일 설정
             new winston.transports.DailyRotateFile({
                 levels: { // 숫자가 낮을 수록 우선순위가 높습니다.
-                    debug: 0,
-                    error: 1,
-                    warn: 2,
-                    info: 3,
+                    error: 0,
+                    warn: 1,
+                    info: 2,
+                    debug: 3,
                 },
-                level: SYSTEM_CONFIG.develop_mode ? 'debug' : 'error',
+                level: SYSTEM_CONFIG.develop_mode ? 'debug' : 'info',
                 datePattern: 'YYYY-MM-DD',
                 dirname: logDir,
                 filename: `%DATE%.log`,

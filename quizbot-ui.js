@@ -124,10 +124,22 @@ function createOptionValueComponents(option_name)
 /** global 변수 **/
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
 let guilds_count = 0; //봇이 참가 중인 guilds 수
+let root_contents = {};
+let bot_client = undefined;
 
 //#region exports 정의
 /** exports **/
 //main embed 인스턴스 반환
+exports.initialize = (client) => {
+  if(client == undefined)
+  {
+      logger.error(`Failed to Initialize Quiz system. ${'Client is undefined'}`);
+      return false;
+  }
+  bot_client = client;
+  return true;
+}
+
 exports.createUIHolder = (interaction) => {
   const guild_id = interaction.guild.id;
   if(uiHolder_map.hasOwnProperty(guild_id))
@@ -469,7 +481,7 @@ class DevQuizSelectUI extends QuizbotUI
 {
 
   static resource_path = SYSTEM_CONFIG.dev_quiz_path;
-  static quiz_contents = utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자
+  static quiz_contents =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
 
   constructor(contents)
   {

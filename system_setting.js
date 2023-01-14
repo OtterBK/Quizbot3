@@ -55,6 +55,7 @@ exports.QUIZ_TYPE = {
     GLOWLING: "포켓몬 울음소리",
     IMAGE: "그림 퀴즈",
     OX: "OX 퀴즈",
+    OX_LONG: "타이머 긴 OX 퀴즈",
     TEXT: "텍스트 퀴즈",
     TEXT_LONG: "타이머 긴 텍스트 퀴즈",
     // FAST_QNA: "텍스트 기반 qna, 타이머 짧음", //안씀
@@ -70,7 +71,7 @@ exports.EXPLAIN_TYPE = {
 exports.BGM_TYPE = {
     BELL: "bell.mp3",
     COUNTDOWN_10: "countdown10.wav",
-    COUNTDOWN_LONG: "longtimer",
+    COUNTDOWN_LONG: "longTimer",
     ENDING: "ENDING.mp3",
     FAIL: "FAIL.mp3",
     MATCH_FIND: "MATCH_FIND.mp3",
@@ -83,7 +84,7 @@ exports.BGM_TYPE = {
 
 exports.QUIZ_MAKER_TYPE = {
     BY_DEVELOPER: '개발자 제작 퀴즈',
-    BY_USER: '유저 제작 퀴즈',
+    CUSTOM: '유저 제작 퀴즈',
     UNKNOWN: '알 수 없음',
 }
 
