@@ -59,6 +59,18 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
 
 }
 
+exports.getQuestionList = async (quiz_id) => {
+
+  const query_string =
+  `select * from tb_question_info where quiz_id = '${quiz_id}'`
+
+  return sendQuery(query_string);
+
+}
+
+
+
+
 function sendQuery(query_string)
 {
   if(is_initialized == false)

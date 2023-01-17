@@ -76,6 +76,7 @@ class OptionStorage
                 use_similar_answer: OPTION_TYPE.ENABLED,
                 score_type: OPTION_TYPE.SCORE_TYPE.POINT,
                 improved_audio_cut: OPTION_TYPE.ENABLED,
+                use_message_intent: OPTION_TYPE.ENABLED,
                 score_show_max: -1,
             }
         }

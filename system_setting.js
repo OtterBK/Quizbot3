@@ -61,7 +61,8 @@ exports.QUIZ_TYPE = {
     // FAST_QNA: "텍스트 기반 qna, 타이머 짧음", //안씀
     INTRO: "인트로 맞추기",
     MULTIPLAY: "멀티플레이",
-    IMAGE_LONG: "타이머 긴 그림 퀴즈"
+    IMAGE_LONG: "타이머 긴 그림 퀴즈",
+    CUSTOM: "커스텀 퀴즈",
 }
 
 exports.EXPLAIN_TYPE = {

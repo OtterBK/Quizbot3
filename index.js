@@ -2,6 +2,8 @@
 
 //외부 modules
 const { Client, GatewayIntentBits, } = require('discord.js');
+const fs = require('fs');
+const ytdl = require('ytdl-core');
 const client = new Client({ intents: [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildVoiceStates,
@@ -11,7 +13,7 @@ const client = new Client({ intents: [
 
 //로컬 modules
 const PRIVATE_CONFIG = require('./private_config.json');
-const { CUSTOM_EVENT_TYPE } = require('./system_setting.js');
+const { CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
 
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
@@ -20,6 +22,7 @@ const option_system = require("./quiz_option.js");
 const utility = require('./utility.js');
 const logger = require('./logger.js')('Main');
 const db_manager = require('./db_manager.js');
+const { start } = require('repl');
 
 /** global 변수 **/
 
@@ -81,6 +84,45 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
     const uiHolder = quizbot_ui.createUIHolder(interaction);
 
     return;
+  }
+
+  if(interaction.commandName === 'qtest')
+  {
+    ytdl.getInfo('https://www.youtube.com/watch?v=mnpQsM-tqQU')
+    .then(info => 
+    {
+      let audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      if(audioFormats.length == 0) return;
+      const audioFormat = audioFormats[audioFormats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
+
+      const start_point = 30;
+      const audio_duration = audioFormat.approxDurationMs;
+      const audio_size = audioFormat.contentLength;
+      const bitrate = audioFormat.averageBitrate;
+      const byterate = bitrate / 8;
+
+      const audio = ytdl.downloadFromInfo(info, { format: audioFormat, range: {start: parseInt(start_point * byterate), end: Infinity} });
+      audio.pipe(fs.createWriteStream(`./test.mp3`));
+    });
+
+    let quiz_info = {};
+    quiz_info['title']  = '테스트퀴즈';
+    quiz_info['icon'] = 'Ⓜ';
+
+    quiz_info['type_name'] = '테스트용 퀴즈입니다'; 
+    quiz_info['description'] = '테스트용 퀴즈입니다.' ;
+
+    quiz_info['author'] = '제육보끔#1916';
+    quiz_info['author_icon'] = 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png';
+    quiz_info['thumbnail'] = 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg'; //썸네일은 그냥 quizbot으로 해두자
+
+    quiz_info['quiz_size'] = '10'; 
+    quiz_info['repeat_count'] = 0; 
+    quiz_info['winner_nickname'] = '테스터';
+    quiz_info['quiz_id'] = 'test';//dev quiz는 quiz_path 필요
+    quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
+    quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
+    quiz_system.startQuiz(interaction.guild, interaction.member, interaction.channel, quiz_info); //퀴즈 시작
   }
 
   let already_deferred = false;

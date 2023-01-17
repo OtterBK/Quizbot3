@@ -41,6 +41,9 @@ const commands = [
     //     .setRequired(true)
     //     .addChannelTypes(ChannelType.GuildVoice)
     // ),
+    new SlashCommandBuilder()
+    .setName('qtest')
+    .setDescription('quiz bot test.'),
 ];
 
 //길드에 명령어 등록용

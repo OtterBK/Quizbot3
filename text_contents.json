@@ -214,7 +214,7 @@
         {
             "title": "⚙ 서버 옵션 설정",
             "pre_description": "\u1CBC\n\u1CBC\n옵션 정보를 불러오는 중입니다...\u1CBC\n\u1CBC\n",
-            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${use_similar_answer}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n✂ 정밀 오디오 자르기\u1CBC:\u1CBC**${improved_audio_cut}**\n\u1CBC\n\u1CBC\n",
+            "description": "\u1CBC\n\u1CBC\n🎧 노래 재생 시간\u1CBC:\u1CBC**${audio_play_time}초**\n\u1CBC\n💡 힌트 요청 방식\u1CBC:\u1CBC**${hint_type}**\n\u1CBC\n⏭ 스킵 요청 방식\u1CBC:\u1CBC**${skip_type}**\n\u1CBC\n📋 유사 정답 사용 여부\u1CBC:\u1CBC**${use_similar_answer}**\n\u1CBC\n📊 점수 채점 방식\u1CBC:\u1CBC**${score_type}**\n\u1CBC\n✂ 정밀 오디오 자르기\u1CBC:\u1CBC**${improved_audio_cut}**\n\u1CBC⌨ 메시지 입력 감지\u1CBC:\u1CBC**${use_message_intent}**\n\u1CBC\n\u1CBC\n",
 
             "select_menu": {
                 "title": "어떤 옵션을 설정할까요?",
@@ -224,7 +224,8 @@
                     { "label": "스킵 요청 방식", "description": "퀴즈 진행 시, 스킵 요청 방식을 설정합니다.", "value": "skip_type" },
                     { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 자동 생성 여부를 설정합니다.", "value": "use_similar_answer" },
                     { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" },
-                    { "label": "정밀 오디오 자르기", "description": "하이트라이트 부분을 추측하여 노래를 재생합니다.", "value": "improved_audio_cut" }
+                    { "label": "정밀 오디오 자르기", "description": "하이트라이트 부분을 추측하여 노래를 재생합니다.", "value": "improved_audio_cut" },
+                    { "label": "메시지 입력 감지", "description": "채팅 메시지를 답안으로 인식합니다.", "value": "improved_audio_cut" }
                 ],
                 "option_values": {
                     "title": "어떤 값으로 설정할까요?",
@@ -260,6 +261,10 @@
                     "improved_audio_cut": [
                         { "label": "사용", "description": "최대한 하이라이트 부분을 찾아 오디오를 재생합니다.", "value": "true" },
                         { "label": "사용 안함", "description": "무작위 지점부터 노래를 재생합니다.", "value": "false" }
+                    ],
+                    "use_message_intent": [
+                        { "label": "사용", "description": "채널에 입력하는 메시지를 답안으로 인식합니다.", "value": "true" },
+                        { "label": "사용 안함", "description": "[/답] 명령어로만 답안 제출이 가능합니다.", "value": "false" }
                     ]
                 }
             },

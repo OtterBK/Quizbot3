@@ -99,6 +99,7 @@ const option_value_components = {
   use_similar_answer:  createOptionValueComponents('use_similar_answer'),
   score_type:  createOptionValueComponents('score_type'),
   improved_audio_cut:  createOptionValueComponents('improved_audio_cut'),
+  message_intent:  createOptionValueComponents('use_message_intent'),
   
 }
 
@@ -774,6 +775,7 @@ class ServerSettingUI extends QuizbotUI {
     description_message = description_message.replace("${score_type}", option_data.quiz.score_type);
     description_message = description_message.replace("${score_show_max}", (option_data.quiz.score_show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
     description_message = description_message.replace("${improved_audio_cut}", (option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${use_message_intent}", (option_data.quiz.use_message_intent == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
     this.embed.description = description_message;
   }
 
