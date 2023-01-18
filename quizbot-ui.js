@@ -14,6 +14,7 @@ const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language];
 const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('./utility.js');
 const logger = require('./logger.js')('QuizUI');
+const { sync_objects } = require('./ipc_manager.js');
 //#endregion
 
 //#region 사전 정의 UI들
@@ -62,6 +63,14 @@ const control_btn_component = new ActionRowBuilder()
     .setCustomId('next')
     .setLabel('다음 페이지')
     .setStyle(ButtonStyle.Secondary),
+);
+
+const main_ui_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setLabel('개인 정보 보호 정책')
+  .setURL('http://quizbot.kro.kr')
+  .setStyle(ButtonStyle.Link),
 );
 
 const option_control_btn_component = new ActionRowBuilder()
@@ -124,8 +133,6 @@ function createOptionValueComponents(option_name)
 
 /** global 변수 **/
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
-let guilds_count = 0; //봇이 참가 중인 guilds 수
-let root_contents = {};
 let bot_client = undefined;
 
 //#region exports 정의
@@ -168,11 +175,6 @@ exports.startUIHolderAgingManager = () =>
   return uiHolderAgingManager();
 }
 
-exports.startGuildsCountManager = (client) => 
-{
-  return guildsCountManager(client);
-}
-
 //#endregion
 
 //#region UI 관리 함수들
@@ -204,22 +206,6 @@ function uiHolderAgingManager()
   }, SYSTEM_CONFIG.ui_holder_aging_manager_interval * 1000); //체크 주기
 
   return uiholder_aging_manager;
-}
-
-function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
-{
-  const guilds_count_manager_interval = SYSTEM_CONFIG.guilds_count_manager_interval * 1000; //체크 주기
-
-  guilds_count = client.guilds.cache.size; //처음에 한번 체크
-
-  const guilds_count_manager = setInterval(()=>{
-    guilds_count = client.guilds.cache.size;
-
-    logger.info(`Calculated guild count: ${guilds_count}`);
-
-  }, guilds_count_manager_interval);
-
-  return guilds_count_manager;
 }
 
 //#endregion
@@ -309,7 +295,7 @@ class UIHolder
       this.initialized = true;
       this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
         {
           return;
         }
@@ -320,7 +306,7 @@ class UIHolder
     {
       this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
         {
           return;
         }
@@ -406,17 +392,17 @@ class MainUI extends QuizbotUI
         },
         {
           name: text_contents.main_menu.total_server,
-          value: `${text_contents.icon.ICON_GUILD} ${guilds_count}`, //TODO 플레이어 수 제대로 표시할 것
+          value: `${text_contents.icon.ICON_GUILD} ${sync_objects.get('guild_count')}`,
           inline: true,
         },
         {
           name: text_contents.main_menu.playing_server,
-          value: `${text_contents.icon.ICON_LOCALPLAY} ${quiz_system.getLocalQuizSessionCount()}`,
+          value: `${text_contents.icon.ICON_LOCALPLAY} ${sync_objects.get('local_play_count')}`,
           inline: true,
         },
         {
           name: text_contents.main_menu.competitive_server,
-          value: `${text_contents.icon.ICON_MULTIPLAY} ${quiz_system.getMultiplayQuizSessionCount()}`,
+          value: `${text_contents.icon.ICON_MULTIPLAY} ${sync_objects.get('multi_play_count')}`,
           inline: true,
         },
       ],
@@ -430,7 +416,7 @@ class MainUI extends QuizbotUI
       // },
     };
 
-    this.components = [select_btn_component]; //MAIN UI에서는 control component는 필요없다.
+    this.components = [select_btn_component, main_ui_component]; //MAIN UI에서는 control component는 필요없다.
   }
 
   onInteractionCreate(interaction)

@@ -17,11 +17,11 @@ exports.SYSTEM_CONFIG = {
     ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
     ui_holder_aging_manager_interval: 600, //체크 주기(s)
 
-    guilds_count_manager_interval: 600, //참여 중인 guild 수 체크 주기(s)
+    guilds_count_manager_interval: 5, //참여 중인 guild 수 체크 주기(s)
 
     correct_answer_cycle_wait: 6500, //정답 맞췄을 시, 얼마나 대기할 지
     timeover_cycle_wait: 6500, //타임오버 시, 얼마나 대기할 지
-    graceful_timeover_max_try: 10, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
+    graceful_timeover_max_try: 5, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
     explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
