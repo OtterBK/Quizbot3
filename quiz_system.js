@@ -1516,7 +1516,7 @@ class Prepare extends QuizLifecycle
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = parseInt(ignore_option_audio_play_time == true ? Infinity : (audio_start_point + ((audio_length / 1000)* audio_byterate))); //엄격하게 잘라야함
+        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + ((audio_length / 1000)* audio_byterate)); //엄격하게 잘라야함
 
         logger.debug(`cut audio, question: ${question}, point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});

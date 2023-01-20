@@ -21,7 +21,7 @@ const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
 const manager = new ClusterManager(`${__dirname}/bot.js`, {
-    totalShards: 'auto', // or 'auto'
+    totalShards: 9, // or 'auto'
     shardsPerClusters: 3,
     totalClusters: 3,
     mode: 'process', // you can also choose "worker"
