@@ -22,8 +22,8 @@ const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 
 const manager = new ClusterManager(`${__dirname}/bot.js`, {
     totalShards: 'auto', // or 'auto'
-    shardsPerClusters: 2,
-    totalClusters: 'auto',
+    shardsPerClusters: 3,
+    totalClusters: 3,
     mode: 'process', // you can also choose "worker"
     token: PRIVATE_CONFIG.BOT.TOKEN,
     restarts: { //최대 자동 재시작 횟수
@@ -45,41 +45,39 @@ manager.on('clusterCreate', cluster =>
     logger.info(`Launched Cluster ${cluster.id}`);
 });
 
-
-function broadcastRequest(message)
-{
-    const promises = [];
-    for (const cluster of Array.from(manager.clusters.values())) promises.push(cluster.request(message));
-    return Promise.all(promises);
-}
-
 /**
  * Sync
  */
 setInterval(async () => { //플레이 현황 체크용
 
-    broadcastRequest({ 
+    const message = { 
         ipc_message_type: IPC_MESSAGE_TYPE.CHECK_STATUS, 
-    })
-    .then(results => 
+    };
+
+    let results = [];
+    for (const cluster of Array.from(manager.clusters.values())) 
     {
-        let status = {
-            guild_count: 0,
-            local_play_count: 0,
-            multi_play_count: 0,
-        }
+        const reply = await cluster.request(message);
+        if(reply != undefined)
+            results.push(reply);
+    }
 
-        results.forEach(result => {
-            status.guild_count += result.guild_count;
-            status.local_play_count += result.local_play_count;
-            status.multi_play_count += result.multi_play_count;
-        });
+    let status = {
+        guild_count: 0,
+        local_play_count: 0,
+        multi_play_count: 0,
+    }
 
-        manager.broadcast( {
-            ipc_message_type: IPC_MESSAGE_TYPE.SYNC_STATUS,
-            status: status,
-        });
-    })
+    results.forEach(result => {
+        status.guild_count += result.guild_count;
+        status.local_play_count += result.local_play_count;
+        status.multi_play_count += result.multi_play_count;
+    });
+
+    manager.broadcast( {
+        ipc_message_type: IPC_MESSAGE_TYPE.SYNC_STATUS,
+        status: status,
+    });
 
 
 }, SYSTEM_CONFIG.guilds_count_manager_interval * 1000);
