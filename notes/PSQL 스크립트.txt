@@ -1,0 +1,98 @@
+#설치
+sudo apt-get install wget ca-certificates
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list'
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
+
+#서비스 활성화
+systemctl enable postgresql
+systemctl start postgresql
+systemctl status postgresql
+
+#로그인
+sudo -i -u postgres
+psql
+
+#유저 생성
+create user quizbot password '1234' superuser;
+\du
+
+#DB생성
+create database quizbot3 owner quizbot
+\l
+\q
+
+
+psql -U quizbot -d quizbot3
+
+#만약 인증 에러 나면->
+	sudo vi /etc/postgresql/12/main/pg_hba.conf #숫자는 버전따라 다름
+            local의 all을 [peer -> md5]로 수정
+	systemctl restart postgresql
+            psql -U quizbot -d quizbot3
+
+#외부 접속 가능하게
+	sudo vi /etc/postgresql/12/main/postgresql.conf
+	[listen_addresses = 'localhost'] -> [listen_addresses = '*']
+	sudo vi /etc/postgresql/12/main/pg_hba.conf
+ 	[host    all             all             all                     md5] 추가
+	systemctl restart postgresql
+
+#DB 스키마, 테이블 생성
+
+CREATE SCHEMA quizbot;
+
+CREATE TABLE tb_option
+( 
+	guild_id bigint PRIMARY KEY, 
+	audio_play_time integer, 
+	hint_type char(16), 
+	skip_type char(16), 
+	use_similar_answer char(16), 
+	score_type char(16), 
+	score_show_max integer, 
+	improved_audio_cut char(16), 
+	use_message_intent char(16) 
+);
+
+CREATE TABLE quizbot.tb_quiz_creator
+(
+    user_id character varying(16),
+    quiz_id character varying(16),
+	PRIMARY KEY (user_id)
+);
+
+CREATE TABLE quizbot.tb_quiz_info
+(
+    quiz_id character varying(16),
+    title character varying(32),
+    simple_description character varying(100),
+    description character varying(500),
+    thumbnail_url character varying(250),
+    quiz_type character varying(16),
+    winner_nickname character varying(32),
+    public boolean,
+    created_date date,
+    updated_date date,
+    play_count integer,
+    PRIMARY KEY (quiz_id)
+);
+
+CREATE TABLE quizbot.tb_question_info
+(
+    question_id serial,
+    quiz_id character varying(16) NOT NULL,
+    question_audio_url character varying(250),
+    answers character varying(250) NOT NULL,
+    hint character varying(100),
+    audio_start integer,
+    audio_end integer,
+    audio_play_time integer DEFAULT 60,
+    question_image_url character varying(250),
+    question_text character varying(250),
+    answer_audio_url character varying(250),
+    answer_image_url character varying(250),
+    answer_text character varying(250),
+    PRIMARY KEY (question_id)
+);

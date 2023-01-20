@@ -1,7 +1,7 @@
 'use strict';
 
 //#region 필요한 외부 모듈
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes  } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder  } = require('discord.js');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
 //#endregion
@@ -14,6 +14,7 @@ const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language];
 const quiz_system = require('./quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('./utility.js');
 const logger = require('./logger.js')('QuizUI');
+const { sync_objects } = require('./ipc_manager.js');
 //#endregion
 
 //#region 사전 정의 UI들
@@ -48,6 +49,15 @@ const select_btn_component = new ActionRowBuilder()
     .setStyle(ButtonStyle.Primary),
 )
 
+const page_select_menu = new StringSelectMenuBuilder().
+setCustomId('page_jump').
+setPlaceholder('페이지 이동');
+
+const page_select_row = new ActionRowBuilder()
+.addComponents(
+  
+)
+
 const control_btn_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
@@ -62,6 +72,22 @@ const control_btn_component = new ActionRowBuilder()
     .setCustomId('next')
     .setLabel('다음 페이지')
     .setStyle(ButtonStyle.Secondary),
+);
+
+const main_ui_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setLabel('개인 정보 보호 정책')
+  .setURL('http://quizbot.kro.kr')
+  .setStyle(ButtonStyle.Link),
+  new ButtonBuilder()
+  .setLabel('퀴즈봇 커뮤니티')
+  .setURL('https://discord.gg/Baw6ZP6rcZ')
+  .setStyle(ButtonStyle.Link),
+  new ButtonBuilder()
+  .setLabel('봇 공유하기')
+  .setURL('https://discord.com/api/oauth2/authorize?client_id=788060831660114012&permissions=2150681600&scope=bot')
+  .setStyle(ButtonStyle.Link),
 );
 
 const option_control_btn_component = new ActionRowBuilder()
@@ -99,6 +125,7 @@ const option_value_components = {
   use_similar_answer:  createOptionValueComponents('use_similar_answer'),
   score_type:  createOptionValueComponents('score_type'),
   improved_audio_cut:  createOptionValueComponents('improved_audio_cut'),
+  use_message_intent:  createOptionValueComponents('use_message_intent'),
   
 }
 
@@ -119,12 +146,22 @@ function createOptionValueComponents(option_name)
     );
 }
 
+const note_ui_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('notice')
+  .setLabel('공지사항')
+  .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+  .setCustomId('patch_note')
+  .setLabel('패치노트')
+  .setStyle(ButtonStyle.Secondary),
+);
+
 //#endregion
 
 /** global 변수 **/
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
-let guilds_count = 0; //봇이 참가 중인 guilds 수
-let root_contents = {};
 let bot_client = undefined;
 
 //#region exports 정의
@@ -167,11 +204,6 @@ exports.startUIHolderAgingManager = () =>
   return uiHolderAgingManager();
 }
 
-exports.startGuildsCountManager = (client) => 
-{
-  return guildsCountManager(client);
-}
-
 //#endregion
 
 //#region UI 관리 함수들
@@ -203,22 +235,6 @@ function uiHolderAgingManager()
   }, SYSTEM_CONFIG.ui_holder_aging_manager_interval * 1000); //체크 주기
 
   return uiholder_aging_manager;
-}
-
-function guildsCountManager(client) //현재 봇이 참가 중인 guild 수
-{
-  const guilds_count_manager_interval = SYSTEM_CONFIG.guilds_count_manager_interval * 1000; //체크 주기
-
-  guilds_count = client.guilds.cache.size; //처음에 한번 체크
-
-  const guilds_count_manager = setInterval(()=>{
-    guilds_count = client.guilds.cache.size;
-
-    logger.info(`Calculated guild count: ${guilds_count}`);
-
-  }, guilds_count_manager_interval);
-
-  return guilds_count_manager;
 }
 
 //#endregion
@@ -308,22 +324,22 @@ class UIHolder
       this.initialized = true;
       this.base_interaction.reply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
         {
           return;
         }
-        logger.error(`Failed to Reply UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.message}`);
+        logger.error(`Failed to Reply UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.stack}`);
       });
     }
     else
     {
       this.base_interaction.editReply( {embeds: [this.getUIEmbed()], components: this.getUIComponents()})
       .catch((err) => {
-        if(err.code === RESTJSONErrorCodes.UnknownMessage) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
+        if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //삭제된 메시지에 update 시도한거라 별도로 핸들링 하지 않는다.
         {
           return;
         }
-        logger.error(`Failed to Update UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.message}`);
+        logger.error(`Failed to Update UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.stack}`);
       });
     }
   }
@@ -337,7 +353,7 @@ class QuizbotUI {
   {
     this.embed = {};
     // this.components = [cloneDeep(select_btn_component), cloneDeep(control_btn_component)]; //내가 clonedeep을 왜 해줬었지?
-    this.components = [select_btn_component, control_btn_component]; //이게 기본 component임
+    this.components = [select_btn_component ]; //이게 기본 component임
     this.holder = undefined; 
   }
 
@@ -368,6 +384,174 @@ class QuizbotUI {
     {
       logger.error(`Failed to self Update UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
     }
+  }
+
+  selectDefaultOptionByValue(select_menu, value)
+  {
+    const options = select_menu.options;
+    for(let index = 0; index < options.length; ++index)
+    {
+      let option = options[index].data;
+      if(option.value == value)
+      {
+        option['default'] = true;
+      }
+      else
+      {
+        option['default'] = false;
+      }
+    }
+
+    return select_menu;
+  }
+}
+
+//QuizBotControlComponentUI, 컨트롤 컴포넌트가 함께 있는 UI
+class QuizBotControlComponentUI extends QuizbotUI {
+
+  constructor()
+  {
+    super();
+
+    this.control_btn_component = cloneDeep(control_btn_component);
+    this.page_jump_component = cloneDeep(page_select_row);
+    this.components = [select_btn_component, this.control_btn_component ]; //이게 기본 component임
+
+    this.cur_contents = undefined;
+    this.cur_page = 0;
+    this.total_page = 0;
+    this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
+    this.main_description = undefined; //displayContent에 같이 표시할 메인 description
+  }
+
+  checkPageMove(interaction) //더미용 이벤트 콜백
+  {
+    /** false => 페이지 이동 관련 아님, undefined => 페이지 이동 관련이긴하나 페이지가 바뀌진 않음, true => 페이지가 바뀜 */
+    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return false;
+
+    if(interaction.customId == 'page_jump') //페이지 점프 시,
+    {
+      const selected_value = interaction.values[0];
+      const selected_page_num = parseInt(selected_value.replace('page_', ""));
+      if(this.cur_page == selected_page_num) return undefined; //페이지 바뀐게 없다면 return;
+
+      if(selected_page_num < 0 || selected_page_num > this.total_page - 1) return undefined; //이상한 범위면 return
+      
+      this.cur_page = selected_page_num;
+      this.displayContents(this.cur_page);
+
+      const page_select_menu = this.page_jump_component.components[0];
+      // this.selectDefaultOptionByValue(page_select_menu, selected_page_num);
+      return true;
+    }
+
+    if(interaction.customId == 'prev') //페이지 이동 시
+    {
+      if(this.cur_page <= 0) return undefined;
+
+      this.cur_page -= 1;
+      this.displayContents(this.cur_page);
+      return true;
+    }
+    
+    if(interaction.customId == 'next')
+    {
+      if(this.cur_page >= this.total_page - 1) return undefined;
+
+      this.cur_page += 1;
+      this.displayContents(this.cur_page);
+      return true;
+    }
+
+    return false;
+  }
+
+  selectDefaultOptionByValue(select_menu, value)
+  {
+    const options = select_menu.options;
+    for(let index = 0; index < options.length; ++index)
+    {
+      let option = options[index].data;
+      if(option.value == value)
+      {
+        option['default'] = true;
+      }
+      else
+      {
+        option['default'] = false;
+      }
+    }
+
+    return select_menu;
+  }
+
+  setPageSelectMenuMax(max_page)
+  {
+    //selectmenu component의 options는 readonly 라서 다시 만들어야함
+
+    if(max_page == 1)
+    {
+      this.components = [select_btn_component, this.control_btn_component]; //페이지가 1개면 페이지 이동 menu 뺌
+      return;
+    }
+
+    this.components = [select_btn_component, this.control_btn_component, this.page_jump_component ]; //기본 component로 다시 지정
+
+    const new_select_menu = cloneDeep(page_select_menu);
+
+    for(let i = 0; i < max_page; ++i)
+    {
+      const page_option = { label: `${i+1}페이지`, description: ` `, value: `page_${i}` };
+      new_select_menu.addOptions(page_option);
+    }
+
+    this.page_jump_component.components[0] = new_select_menu;
+    this.components[2] = this.page_jump_component;
+  }
+
+  displayContents(page_num)
+  {
+    if(this.cur_contents == undefined) return;
+
+    const contents = this.cur_contents;
+
+    const total_page = parseInt(contents.length / this.count_per_page) + (contents.length % this.count_per_page != 0 ? 1 : 0);
+
+    if(this.total_page == 0 || this.total_page != total_page) //total page 변경 사항 있을 시
+    {
+      this.total_page = total_page; //나중에 쓸거라 저장
+      this.setPageSelectMenuMax(this.total_page);
+    }
+
+    let page_contents = [];
+    let from = this.count_per_page * page_num;
+    let to = (this.count_per_page * page_num) + this.count_per_page;
+    if(to >=  contents.length) 
+      to = contents.length;
+
+    for(let i = from; i < to; i++)
+    {
+      const content = this.cur_contents[i];
+      if(content == undefined) continue;
+      page_contents.push(content);
+    }
+
+    let contents_message = this.main_description ?? "";
+    for(let i = 0; i < page_contents.length; i++)
+    {
+      const cur_content = page_contents[i];
+      let message = text_contents.icon["ICON_NUM_"+(i+1)];
+      contents_message += `${message})\u1CBC\u1CBC${cur_content.icon ?? ""} ${cur_content.name}\n\n`;
+    }
+
+    // contents_message += "\u1CBC\u1CBC\n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
+    this.embed.description = contents_message + "\u1CBC\n";
+
+    let page_message = `${text_contents.icon.ICON_PAGE} ${page_num + 1} / ${total_page}`;
+    // page_message += `| ${text_contents.icon.ICON_FOLDER} ${page_num + 1}`;
+    this.embed.footer = { 
+      text: page_message,
+    };
   }
   
 }
@@ -405,17 +589,17 @@ class MainUI extends QuizbotUI
         },
         {
           name: text_contents.main_menu.total_server,
-          value: `${text_contents.icon.ICON_GUILD} ${guilds_count}`, //TODO 플레이어 수 제대로 표시할 것
+          value: `${text_contents.icon.ICON_GUILD} ${sync_objects.get('guild_count')}`,
           inline: true,
         },
         {
           name: text_contents.main_menu.playing_server,
-          value: `${text_contents.icon.ICON_LOCALPLAY} ${quiz_system.getLocalQuizSessionCount()}`,
+          value: `${text_contents.icon.ICON_LOCALPLAY} ${sync_objects.get('local_play_count')}`,
           inline: true,
         },
         {
           name: text_contents.main_menu.competitive_server,
-          value: `${text_contents.icon.ICON_MULTIPLAY} ${quiz_system.getMultiplayQuizSessionCount()}`,
+          value: `${text_contents.icon.ICON_MULTIPLAY} ${sync_objects.get('multi_play_count')}`,
           inline: true,
         },
       ],
@@ -429,7 +613,7 @@ class MainUI extends QuizbotUI
       // },
     };
 
-    this.components = [select_btn_component]; //MAIN UI에서는 control component는 필요없다.
+    this.components = [select_btn_component, main_ui_component]; //MAIN UI에서는 control component는 필요없다.
   }
 
   onInteractionCreate(interaction)
@@ -441,9 +625,20 @@ class MainUI extends QuizbotUI
       return new SelectQuizTypeUI();
     }
 
+    if(interaction.customId == '3') //퀴즈만들기 눌렀을 때
+    {
+      interaction.channel.send({content:"```조금만 기다려주세요. 열심히 만들고 있습니다.```"});
+      return;
+    }
+
     if(interaction.customId == '4') //서버 설정 눌렀을 때
     {
       return new ServerSettingUI(interaction.guild.id);
+    }
+
+    if(interaction.customId == '5') //공지/패치노트 눌렀을 때
+    {
+      return new NotesSelectUI();
     }
   }
 
@@ -477,7 +672,7 @@ class SelectQuizTypeUI extends QuizbotUI {
 }
 
 //개발자 퀴즈 선택 UI
-class DevQuizSelectUI extends QuizbotUI  
+class DevQuizSelectUI extends QuizBotControlComponentUI  
 {
 
   static resource_path = SYSTEM_CONFIG.dev_quiz_path;
@@ -500,72 +695,19 @@ class DevQuizSelectUI extends QuizbotUI
       logger.error(`Undefined Current Contents on DevQuizSelectUI guild_id:${this.guild_id}, err: ${"Check Value of Resource Path Option"}`);
     }
 
-    this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
-    this.cur_page = 0;
-    this.total_page = 0;
-    this.displayContents(this.cur_page);
+    this.main_description = text_contents.dev_select_category.description;
 
-  }
+    this.displayContents(0);
 
-  displayContents(page_num)
-  {
-    const contents = this.cur_contents;
-
-    const total_page = parseInt(contents.length / this.count_per_page) + (contents.length % this.count_per_page != 0 ? 1 : 0);
-    this.total_page = total_page; //나중에 쓸거라 저장
-
-    let page_contents = [];
-    let from = this.count_per_page * page_num;
-    let to = (this.count_per_page * page_num) + this.count_per_page;
-    if(to >=  contents.length) 
-      to = contents.length;
-
-    for(let i = from; i < to; i++)
-    {
-      const content = this.cur_contents[i];
-      if(content == undefined) continue;
-      page_contents.push(content);
-    }
-
-    let contents_message = text_contents.dev_select_category.description;
-    for(let i = 0; i < page_contents.length; i++)
-    {
-      const cur_content = page_contents[i];
-      let message = text_contents.icon["ICON_NUM_"+(i+1)];
-      contents_message += `${message})\u1CBC\u1CBC${cur_content.icon} ${cur_content.name}\n\n`;
-    }
-
-    // contents_message += "\u1CBC\u1CBC\n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
-    this.embed.description = contents_message + "\u1CBC\n";
-
-    let page_message = `${text_contents.icon.ICON_PAGE} ${page_num + 1} / ${total_page}`;
-    // page_message += `| ${text_contents.icon.ICON_FOLDER} ${page_num + 1}`;
-    this.embed.footer = { 
-      text: page_message,
-    };
   }
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton()) return;
+    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-    if(interaction.customId == 'prev') //페이지 이동 시
-    {
-      if(this.cur_page <= 0) return;
-
-      this.cur_page -= 1;
-      this.displayContents(this.cur_page);
-      return this;
-    }
-    
-    if(interaction.customId == 'next')
-    {
-      if(this.cur_page >= this.total_page - 1) return;
-
-      this.cur_page += 1;
-      this.displayContents(this.cur_page);
-      return this;
-    }
+    const is_page_move = this.checkPageMove(interaction);
+    if(is_page_move == undefined) return;
+    if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
     if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
@@ -737,7 +879,7 @@ class AlertQuizStartUI extends QuizbotUI
 }
 
 //서버 설정 UI
-class ServerSettingUI extends QuizbotUI {
+class ServerSettingUI extends QuizBotControlComponentUI {
 
   constructor(guild_id)
   {
@@ -756,8 +898,8 @@ class ServerSettingUI extends QuizbotUI {
     this.fillDescription(this.option_data);
 
     this.option_component = cloneDeep(option_component); //아예 deep copy해야함
-    this.option_value_components = cloneDeep(option_value_components);
     this.option_control_btn_component = cloneDeep(option_control_btn_component);
+    this.option_value_components = cloneDeep(option_value_components);
     this.components = [ this.option_component, this.option_control_btn_component ];
 
     this.selected_option = undefined;
@@ -774,6 +916,7 @@ class ServerSettingUI extends QuizbotUI {
     description_message = description_message.replace("${score_type}", option_data.quiz.score_type);
     description_message = description_message.replace("${score_show_max}", (option_data.quiz.score_show_max == -1 ? `${text_contents.server_setting_ui.score_infinity}` : option_data.quiz.score.show_max));
     description_message = description_message.replace("${improved_audio_cut}", (option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
+    description_message = description_message.replace("${use_message_intent}", (option_data.quiz.use_message_intent == OPTION_TYPE.ENABLED ? `${text_contents.server_setting_ui.use}` : `${text_contents.server_setting_ui.not_use}`));
     this.embed.description = description_message;
   }
 
@@ -787,7 +930,7 @@ class ServerSettingUI extends QuizbotUI {
         
         this.selected_option = selected_option;
   
-        this.selectDefaultOptionByValue(this.option_component, selected_option);
+        this.selectDefaultOptionByValue(this.option_component.components[0], selected_option);
   
         this.option_value_component = this.option_value_components[this.selected_option]; //value 컴포넌트를 보내줌
         this.components = [ this.option_component, this.option_value_component, this.option_control_btn_component];
@@ -802,7 +945,7 @@ class ServerSettingUI extends QuizbotUI {
         
         this.selected_value = selected_value;
   
-        this.selectDefaultOptionByValue(this.option_value_component, selected_value);
+        this.selectDefaultOptionByValue(this.option_component.components[0], this.selected_option);
   
         this.option_data.quiz[this.selected_option] = selected_value;
         this.fillDescription(this.option_data);
@@ -838,23 +981,134 @@ class ServerSettingUI extends QuizbotUI {
     }
   }
 
-  selectDefaultOptionByValue(component, value)
+}
+
+//공지/패치노트 UI
+class NotesSelectUI extends QuizBotControlComponentUI  
+{
+
+  constructor()
   {
-    const options = component.components[0].options;
-    for(let index = 0; index < options.length; ++index)
+    super();
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: text_contents.notes_select_ui.title,
+      description: text_contents.notes_select_ui.description,
+    };
+
+    this.cur_contents = undefined; //현재 표시할 컨텐츠
+    this.notice_contents = undefined; //공지용
+    this.patch_note_contents = undefined; //패치노트용
+
+    this.main_description = text_contents.notes_select_ui.description;
+
+    this.loadNoteContents(SYSTEM_CONFIG.notices_path)
+    .then(content_list =>
     {
-      let option = options[index].data;
-      if(option.value == value)
-      {
-        option['default'] = true;
-      }
-      else
-      {
-        option['default'] = false;
-      }
+      this.notice_contents = content_list;
+      this.cur_contents = this.notice_contents;
+      this.displayContents(0);
+      this.update();
+    });
+
+    // this.loadNoteContents(SYSTEM_CONFIG.patch_notes_path)
+    // .then(content_list =>
+    // {
+    //   this.patch_note_contents = content_list;
+    // });
+
+  }
+
+  async loadNoteContents(notes_folder_path) 
+  {
+    //파일 생성일로 정렬
+    const content_list_sorted_by_birthtime = fs.readdirSync(notes_folder_path)
+        .map(function(v) { 
+            return { name:v.replace('.txt', ""),
+                    birthtime:fs.statSync(`${notes_folder_path}/${v}`).birthtime,
+                    note_path: `${notes_folder_path}/${v}`
+                  }; 
+        })
+        .sort(function(a, b) { return b.birthtime - a.birthtime; });
+
+    return content_list_sorted_by_birthtime;
+  }
+
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+    const is_page_move = this.checkPageMove(interaction);
+    if(is_page_move == undefined) return;
+    if(is_page_move == true) return this;
+
+    if(interaction.customId == 'notice') //공지사항 버튼 클릭 시
+    {
+      this.cur_contents = this.notice_contents;
+      this.cur_page = 0;
+      this.displayContents(this.cur_page);
+      return;
     }
 
-    return component;
+    if(interaction.customId == 'patch_note') //패치노트 버튼 클릭 시
+    {
+      this.cur_contents = this.patch_note_contents;
+      this.cur_page = 0;
+      this.displayContents(this.cur_page);
+      return;
+    }
+
+    const select_num = parseInt(interaction.customId);
+    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+
+    // 그냥 페이지 계산해서 content 가져오자
+    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    {
+      return;
+    }
+
+    const note_info = this.cur_contents[index];
+    if(note_info['note_path'] != undefined) //Note를 클릭했을 경우
+    {
+      return new NoteUI(note_info);
+    }
+    
+  }
+}
+
+//일반 텍스트 표시 UI
+class NoteUI extends QuizbotUI
+{
+  constructor(note_info)
+  {
+    super();
+
+    this.note_info = note_info;
+
+    const description = fs.readFileSync(note_info['note_path'], {encoding: 'utf8', flag:'r'});
+
+    this.embed = {
+      color: 0xFED049,
+      title: `${note_info['name']}`,
+      description: description,
+      footer: { //내 이름 표시
+        text: `제육보끔#1916`,
+        icon_url: `https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png`,
+      },
+      timestamp: new Date(note_info['birthtime']).toISOString(),
+    };
+
+    const note_ui_comp = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('back')
+        .setLabel('뒤로가기')
+        .setStyle(ButtonStyle.Secondary),
+    )
+    this.components = [note_ui_comp]; //여기서는 component를 바꿔서 해주자
   }
 
 }

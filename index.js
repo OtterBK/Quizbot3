@@ -1,131 +1,95 @@
-'use strict';
+/**
+ * Sharding을 위해 bot의 소스코드는 bot.js로 옮겼다
+ * 내가 이해한게 맞다면
+ * cluster는 각각의 병렬 프로세스이고
+ * master cluster에서 cluster를 생성하면 이 cluster는 각각의 내부 shard를 생성한다.
+ * 각각의 shard는 봇 서버라고 생각하면 되고 일정 길드 수 별로 각각의 shard와 통신한다.
+ * 기본으로 제공되는 shard manager 방식은 하나의 cluster에 여러 shard를 생성하는 방식인데,
+ * 이 경우 사실 상 1개의 프로세스에서 동작하기 때문에 14000개 이상의 길드에서는 동작이 느리다
+ * 반면 이 discord-hybrid-sharding 라이브러리는 master 프로세스에서 여러 개의 병렬 프로세스를 생성하고
+ * 생성된 프로세스는 각각의 내부 shard를 갖기 때문에 메모리 및 성능 부분에서 더 좋다
+ */
 
-//외부 modules
-const { Client, GatewayIntentBits, } = require('discord.js');
-const client = new Client({ intents: [
-  GatewayIntentBits.Guilds,
-  GatewayIntentBits.GuildVoiceStates,
-  GatewayIntentBits.GuildMessages,
-  GatewayIntentBits.MessageContent,
-] });
+//외부 모듈
+const { ClusterManager, HeartbeatManager } = require('discord-hybrid-sharding');
 
-//로컬 modules
+//로컬 모듈
 const PRIVATE_CONFIG = require('./private_config.json');
-const { CUSTOM_EVENT_TYPE } = require('./system_setting.js');
+const logger = require('./logger.js')('ShardManager');
+const { SYSTEM_CONFIG } = require('./system_setting.js');
+const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
+// const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
-const command_register = require('./commands.js');
-const quizbot_ui = require('./quizbot-ui.js');
-const quiz_system = require('./quiz_system.js');
-const option_system = require("./quiz_option.js");
-const utility = require('./utility.js');
-const logger = require('./logger.js')('Main');
-const db_manager = require('./db_manager.js');
-
-/** global 변수 **/
-
-
-/**  이벤트 등록  **/
-//봇 최초 실행 이벤트
-client.on('ready', () => {
-  logger.info(`Initializing Quizbot...`);
-
-  ///////////
-  logger.info(`Initializing BGM Resources`);
-  utility.initializeBGM();
-
-  logger.info(`Initializing Quiz System`);
-  quiz_system.initialize(client);
-
-  logger.info(`Initializing Quiz UI`);
-  quizbot_ui.initialize(client);
-
-  logger.info(`Starting GuildCount Manager`);
-  db_manager.initialize(client);
-
-  logger.info(`Starting UI Holder Aging Manager`);
-  quizbot_ui.startUIHolderAgingManager();
-
-  logger.info(`Starting GuildCount Manager`);
-  quizbot_ui.startGuildsCountManager(client);
-
-  logger.info(`Loading Option Data from Database...`);
-  client.guilds.cache.forEach(guild => {
-    if(guild != undefined) option_system.loadOptionData(guild.id);
-  });
-  
-  ///////////
-  logger.info(`Register commands...`);
-
-  command_register.registerGlobalCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID);
-
-  client.guilds.cache.forEach(guild => {
-    if(guild != undefined) command_register.registerCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID, guild.id);
-  });
-
-  ///////////
-  logger.info(`Setting bot Status...`);
-  client.user.setActivity(`/퀴즈 | /quiz `);
-
-  ///////////
-  logger.info(`Started Quizbot! tag name: ${client.user.tag}!`);
-
+const manager = new ClusterManager(`${__dirname}/bot.js`, {
+    totalShards: 'auto', // or 'auto'
+    shardsPerClusters: 2,
+    totalClusters: 'auto',
+    mode: 'process', // you can also choose "worker"
+    token: PRIVATE_CONFIG.BOT.TOKEN,
+    restarts: { //최대 자동 재시작 횟수
+        max: 5, // Maximum amount of restarts per cluster
+        interval: 60000 * 60, // Interval to reset restarts
+    },
 });
 
-// 상호작용 이벤트
-client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
+manager.extend( 
+    //신호가 최대 miss에 달하면 알아서 재시작함
+    new HeartbeatManager({
+        interval: 10000, // Interval to send a heartbeat
+        maxMissedHeartbeats: 10, // Maximum amount of missed Heartbeats until Cluster will get respawned
+    })
+)
 
-  let guildID = interaction.guild.id;
+manager.on('clusterCreate', cluster =>
+{
+    logger.info(`Launched Cluster ${cluster.id}`);
+});
 
-  if(interaction.commandName === '퀴즈' || interaction.commandName === 'quiz') 
-  {
-    const uiHolder = quizbot_ui.createUIHolder(interaction);
 
-    return;
-  }
+function broadcastRequest(message)
+{
+    const promises = [];
+    for (const cluster of Array.from(manager.clusters.values())) promises.push(cluster.request(message));
+    return Promise.all(promises);
+}
 
-  let already_deferred = false;
-  const quiz_session = quiz_system.getQuizSession(guildID);
-  if(quiz_session != undefined)
-  {
-    if(already_deferred == false && interaction.isButton())
+/**
+ * Sync
+ */
+setInterval(async () => { //플레이 현황 체크용
+
+    broadcastRequest({ 
+        ipc_message_type: IPC_MESSAGE_TYPE.CHECK_STATUS, 
+    })
+    .then(results => 
     {
-      already_deferred = true;
-      await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
-    } 
-    quiz_session.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
-  }
+        let status = {
+            guild_count: 0,
+            local_play_count: 0,
+            multi_play_count: 0,
+        }
 
-  const uiHolder = quizbot_ui.getUIHolder(guildID);
-  if(uiHolder != undefined)
-  {
-    if(already_deferred == false && (interaction.isButton() || interaction.isStringSelectMenu()))
-    {
-      already_deferred = true;
-      await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
-    } 
-    uiHolder.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
-  }
+        results.forEach(result => {
+            status.guild_count += result.guild_count;
+            status.local_play_count += result.local_play_count;
+            status.multi_play_count += result.multi_play_count;
+        });
 
-});
+        manager.broadcast( {
+            ipc_message_type: IPC_MESSAGE_TYPE.SYNC_STATUS,
+            status: status,
+        });
+    })
 
-//메시지 이벤트
-client.on(CUSTOM_EVENT_TYPE.messageCreate, async interaction => {
 
-  let guildID = interaction.guild.id;
+}, SYSTEM_CONFIG.guilds_count_manager_interval * 1000);
 
-  const quiz_session = quiz_system.getQuizSession(guildID);
-  if(quiz_session != undefined)
-  {
-    quiz_session.on(CUSTOM_EVENT_TYPE.message, interaction);
-  }
-
-});
+// //웹 서버 시작
+// web_manager.strat_web();
 
 //전역 에러 처리
 process.on('uncaughtException', (err) => {
-  logger.error(`Uncaught exception error!!! err: ${err.stack}`);
-});
+    logger.error(`Uncaught exception error!!! err: ${err.stack}`);
+  });
 
-/** 메인 **/
-//봇 활성화
-client.login(PRIVATE_CONFIG.BOT.TOKEN);
+manager.spawn({ timeout: -1 });

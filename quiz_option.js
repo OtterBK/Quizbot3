@@ -76,6 +76,7 @@ class OptionStorage
                 use_similar_answer: OPTION_TYPE.ENABLED,
                 score_type: OPTION_TYPE.SCORE_TYPE.POINT,
                 improved_audio_cut: OPTION_TYPE.ENABLED,
+                use_message_intent: OPTION_TYPE.ENABLED,
                 score_show_max: -1,
             }
         }
@@ -105,7 +106,7 @@ class OptionStorage
         let option_data = {};
         Object.keys(result_row).forEach((key) => {
             const value = result_row[key];
-            option_data[key] = value;
+            option_data[key] = typeof value == 'string' ? value.trim() : value;
         })
         this.option.quiz = option_data;
 

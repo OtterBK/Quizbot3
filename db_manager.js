@@ -19,17 +19,18 @@ const pool = new pg.Pool({
 
 is_initialized = false;
 
-exports.initialize = async () => {
-    return await pool.connect(err => {
+exports.initialize = () => {
+    return new Promise((resolve, reject) => {
+      pool.connect(err => {
         if (err) {
           logger.error(`Failed to connect db err: ${err}`);
           is_initialized = false;
-          return true;
         } else {
           logger.info(`Connected to db!`);
           is_initialized = true;
-          return false;
         }
+        resolve(is_initialized);
+      });
     });
 }
 
@@ -58,6 +59,18 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
     return sendQuery(query_string); 
 
 }
+
+exports.getQuestionList = async (quiz_id) => {
+
+  const query_string =
+  `select * from tb_question_info where quiz_id = '${quiz_id}'`
+
+  return sendQuery(query_string);
+
+}
+
+
+
 
 function sendQuery(query_string)
 {
