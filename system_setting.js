@@ -7,8 +7,8 @@ exports.SYSTEM_CONFIG = {
 
     use_inline_volume: true, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
     fade_interval: 500, //fade in,out 시 사용할 interval(ms), 값이 낮을수록 부드러운 fade 효과를 얻을 수 있으나 리소스를 많이 잡아먹음
-    fade_in_duration: 3500, //fade in 시간(ms)
-    fade_out_duration: 3500, //fade out 시간(ms)
+    fade_in_duration: 5000, //fade in 시간(ms)
+    fade_out_duration: 5000, //fade out 시간(ms)
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
     max_check_prepared_queue: 300, //prepared queue 최대 확인 횟수
@@ -24,7 +24,7 @@ exports.SYSTEM_CONFIG = {
     graceful_timeover_max_try: 5, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
+    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, 대부분의 상황에서는 false로 하면됨
@@ -32,6 +32,8 @@ exports.SYSTEM_CONFIG = {
     bgm_path: `${__dirname}/resources/bgm`, //BGM 파일 위치
     dev_quiz_path: `${__dirname}/resources/quizdata`, //Dev퀴즈 파일 위치
     log_path: `${__dirname}/log`, //LOG 저장할 위치
+    notices_path: `${__dirname}/resources/notices`, //공지사항 파일 위치
+    patch_notes_path: `${__dirname}/resources/patch_notes`, //공지사항 파일 위치
 
     hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수

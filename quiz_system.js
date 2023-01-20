@@ -2,7 +2,7 @@
 
 //#region 외부 모듈 로드
 const fs = require('fs');
-const ytdl = require('ytdl-core');
+const ytdl = require('discord-ytdl-core');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes, TeamMemberMembershipState } = require('discord.js');
 //#endregion
@@ -282,7 +282,7 @@ class QuizSession
 {
     constructor(guild, owner, channel, quiz_info)
     {
-        logger.info(`Creating Quiz Session, guild_id: ${this.guild_id}`);
+        logger.info(`Creating Quiz Session, guild_id: ${guild.id}`);
 
         this.guild = guild;
         this.owner = owner;
@@ -1582,7 +1582,7 @@ class Prepare extends QuizLifecycle
          * audio_end,
          */
         const question_audio_url = target_question['question_audio_url'];
-        
+
         //오디오 정보 가져오기
         const youtube_info = await ytdl.getInfo(question_audio_url);
         let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
@@ -1598,10 +1598,12 @@ class Prepare extends QuizLifecycle
         const audio_bitrate = audio_format.averageBitrate;
         const audio_byterate = audio_bitrate / 8;
 
-        const audio_start_byte = target_question['audio_start'];
-        const audio_end_byte = target_question['audio_end'] ?? audio_size;
         let audio_play_time = (target_question['audio_play_time'] ?? 0) <= 0 ? option_data.quiz.audio_play_time / 1000 : target_question['audio_play_time'];
         if(audio_play_time > 60) audio_play_time = 60; //60초가 넘어가서는 안된다.
+
+        const audio_start_sec = target_question['audio_start'];
+        const audio_end_sec = target_question['audio_end'] ?? audio_duration;
+        
 
         //오디오 길이가 audio_play_time 보다 작으면 오디오 길이를 audio_length로
         let audio_length; 
@@ -1616,9 +1618,8 @@ class Prepare extends QuizLifecycle
         }
         target_question['audio_length'] = audio_length;
 
-        const audio_play_time_as_byte = audio_play_time * audio_byterate
-        let audio_min_start_point = audio_start_byte * audio_byterate;
-        let audio_max_start_point = audio_end_byte - audio_play_time_as_byte;
+        let audio_min_start_point = audio_start_sec;
+        let audio_max_start_point = audio_end_sec - audio_play_time;
 
         let audio_start_point = undefined;
         let audio_end_point = undefined;
@@ -1629,19 +1630,19 @@ class Prepare extends QuizLifecycle
             if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
             {
                 const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                const refined_audio_min_start_point = audio_mid_point - (audio_play_time_as_byte / 2) + audio_byterate;
-                const refined_audio_max_start_point = audio_mid_point + (audio_play_time_as_byte /2) + audio_byterate;
+                const refined_audio_min_start_point = audio_mid_point - (audio_play_time / 2) + 1;
+                const refined_audio_max_start_point = audio_mid_point + (audio_play_time /2) + 1;
 
                 if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
                 {
-                    logger.debug(`Refined audio point, question: ${question_audio_url}min: ${audio_min_start_point/audio_byterate} -> ${refined_audio_min_start_point/audio_byterate}, max: ${audio_max_start_point/audio_byterate} -> ${refined_audio_max_start_point/audio_byterate}`);
+                    logger.debug(`Refined audio point, question: ${question_audio_url}min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
                     audio_min_start_point = refined_audio_min_start_point;
                     audio_max_start_point = refined_audio_max_start_point;
                 }
             }
 
             audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point));
-            audio_end_point = parseInt(audio_start_point + audio_play_time_as_byte);
+            audio_end_point = parseInt(audio_start_point + audio_play_time);
         }
 
         
@@ -1650,23 +1651,16 @@ class Prepare extends QuizLifecycle
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_play_time_as_byte; 
+        if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_play_time; 
 
-        logger.debug(`cut audio, question: ${question_audio_url}, point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
+        logger.debug(`cut audio, question: ${question_audio_url}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
         // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} });
-        // 구간 잘라서 가져오는거? 절대 안된다. webm/opus 를 완벽하게 디코딩하려면 완전한 데이터가 있어야 하는 것 같다. 우선 다 받자
-        let webm_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format });
-        //set stream for conversion
-        let proc = new ffmpeg({source: webm_stream});
-
-        //currently have ffmpeg stored directly on the server, and ffmpegLocation is the path to its location... perhaps not ideal, but what I'm currently settled on. And then sending the output directly to the response.
-        proc.setFfmpegPath(ffmpegLocation);
-        proc.withAudioCodec('libmp3lame')
-            .toFormat('mp3')
-            .output(fs.createWriteStream("./test4.mp3"))
-            .run();
-        proc.on('end', function() {
-            console.log('finished');
+        audio_stream = ytdl(question_audio_url, { 
+            format: audio_format ,
+            opusEncoded: true,
+            // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
+            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_play_time}`],
+            seek: audio_start_point,
         });
 
         /**
@@ -1677,6 +1671,10 @@ class Prepare extends QuizLifecycle
          * 3. 이미 Webm/opus 타입이다. inline 볼륨 꺼보고 해보자
          * 4. discord-ytdl-core 라는게 있다. 좀 옛날거라 지금은 안될텐데 참고는 해보자
          * 5. 정상적으로 돌아갈 때랑 잘렸을 때 edge 상태 확인
+         * 6. https://www.npmjs.com/package/discord-ytdl-core?activeTab=explore, 이건 discord-ytdl-core 의 소스코드다
+         * 확인해보면 ytdl 로 받은걸 ffmpeg 를 직접 만들고 실행하는걸 볼 수 있다. 이 중 seek 옵션이 있는데, 이게 시작 위치(second)이고 -t 옵션으로 duration, -to 옵션으로 ~~까지를 설정할 수 있다
+         * https://github.com/skdhg/discord-ytdl-core/issues/17
+         * 이게 되면 veryvery thank u T.T, => 6번으로 해결했다!!!!
          */
 
         if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
@@ -1685,24 +1683,14 @@ class Prepare extends QuizLifecycle
         }
 
         let resource = undefined;
-        if(config.use_inline_volume == false)
-        {
-            resource = createAudioResource(audio_stream, {
-                inputType: StreamType.WebmOpus,
-                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            });
-        }
-        else
-        {
-            resource = createAudioResource(audio_stream, {
-                inputType: StreamType.WebmOpus,
-                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            });
-        }
+        resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
+            inputType: StreamType.Opus,
+            inlineVolume: SYSTEM_CONFIG.use_inline_volume,
+        });
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
-            // resource.volume.setVolume(0);
+            resource.volume.setVolume(0);
         }
 
         target_question['audio_resource'] = resource;
@@ -2266,9 +2254,9 @@ class Question extends QuizLifeCycleWithUtility
     {
         const option_data = this.quiz_session.option_data;
 
-        if(option_data.quiz.use_message_intent == OPTION_TYPE.DISABLED) return; //Message Intent 안쓴다면 return
+        if(message.author == bot_client.user) return;
 
-        if(message.user == bot_client.user) return;
+        if(option_data.quiz.use_message_intent == OPTION_TYPE.DISABLED) return; //Message Intent 안쓴다면 return
 
         if(message.channel != this.quiz_session.channel) return; //퀴즈 진행 중인 채널 아니면 return
 

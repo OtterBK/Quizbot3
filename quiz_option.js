@@ -106,7 +106,7 @@ class OptionStorage
         let option_data = {};
         Object.keys(result_row).forEach((key) => {
             const value = result_row[key];
-            option_data[key] = value;
+            option_data[key] = typeof value == 'string' ? value.trim() : value;
         })
         this.option.quiz = option_data;
 
