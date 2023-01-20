@@ -158,6 +158,14 @@ const note_ui_component = new ActionRowBuilder()
   .setStyle(ButtonStyle.Secondary),
 );
 
+const only_back_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+    .setCustomId('back')
+    .setLabel('뒤로가기')
+    .setStyle(ButtonStyle.Secondary),
+)
+
 //#endregion
 
 /** global 변수 **/
@@ -174,6 +182,7 @@ exports.initialize = (client) => {
       return false;
   }
   bot_client = client;
+
   return true;
 }
 
@@ -231,7 +240,7 @@ function uiHolderAgingManager()
         }
       })
 
-      logger.info(`Dong Aginging UI Holder... free count: ${free_count}`);
+      logger.info(`Done Aginging UI Holder... free count: ${free_count}`);
   }, SYSTEM_CONFIG.ui_holder_aging_manager_interval * 1000); //체크 주기
 
   return uiholder_aging_manager;
@@ -657,6 +666,8 @@ class SelectQuizTypeUI extends QuizbotUI {
       url: text_contents.select_quiz_type.url,
       description: text_contents.select_quiz_type.description,
     };
+
+    this.components = [select_btn_component ]; //이게 기본 component임
   }
 
   onInteractionCreate(interaction)
@@ -1101,14 +1112,8 @@ class NoteUI extends QuizbotUI
       timestamp: new Date(note_info['birthtime']).toISOString(),
     };
 
-    const note_ui_comp = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('back')
-        .setLabel('뒤로가기')
-        .setStyle(ButtonStyle.Secondary),
-    )
-    this.components = [note_ui_comp]; //여기서는 component를 바꿔서 해주자
+
+    this.components = [only_back_comp]; //여기서는 component를 바꿔서 해주자
   }
 
 }
