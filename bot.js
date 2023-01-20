@@ -21,23 +21,8 @@ const db_manager = require('./db_manager.js');
 const ipc_manager = require('./ipc_manager.js');
 
 /** global 변수 **/
-const client = new KoreanbotsClient(
-  { 
-    shards: getInfo().SHARD_LIST, // An array of shards that will get spawned
-    shardCount: getInfo().TOTAL_SHARDS, // Total number of shards,
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
-    ],
-    koreanbots: {
-      api: {
-        token: PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN,
-      }
-    },
-  });
-// const client = new Client(
+//Koreansbots 랑 discord-hybrid-shard 랑 쓰면 서버 수 잘못인식함
+// const client = new KoreanbotsClient(
 //   { 
 //     shards: getInfo().SHARD_LIST, // An array of shards that will get spawned
 //     shardCount: getInfo().TOTAL_SHARDS, // Total number of shards,
@@ -47,7 +32,23 @@ const client = new KoreanbotsClient(
 //       GatewayIntentBits.GuildMessages,
 //       GatewayIntentBits.MessageContent,
 //     ],
+//     koreanbots: {
+//       api: {
+//         token: PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN,
+//       }
+//     },
 //   });
+const client = new Client(
+  { 
+    shards: getInfo().SHARD_LIST, // An array of shards that will get spawned
+    shardCount: getInfo().TOTAL_SHARDS, // Total number of shards,
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildVoiceStates,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
+  });
   
 client.cluster = new ClusterClient(client); // initialize the Client, so we access the .broadcastEval()
 
