@@ -38,7 +38,7 @@ exports.SYSTEM_CONFIG = {
     hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
 
-    pg_max_pool_size: 10, //Postgresql max pool 개수
+    pg_max_pool_size: 5, //Postgresql max pool 개수
 
     log_max_files: 10, //log로 남길 파일 최대 수
     log_max_size: '100m' //각 log 파일 최대 크기
