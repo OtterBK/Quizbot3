@@ -237,6 +237,10 @@ class QuizPlayUI
         const objects = this.createSendObject();
         await this.ui_instance.edit(objects)
         .catch(err => {
+            if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //뭔가 이상함
+            {
+                return;
+            }
             logger.error(`Failed to Update QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
         })
         .finally(() => {

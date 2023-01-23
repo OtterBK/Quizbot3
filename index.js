@@ -57,9 +57,15 @@ setInterval(async () => { //플레이 현황 체크용
     let results = [];
     for (const cluster of Array.from(manager.clusters.values())) 
     {
-        const reply = await cluster.request(message);
-        if(reply != undefined)
-            results.push(reply);
+        try{
+            const reply = await cluster.request(message);
+            if(reply != undefined)
+                results.push(reply);
+        }catch(err)
+        {
+            
+        }
+
     }
 
     let status = {

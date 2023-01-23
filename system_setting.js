@@ -5,7 +5,7 @@ exports.SYSTEM_CONFIG = {
 
     develop_mode: true, //개발자 모드 활성화, console 로깅 등
 
-    use_inline_volume: true, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
+    use_inline_volume: false, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
     fade_interval: 500, //fade in,out 시 사용할 interval(ms), 값이 낮을수록 부드러운 fade 효과를 얻을 수 있으나 리소스를 많이 잡아먹음
     fade_in_duration: 5000, //fade in 시간(ms)
     fade_out_duration: 5000, //fade out 시간(ms)
@@ -17,7 +17,7 @@ exports.SYSTEM_CONFIG = {
     ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
     ui_holder_aging_manager_interval: 600, //체크 주기(s)
 
-    guilds_count_manager_interval: 5, //참여 중인 guild 수 체크 주기(s)
+    guilds_count_manager_interval: 10, //참여 중인 guild 수 체크 주기(s)
 
     correct_answer_cycle_wait: 6500, //정답 맞췄을 시, 얼마나 대기할 지
     timeover_cycle_wait: 6500, //타임오버 시, 얼마나 대기할 지
@@ -72,17 +72,17 @@ exports.EXPLAIN_TYPE = {
 }
 
 exports.BGM_TYPE = {
-    BELL: "bell.mp3",
-    COUNTDOWN_10: "countdown10.wav",
+    BELL: "bell.opus",
+    COUNTDOWN_10: "countdown10.opus",
     COUNTDOWN_LONG: "longTimer",
-    ENDING: "ENDING.mp3",
-    FAIL: "FAIL.mp3",
-    MATCH_FIND: "MATCH_FIND.mp3",
-    MATCHING: "MATCHING.mp3",
-    PLING: "pling.mp3",
-    ROUND_ALARM: "ROUND_ALARM.mp3",
-    SCORE_ALARM: "SCORE_ALARM.mp3",
-    SUCCESS: "SUCCESS.mp3",
+    ENDING: "ENDING.opus",
+    FAIL: "FAIL.opus",
+    MATCH_FIND: "MATCH_FIND.opus",
+    MATCHING: "MATCHING.opus",
+    PLING: "pling.opus",
+    ROUND_ALARM: "ROUND_ALARM.opus",
+    SCORE_ALARM: "SCORE_ALARM.opus",
+    SUCCESS: "SUCCESS.opus",
 }
 
 exports.QUIZ_MAKER_TYPE = {
