@@ -310,7 +310,7 @@ exports.playBGM = async (audio_player, bgm_type) => {
 
   if(bgm_file_path == undefined) return;
 
-  // const bgm_file_stream = fs.createReadStream(bgm_file_path, {flags:'r'});
+  const bgm_file_stream = fs.createReadStream(bgm_file_path, {flags:'r'});
 
   //23.01.23 use_inline_volume 옵션을 끄니, bgm이 안나오는 버그가 있었다.
   //도저히 왜 그런지는 모르겠으나, file 경로를 createAudioResource로 넘기지 않고, 
@@ -320,7 +320,7 @@ exports.playBGM = async (audio_player, bgm_type) => {
   if(bgm_file_path.endsWith(".opus")) inputType = StreamType.OggOpus;
   if(bgm_file_path.endsWith(".mp3")) inputType = StreamType.Arbitrary;
 
-  const bgm_resource = createAudioResource(bgm_file_path, {
+  const bgm_resource = createAudioResource(bgm_file_stream, {
     inputType:  inputType,
     inlineVolume: false,
   });

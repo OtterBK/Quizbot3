@@ -72,17 +72,17 @@ exports.EXPLAIN_TYPE = {
 }
 
 exports.BGM_TYPE = {
-    BELL: "bell.opus",
-    COUNTDOWN_10: "countdown10.opus",
+    BELL: "bell.webm",
+    COUNTDOWN_10: "countdown10.webm",
     COUNTDOWN_LONG: "longTimer",
-    ENDING: "ENDING.opus",
-    FAIL: "FAIL.opus",
-    MATCH_FIND: "MATCH_FIND.opus",
-    MATCHING: "MATCHING.opus",
-    PLING: "pling.opus",
-    ROUND_ALARM: "ROUND_ALARM.opus",
-    SCORE_ALARM: "SCORE_ALARM.opus",
-    SUCCESS: "SUCCESS.opus",
+    ENDING: "ENDING.webm",
+    FAIL: "FAIL.webm",
+    MATCH_FIND: "MATCH_FIND.webm",
+    MATCHING: "MATCHING.webm",
+    PLING: "pling.webm",
+    ROUND_ALARM: "ROUND_ALARM.webm",
+    SCORE_ALARM: "SCORE_ALARM.webm",
+    SUCCESS: "SUCCESS.webm",
 }
 
 exports.QUIZ_MAKER_TYPE = {
