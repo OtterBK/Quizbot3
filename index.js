@@ -21,9 +21,9 @@ const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
 const manager = new ClusterManager(`${__dirname}/bot.js`, {
-    totalShards: 9, // or 'auto'
-    shardsPerClusters: 3,
-    totalClusters: 3,
+    totalShards: 8, // or 'auto'
+    shardsPerClusters: 2,
+    totalClusters: 4,
     mode: 'process', // you can also choose "worker"
     token: PRIVATE_CONFIG.BOT.TOKEN,
     restarts: { //최대 자동 재시작 횟수
@@ -57,9 +57,17 @@ setInterval(async () => { //플레이 현황 체크용
     let results = [];
     for (const cluster of Array.from(manager.clusters.values())) 
     {
-        const reply = await cluster.request(message);
-        if(reply != undefined)
-            results.push(reply);
+        try
+        {
+            const reply = await cluster.request(message);
+            if(reply != undefined)
+                results.push(reply);
+        }
+        catch(err)
+        {
+            
+        }
+
     }
 
     let status = {

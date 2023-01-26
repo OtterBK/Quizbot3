@@ -199,6 +199,17 @@ class QuizPlayUI
         this.ui_instance = ui_instance;
     })
     .catch(err => {
+        if(err.code === RESTJSONErrorCodes.UnknownChannel)
+        {
+            const guild_id = this.channel.guild.id;
+            const quiz_session = exports.getQuizSession(guild.id);
+            logger.info(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
+            if(quiz_session != undefined)
+            {
+                quiz_session.forceStop();
+            }
+            return;
+        }
         logger.error(`Failed to Send QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
     })
     .finally(() => {
@@ -237,6 +248,10 @@ class QuizPlayUI
         const objects = this.createSendObject();
         await this.ui_instance.edit(objects)
         .catch(err => {
+            if(err.code === RESTJSONErrorCodes.UnknownMessage || err.code === RESTJSONErrorCodes.UnknownInteraction) //뭔가 이상함
+            {
+                return;
+            }
             logger.error(`Failed to Update QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
         })
         .finally(() => {
@@ -1401,10 +1416,6 @@ class Prepare extends QuizLifecycle
             let audio_resource = undefined;
 
             let inputType = StreamType.WebmOpus;
-            if(question.endsWith('.ogg')) //ogg
-            {
-                inputType = StreamType.OggOpus;
-            }
 
             if(config.use_inline_volume == false) //Inline volume 옵션 켜면 의미 없음
             {
@@ -1528,10 +1539,6 @@ class Prepare extends QuizLifecycle
 
         let resource = undefined;
         let inputType = StreamType.WebmOpus;
-        if(question.endsWith('.ogg')) //ogg
-        {
-            inputType = StreamType.OggOpus;
-        }
 
         //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)

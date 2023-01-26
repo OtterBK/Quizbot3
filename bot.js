@@ -106,6 +106,10 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   if(interaction.commandName === '퀴즈' || interaction.commandName === 'quiz') 
   {
     const uiHolder = quizbot_ui.createUIHolder(interaction);
+    //임시로 잠시 해둠
+    const current_notice = fs.readFileSync(`${__dirname}/resources/current_notice.txt`, {encoding: 'utf8', flag:'r'});
+
+    interaction.channel.send({content: '```' + current_notice + '```'});
 
     return;
   }

@@ -81,11 +81,7 @@ const main_ui_component = new ActionRowBuilder()
   .setURL('http://quizbot.kro.kr')
   .setStyle(ButtonStyle.Link),
   new ButtonBuilder()
-  .setLabel('퀴즈봇 커뮤니티')
-  .setURL('https://discord.gg/Baw6ZP6rcZ')
-  .setStyle(ButtonStyle.Link),
-  new ButtonBuilder()
-  .setLabel('봇 공유하기')
+  .setLabel('봇 공유')
   .setURL('https://discord.com/api/oauth2/authorize?client_id=788060831660114012&permissions=2150681600&scope=bot')
   .setStyle(ButtonStyle.Link),
 );
@@ -667,7 +663,7 @@ class SelectQuizTypeUI extends QuizbotUI {
       description: text_contents.select_quiz_type.description,
     };
 
-    this.components = [select_btn_component ]; //이게 기본 component임
+    this.components = [select_btn_component, only_back_comp ]; //이게 기본 component임
   }
 
   onInteractionCreate(interaction)
