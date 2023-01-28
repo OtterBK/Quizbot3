@@ -13,7 +13,6 @@ const option_system = require("./quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('./utility.js');
-const { config } = require('process');
 const logger = require('./logger.js')('QuizSystem');
 const db_manager = require('./db_manager.js');
 
@@ -170,7 +169,7 @@ class QuizPlayUI
 
     if(image_resource.includes(SYSTEM_CONFIG.dev_quiz_path) == true) //dev path 포함하면 로컬 이미지 취급
     {
-        const file_name = image_resource.split('/').pop();
+        const file_name = image_resource.split('/').pop(); 
         this.files = [ { attachment: image_resource, name: file_name } ];
         this.embed.image = { url: "attachment://" + file_name };
     }
@@ -340,23 +339,53 @@ class QuizSession
     {
         const guild_id = this.guild_id;
 
-        this.guild = undefined;
-        this.owner = undefined;
-        this.channel = undefined;
-        this.quiz_info = undefined;
-        this.voice_channel = undefined;
+        this.audio_player.stop(true); //stop 걸어주고
 
-        this.quiz_ui = undefined; //직접 새로 UI만들자
-        this.voice_connection = undefined;
-        this.audio_player = undefined;
+        let free_stream_count = 0;
+        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 STREAM 명시적으로 닫음
+        {
+            const audio_stream_for_close = this.game_data['audio_stream_for_close'];
+            if(audio_stream_for_close != undefined && audio_stream_for_close.length != 0)
+            {
+                audio_stream_for_close.forEach((audio_stream_array) => {
+                    audio_stream_array.forEach((audio_stream) => {
+                        if(audio_stream == undefined) return;
 
-        this.lifecycle_map = undefined;
+                        if(audio_stream.closed == false)
+                            audio_stream.close();
+                        if(audio_stream.destroyed == false)
+                            audio_stream.destroy();
 
-        this.quiz_data = undefined;
-        this.game_data = undefined; 
-        this.option_data = undefined; //옵션
+                        ++free_stream_count;
+                    });
+                });
+                audio_stream_for_close.splice(0, audio_stream_for_close.length);
+            }
+        }
+        logger.info(`free stream count, ${free_stream_count}`);
 
-        this.scoreboard = undefined; //scoreboard 
+        for(const cycle of Object.values(this.lifecycle_map))
+        {
+            cycle.free();
+        }
+
+        delete this.guild;
+        delete this.owner;
+        delete this.channel;
+        delete this.quiz_info;
+        delete this.voice_channel;
+
+        delete this.quiz_ui; //직접 새로 UI만들자
+        delete this.voice_connection;
+        delete this.audio_player;
+
+        delete this.lifecycle_map;
+
+        delete this.quiz_data;
+        delete this.game_data; 
+        delete this.option_data; //옵션
+
+        delete this.scoreboard; //scoreboard 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -407,6 +436,7 @@ class QuizSession
 
         this.inputLifeCycle(CYCLE_TYPE.CORRECTANSWER, new CorrectAnswer(this));
         this.inputLifeCycle(CYCLE_TYPE.TIMEOVER, new TimeOver(this));
+        this.inputLifeCycle(CYCLE_TYPE.CLEARING, new Clearing(this));
 
         //이 아래는 공통
         this.inputLifeCycle(CYCLE_TYPE.ENDING, new Ending(this));
@@ -479,8 +509,14 @@ class QuizLifecycle
     {
         // this.quiz_session = weak(quiz_session); //strong ref cycle 떄문에 weak 타입으로
         this.quiz_session = quiz_session; //weak이 얼마나 성능에 영향을 미칠 지 모르겠다. 어차피 free()는 어지간해서 타니깐 이대로하자
+        this.force_stop = false;
         this.next_cycle = CYCLE_TYPE.UNDEFINED;
         this.ignore_block = false;
+    }
+
+    free()
+    {
+        delete this.quiz_session;
     }
 
     do()
@@ -511,7 +547,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.quiz_session.force_stop == true)
+        if(this.force_stop == true)
         {
             goNext = false;
         }
@@ -533,7 +569,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.quiz_session.force_stop == true) 
+        if(this.force_stop == true) 
         {
             goNext = false;
         }
@@ -555,7 +591,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.quiz_session.force_stop == true) 
+        if(this.force_stop == true) 
         {
             goNext = false;
         }
@@ -573,6 +609,7 @@ class QuizLifecycle
     {
         logger.info(`Call force stop quiz session on cycle, guild_id: ${this.quiz_session.guild_id}, current cycle type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}`);
         this.quiz_session.force_stop = true;
+        this.force_stop = true;
         this.next_cycle == CYCLE_TYPE.UNDEFINED;
         if(this.exit != undefined && do_exit)
         {
@@ -699,7 +736,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
         const audio_resource = target_question['answer_audio_resource'];
         audio_play_time = target_question['answer_audio_play_time'];
 
-        audio_player.stop(); //우선 지금 나오는 거 멈춤
+        //audio_player.stop(true); //우선 지금 나오는 거 멈춤
         this.startAudio(audio_player, audio_resource); //오디오 재생
         this.autoFadeOut(audio_player, audio_resource, audio_play_time) //자동 fadeout
 
@@ -831,7 +868,11 @@ class Initialize extends QuizLifecycle
             }
         });
 
-        const audio_player = createAudioPlayer();
+        const audio_player = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Stop,
+            },
+        });
         voice_connection.subscribe(audio_player);
 
         this.quiz_session.voice_connection = voice_connection;
@@ -866,6 +907,8 @@ class Initialize extends QuizLifecycle
             'scoreboard': {}, //점수표
             'ranking_list': [], //순위표
             'prepared_question_queue': [], //PREPARE Cycle을 거친 퀴즈 큐
+            'processing_question': undefined, //Clearing 단계에서 정리할 이전 quiz
+            'audio_stream_for_close': [], //Clearing 단계에서 정리할 stream
         };
         this.quiz_session.game_data = game_data;
         this.quiz_session.quiz_data = quiz_data;
@@ -1324,6 +1367,7 @@ class Prepare extends QuizLifecycle
         this.skip_prepare = false;
         this.prepared_question = undefined;
         this.target_question = undefined;
+        this.current_audio_streams = [];
     }
 
     async enter()
@@ -1355,7 +1399,7 @@ class Prepare extends QuizLifecycle
         let game_data = this.quiz_session.game_data;
 
         const question_num = game_data['question_num'];
-        let target_question = quiz_data.question_list[question_num];
+        let target_question = quiz_data['question_list'].pop(); //어차피 앞에서부터 꺼내든, 뒤에서부터 꺼내든 랜덤인건 똑같다.
         this.target_question = target_question;
 
         const question_type = target_question['type'];
@@ -1391,9 +1435,16 @@ class Prepare extends QuizLifecycle
 
     async exit()
     {
+        if(this.skip_prepare == true) return;
+
         let game_data = this.quiz_session.game_data;
 
-        if(this.skip_prepare == true) return;
+        let audio_stream_for_close = game_data['audio_stream_for_close'];
+        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
+        {
+            audio_stream_for_close.push(this.current_audio_streams);
+        }
+        this.current_audio_streams = [];
 
         if(this.prepared_question == undefined) //prepare 시도했는데 실패했다면
         {
@@ -1401,23 +1452,28 @@ class Prepare extends QuizLifecycle
         }
 
         game_data.prepared_question_queue.push(this.prepared_question);
+        delete this.target_question;
+        
         return;
     }
 
     async prepareAnswerAdditionalInfo(target_question)
     {
         const option_data = this.quiz_session.option_data;
+        const game_data = this.quiz_session.game_data;
 
         if(target_question.hasOwnProperty('answer_audio'))
         {
             const question = target_question['answer_audio'];
             const audio_stream = fs.createReadStream(question, {flags:'r'});
+            this.current_audio_streams.push(audio_stream);
 
             let audio_resource = undefined;
 
-            let inputType = StreamType.WebmOpus;
+            let inputType = undefined;
+            if(question.endsWith('.webm')) inputType = StreamType.WebmOpus;
 
-            if(config.use_inline_volume == false) //Inline volume 옵션 켜면 의미 없음
+            if(inputType != undefined && SYSTEM_CONFIG.use_inline_volume == false) //Inline volume 옵션 켜면 의미 없음
             {
                 audio_resource = createAudioResource(audio_stream, {
                     inputType: inputType,
@@ -1449,6 +1505,7 @@ class Prepare extends QuizLifecycle
                 audio_play_time = ((audio_info.format.duration) ?? 1000) * 1000; //10000000 -> 무조건 오디오 길이 쓰도록
             }
             target_question['answer_audio_play_time'] = audio_play_time;
+
         }
 
         if(target_question.hasOwnProperty('answer_image'))
@@ -1461,6 +1518,7 @@ class Prepare extends QuizLifecycle
     async prepareAudio(target_question)
     {
         const option_data = this.quiz_session.option_data;
+        const game_data = this.quiz_session.game_data;
 
         const question = target_question['question'];
         const use_random_start = target_question['use_random_start'] ?? true; //노래 어디서부터 시작할 지 랜덤으로 설정 여부
@@ -1523,7 +1581,7 @@ class Prepare extends QuizLifecycle
         }
         
         //오디오 스트림 미리 생성
-        let audio_stream_for_close = undefined;
+        let audio_stream_for_close = game_data['audio_stream_for_close'];
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
@@ -1531,18 +1589,15 @@ class Prepare extends QuizLifecycle
 
         logger.debug(`cut audio, question: ${question}, point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
         audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});
-
-        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
-        {
-            audio_stream_for_close = [audio_stream];
-        }
+        this.current_audio_streams.push(audio_stream);
 
         let resource = undefined;
-        let inputType = StreamType.WebmOpus;
+        let inputType = undefined;
+        if(question.endsWith('.webm')) inputType = StreamType.WebmOpus;
 
         //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
-        if(config.use_inline_volume == false) //Inline volume 옵션 켜면 inputType 설정 의미 없음
+        if(inputType != undefined && SYSTEM_CONFIG.use_inline_volume == false) //Inline volume 옵션 켜면 inputType 설정 의미 없음
         {
             resource = createAudioResource(audio_stream, {
                 inputType: inputType,
@@ -1562,7 +1617,6 @@ class Prepare extends QuizLifecycle
         }
 
         target_question['audio_resource'] = resource;
-        target_question['audio_stream_for_close'] = audio_stream_for_close;
     }
 
     async prepareImage(target_question)
@@ -1584,6 +1638,7 @@ class Prepare extends QuizLifecycle
     async prepareCustom(target_question) //TODO 나중에 Dev quiz랑 중복 코드 처리하자...어우 귀찮아
     {
         const option_data = this.quiz_session.option_data;
+        const game_data = this.quiz_session.game_data;
 
         /**
          * question_audio_url,
@@ -1656,7 +1711,6 @@ class Prepare extends QuizLifecycle
 
         
         //오디오 스트림 미리 생성
-        let audio_stream_for_close = undefined;
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
@@ -1671,6 +1725,7 @@ class Prepare extends QuizLifecycle
             encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_play_time}`],
             seek: audio_start_point,
         });
+        this.current_audio_streams.push(audio_stream);
 
         /**
          * 시도해 볼만한 방법들
@@ -1686,11 +1741,6 @@ class Prepare extends QuizLifecycle
          * 이게 되면 veryvery thank u T.T, => 6번으로 해결했다!!!!
          */
 
-        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
-        {
-            audio_stream_for_close = [audio_stream];
-        }
-
         let resource = undefined;
         resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
             inputType: StreamType.Opus,
@@ -1703,7 +1753,6 @@ class Prepare extends QuizLifecycle
         }
 
         target_question['audio_resource'] = resource;
-        target_question['audio_stream_for_close'] = audio_stream_for_close;
 
 
         /**
@@ -1856,32 +1905,12 @@ class Question extends QuizLifeCycleWithUtility
             return; //더 이상 진행할 게 없다.
         }
 
-        await this.quiz_session.audio_player.stop(); //시작 전엔 audio stop 걸고 가자
+        //await this.quiz_session.audio_player.stop(true); //시작 전엔 audio stop 걸고 가자
 
         //진행 UI 관련
         utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.ROUND_ALARM);
         let quiz_ui = await this.createQuestionUI();
         const essential_term = Date.now() + 3000; //최소 문제 제출까지 3초간의 텀은 주자
-
-        //이전 퀴즈 resource 해제
-        const previous_question = game_data['processing_question'];
-        if(previous_question != undefined)
-        {
-            if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 STREAM 명시적으로 닫음
-            {
-                const audio_stream_for_close = previous_question['audio_stream_for_close'];
-                if(audio_stream_for_close != undefined)
-                {
-                    audio_stream_for_close.forEach((audio_stream) => audio_stream.close());
-                }
-            }
-
-            const fade_out_timer = previous_question['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
-            if(fade_out_timer != undefined)
-            {
-                clearTimeout(fade_out_timer);
-            }
-        }
 
         //아직 prepared queue에 아무것도 없다면
         let current_check_prepared_queue = 0;
@@ -2171,7 +2200,7 @@ class Question extends QuizLifeCycleWithUtility
                 clearTimeout(this.progress_bar_timer);
             }
             const audio_player = this.quiz_session.audio_player;
-            await audio_player.stop();
+            //await audio_player.stop(true);
             utility.playBGM(audio_player, bgm_type);
             this.startProgressBar(wait_time);
 
@@ -2470,7 +2499,7 @@ class QuestionSong extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Song, guild_id:${this.quiz_session.guild_id}, question: ${question}`);
+        logger.info(`Questioning Song, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //오디오 재생 부
         const audio_player = this.quiz_session.audio_player;
@@ -2540,7 +2569,7 @@ class QuestionImage extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Image, guild_id:${this.quiz_session.guild_id}, question: ${question}`);
+        logger.info(`Questioning Image, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //그림 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2575,7 +2604,7 @@ class QuestionImage extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(); //BGM 바로 멈춰준다.
+            //audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2619,7 +2648,7 @@ class QuestionIntro extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Intro, guild_id:${this.quiz_session.guild_id}, question: ${question}`);
+        logger.info(`Questioning Intro, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //오디오 재생 부
         const audio_player = this.quiz_session.audio_player;
@@ -2692,7 +2721,7 @@ class QuestionText extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question: ${question.trim()}`);
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
 
         //텍스트 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2721,7 +2750,7 @@ class QuestionText extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(); //BGM 바로 멈춰준다.
+            //audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2767,7 +2796,7 @@ class QuestionOX extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question: ${question.trim()}`);
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
 
         //OX 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2795,7 +2824,7 @@ class QuestionOX extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(); //BGM 바로 멈춰준다.
+            //audio_player.stop(true); //BGM 바로 멈춰준다.
 
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //ox퀴즈는 스킵만 타임오버가 일찍 끝난다. 그러니 타임오버로~
         }
@@ -2862,7 +2891,7 @@ class QuestionCustom extends Question
         this.answers = current_question['answers'];
         const question_id = current_question['question_id'];
 
-        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_id: ${question_id}`);
+        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question_id: ${question_id}`);
 
         //이미지 표시
         const image_resource = current_question['image_resource'];
@@ -2949,7 +2978,7 @@ class TimeOver extends QuizLifeCycleWithUtility
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_cycle = CYCLE_TYPE.QUESTIONING;
+        this.next_cycle = CYCLE_TYPE.CLEARING;
         this.custom_wait = undefined;
     }
 
@@ -3033,8 +3062,7 @@ class TimeOver extends QuizLifeCycleWithUtility
 
     async exit()
     {
-        let quiz_ui = this.quiz_session.quiz_ui;
-        quiz_ui.delete();
+
     }
 }
 
@@ -3048,7 +3076,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
     constructor(quiz_session)
     {
         super(quiz_session);
-        this.next_cycle = CYCLE_TYPE.QUESTIONING;
+        this.next_cycle = CYCLE_TYPE.CLEARING;
         this.custom_wait = undefined;
     }
 
@@ -3141,8 +3169,83 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
 
     async exit()
     {
+
+    }
+
+}
+//#endregion
+
+
+//#region Clearing Cycle
+/** 자원 정리용 **/
+class Clearing extends QuizLifeCycleWithUtility
+{
+    static cycle_type = CYCLE_TYPE.CLEARING;
+    constructor(quiz_session)
+    {
+        super(quiz_session);
+        this.next_cycle = CYCLE_TYPE.QUESTIONING;
+        this.custom_wait = undefined;
+    }
+
+    async enter()
+    {
+        
+    }
+
+    async act()
+    {
+
+    }
+
+    async exit()
+    {
+        const quiz_data = this.quiz_session.quiz_data;
+        const game_data = this.quiz_session.game_data;
+
+        //await this.quiz_session.audio_player.stop(true); 
+        // await utility.sleep(1000);
+
         let quiz_ui = this.quiz_session.quiz_ui;
         quiz_ui.delete();
+
+        //이전 퀴즈 resource 해제
+        const previous_question = game_data['processing_question'];
+        if(previous_question != undefined)
+        {
+            const fade_out_timer = previous_question['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
+            if(fade_out_timer != undefined)
+            {
+                clearTimeout(fade_out_timer);
+            }
+        }
+
+        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 STREAM 명시적으로 닫음
+        {
+            const audio_stream_for_close = game_data['audio_stream_for_close'];
+            if(audio_stream_for_close != undefined && audio_stream_for_close.length != 0)
+            {
+                const used_stream = audio_stream_for_close.shift();
+                used_stream.forEach((audio_stream) => {
+                    if(audio_stream == undefined) return;
+
+                    if(audio_stream.closed == false)
+                        audio_stream.close();
+                    if(audio_stream.destroyed == false)
+                        audio_stream.destroy();
+                });
+            }
+        }
+
+
+        delete game_data['processing_question'];
+
+        if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
+        {
+            this.next_cycle = CYCLE_TYPE.ENDING;
+            logger.info(`All Question Submitted on Clearing, guild_id:${this.quiz_session.guild_id}`);
+            return; //더 이상 진행할 게 없다.
+        }
     }
 
 }
@@ -3272,7 +3375,7 @@ class Finish extends QuizLifecycle
         const audio_player = this.quiz_session.audio_player;
         if(audio_player != undefined)
         {
-            audio_player.stop();
+            audio_player.stop(true);
         }
         const voice_connection = this.quiz_session.voice_connection;
         if(voice_connection!= undefined)

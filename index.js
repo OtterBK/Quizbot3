@@ -1,3 +1,5 @@
+'use strict'
+
 /**
  * Sharding을 위해 bot의 소스코드는 bot.js로 옮겼다
  * 내가 이해한게 맞다면
@@ -21,9 +23,9 @@ const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
 const manager = new ClusterManager(`${__dirname}/bot.js`, {
-    totalShards: 8, // or 'auto'
-    shardsPerClusters: 2,
-    totalClusters: 4,
+    totalShards: 1, // or 'auto'
+    shardsPerClusters: 1,
+    totalClusters: 1,
     mode: 'process', // you can also choose "worker"
     token: PRIVATE_CONFIG.BOT.TOKEN,
     restarts: { //최대 자동 재시작 횟수

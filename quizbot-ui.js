@@ -168,6 +168,10 @@ const only_back_comp = new ActionRowBuilder()
 let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
 let bot_client = undefined;
 
+exports.getTestContent = () => {
+  return DevQuizSelectUI.quiz_contents[0].sub_contents[3];
+}
+
 //#region exports 정의
 /** exports **/
 //main embed 인스턴스 반환
@@ -684,7 +688,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
 
   static resource_path = SYSTEM_CONFIG.dev_quiz_path;
   static quiz_contents =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
-
+  
   constructor(contents)
   {
     super();

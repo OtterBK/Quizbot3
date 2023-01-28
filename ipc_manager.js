@@ -1,3 +1,5 @@
+'use strict'
+
 //외부 모듈
 const { messageType } = require('discord-hybrid-sharding');
 

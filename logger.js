@@ -1,3 +1,5 @@
+'use strict'
+
 /**
 * logger.js
 * 로깅용 모듈
