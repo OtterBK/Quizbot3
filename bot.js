@@ -144,30 +144,6 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
 
   let guildID = message.guild.id;
 
-  if(message.content.startsWith("!test"))
-  {
-    const content = quizbot_ui.getTestContent();
-    //어차피 여기서 만드는 quiz info 는 내가 하드코딩해도 되네
-    let quiz_info = {};
-    quiz_info['title']  = content['name'];
-    quiz_info['icon'] = content['icon'];
-
-    quiz_info['type_name'] = content['type_name']; 
-    quiz_info['description'] = content['description']; 
-
-    quiz_info['author'] = '제육보끔#1916';
-    quiz_info['author_icon'] = 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png';
-    quiz_info['thumbnail'] = 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg'; //썸네일은 그냥 quizbot으로 해두자
-
-    quiz_info['quiz_size'] = content['quiz_size']; 
-    quiz_info['repeat_count'] = content['repeat_count']; 
-    quiz_info['winner_nickname'] = content['winner_nickname'];
-    quiz_info['quiz_path'] = content['content_path'];//dev quiz는 quiz_path 필요
-    quiz_info['quiz_type'] = content['quiz_type'];
-    quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.BY_DEVELOPER;
-    quiz_system.startQuiz(message.guild, message.member, message.channel, quiz_info); //퀴즈 시작
-  }
-
   const quiz_session = quiz_system.getQuizSession(guildID);
   if(quiz_session != undefined)
   {

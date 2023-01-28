@@ -390,6 +390,8 @@ class QuizSession
 
         delete this.scoreboard; //scoreboard 
 
+        delete quiz_session_map[guild_id];
+
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
 
@@ -3218,9 +3220,9 @@ class Clearing extends QuizLifeCycleWithUtility
         const game_data = this.quiz_session.game_data;
 
         const prev_audio_player = this.quiz_session.audio_player;
-        prev_audio_player.stop(true); 
+        // prev_audio_player.stop(true); 
         
-        const rotate_audio_player_amount = SYSTEM_CONFIG.rotate_audio_player_amount;
+        const rotate_audio_player_amount = this.quiz_session.rotate_audio_player.length;
 
         if(rotate_audio_player_amount > 1) //1개 일때는 rotate 돌릴게 없으니 그냥  패스
         {
@@ -3417,8 +3419,6 @@ class Finish extends QuizLifecycle
         const guild_id = this.quiz_session.guild_id;
         const quiz_session = quiz_session_map[guild_id];
         quiz_session.free();
-
-        delete quiz_session_map[guild_id];
     }
 }
 //#endregion
