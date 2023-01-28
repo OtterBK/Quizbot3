@@ -41,7 +41,9 @@ exports.SYSTEM_CONFIG = {
     pg_max_pool_size: 5, //Postgresql max pool 개수
 
     log_max_files: 10, //log로 남길 파일 최대 수
-    log_max_size: '100m' //각 log 파일 최대 크기
+    log_max_size: '100m', //각 log 파일 최대 크기
+
+    rotate_audio_player_amount: 2, //discord voice 라이브러리의 버그인 ffmpeg pcm을 사용하는 audio_resource 재생 중, 중간에 stop 걸거나 다른 resource 실행으로 중지될 시, ffmpeg가 계속 살아서 메모리 먹음
 }
 
 exports.CUSTOM_EVENT_TYPE = {

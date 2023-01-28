@@ -309,6 +309,8 @@ class QuizSession
 
         this.voice_connection = undefined;
         this.audio_player = undefined;
+        this.rotate_audio_player = [];
+        this.rotate_index = 0;
 
         this.lifecycle_map = {};
         this.current_cycle_type = CYCLE_TYPE.UNDEFINED;
@@ -378,6 +380,7 @@ class QuizSession
         delete this.quiz_ui; //직접 새로 UI만들자
         delete this.voice_connection;
         delete this.audio_player;
+        delete this.rotate_audio_player;
 
         delete this.lifecycle_map;
 
@@ -543,7 +546,8 @@ class QuizLifecycle
                 goNext = (await this.enter()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                if(this.force_stop == false)
+                    logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -565,7 +569,8 @@ class QuizLifecycle
                 goNext = (await this.act()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed act step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                if(this.force_stop == false)
+                    logger.error(`Failed act step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -587,7 +592,8 @@ class QuizLifecycle
                 goNext = (await this.exit()) ?? true;    
             }catch(err)
             {
-                logger.error(`Failed exit step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                if(this.force_stop == false)
+                    logger.error(`Failed exit step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -868,11 +874,19 @@ class Initialize extends QuizLifecycle
             }
         });
 
-        const audio_player = createAudioPlayer({
-            behaviors: {
-                noSubscriber: NoSubscriberBehavior.Stop,
-            },
-        });
+        let rotate_audio_player_amount = SYSTEM_CONFIG.rotate_audio_player_amount;
+        if(rotate_audio_player_amount < 0) rotate_audio_player_amount = 1; //최소 1개는 있어야함
+        for(let i = 0; i < rotate_audio_player_amount; ++i)
+        {
+            const new_audio_player = createAudioPlayer({
+                behaviors: {
+                    noSubscriber: NoSubscriberBehavior.Stop,
+                },
+            });
+            this.quiz_session.rotate_audio_player.push(new_audio_player);
+        }
+        this.quiz_session.rotate_index = 0;
+        const audio_player = this.quiz_session.rotate_audio_player[0];
         voice_connection.subscribe(audio_player);
 
         this.quiz_session.voice_connection = voice_connection;
@@ -3203,9 +3217,20 @@ class Clearing extends QuizLifeCycleWithUtility
         const quiz_data = this.quiz_session.quiz_data;
         const game_data = this.quiz_session.game_data;
 
-        //await this.quiz_session.audio_player.stop(true); 
-        // await utility.sleep(1000);
+        const prev_audio_player = this.quiz_session.audio_player;
+        prev_audio_player.stop(true); 
+        
+        const rotate_audio_player_amount = SYSTEM_CONFIG.rotate_audio_player_amount;
 
+        if(rotate_audio_player_amount > 1) //1개 일때는 rotate 돌릴게 없으니 그냥  패스
+        {
+            if(this.quiz_session.rotate_index >= rotate_audio_player_amount) this.quiz_session.rotate_index = 0;
+            const next_audio_player = this.quiz_session.rotate_audio_player[this.quiz_session.rotate_index];    
+            const voice_connection = this.quiz_session.voice_connection;
+            voice_connection.subscribe(next_audio_player);
+            this.quiz_session.audio_player = next_audio_player;
+        }
+        
         let quiz_ui = this.quiz_session.quiz_ui;
         quiz_ui.delete();
 
@@ -3236,7 +3261,6 @@ class Clearing extends QuizLifeCycleWithUtility
                 });
             }
         }
-
 
         delete game_data['processing_question'];
 
