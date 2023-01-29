@@ -597,7 +597,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.force_stop == true)
+        if(this.force_stop == true || this.quiz_session?.force_stop == true)
         {
             goNext = false;
         }
@@ -620,7 +620,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.force_stop == true) 
+        if(this.force_stop == true || this.quiz_session?.force_stop == true)
         {
             goNext = false;
         }
@@ -643,7 +643,7 @@ class QuizLifecycle
             }
         }
 
-        if(this.force_stop == true) 
+        if(this.force_stop == true || this.quiz_session?.force_stop == true)
         {
             goNext = false;
         }
@@ -1424,6 +1424,11 @@ class Prepare extends QuizLifecycle
 
     async enter()
     {
+        if(this.quiz_session == undefined)
+        {
+            return false;
+        }
+
         //다음에 문제낼 퀴즈 꺼내기
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
@@ -1494,6 +1499,8 @@ class Prepare extends QuizLifecycle
     async exit()
     {
         if(this.skip_prepare == true) return;
+
+        if(this.quiz_session.force_stop == true) return;
 
         let game_data = this.quiz_session.game_data;
 
@@ -1934,6 +1941,8 @@ class Question extends QuizLifeCycleWithUtility
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
 
+        if(this.quiz_session.force_stop == true) return false;
+
         this.current_question = undefined; //현재 진행 중인 퀴즈
 
         this.hint_timer = undefined; //자동 힌트 타이머
@@ -1973,16 +1982,19 @@ class Question extends QuizLifeCycleWithUtility
 
         //아직 prepared queue에 아무것도 없다면
         let current_check_prepared_queue = 0;
+        // const max_try = SYSTEM_CONFIG.max_check_prepared_queue;
+        const max_try = 40; //고정값으로 테스트해보자
         while(game_data.prepared_question_queue.length == 0)
         {
-            if(++current_check_prepared_queue >= SYSTEM_CONFIG.max_check_prepared_queue) //최대 체크 횟수 초과 시
+            if(++current_check_prepared_queue >= max_try) //최대 체크 횟수 초과 시
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
-                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${SYSTEM_CONFIG.prepared_queue_check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${max_try}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
                 return;
             }
 
-            await utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
+            // await utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
+            await utility.sleep(500); //고정값으로 테스트 해보자
         }
         
         this.current_question = game_data.prepared_question_queue.shift(); //하나 꺼내오자
@@ -2008,18 +2020,6 @@ class Question extends QuizLifeCycleWithUtility
 
     exit()
     {
-
-        if(this.quiz_session.force_stop == true) //강제 종료가 호출됐다.
-        {
-            this.skip_prepare_cycle = true; //더 이상 prepare는 필요없다.
-            this.stopTimeoverTimer(); //타임오버 타이머도 취소한다.
-        }
-
-        if(this.skip_prepare_cycle == false)
-        {
-            this.asyncCallCycle(CYCLE_TYPE.PREPARE); //다음 문제 미리 준비
-        }
-
         if(this.progress_bar_timer != undefined)
         {
             clearInterval(this.progress_bar_timer);
@@ -2028,6 +2028,18 @@ class Question extends QuizLifeCycleWithUtility
         if(this.hint_timer != undefined)
         {
             clearTimeout(this.hint_timer);
+        }
+
+        if(this.quiz_session.force_stop == true) //강제 종료가 호출됐다.
+        {
+            this.skip_prepare_cycle = true; //더 이상 prepare는 필요없다.
+            this.stopTimeoverTimer(); //타임오버 타이머도 취소한다.
+            return false;
+        }
+
+        if(this.skip_prepare_cycle == false)
+        {
+            this.asyncCallCycle(CYCLE_TYPE.PREPARE); //다음 문제 미리 준비
         }
     }
 
