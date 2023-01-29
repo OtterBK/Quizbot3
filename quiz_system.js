@@ -1436,7 +1436,7 @@ class Prepare extends QuizLifecycle
         }
         catch(err)
         {
-            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session.guild_id}, target_question: ${JSON.stringify(target_question)}, err: ${err.stack ?? err.message}`);
+            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session.guild_id}, target_question: ${target_question.question}, err: ${err.stack ?? err.message}`);
         }
 
         this.prepared_question = target_question;
@@ -1457,7 +1457,7 @@ class Prepare extends QuizLifecycle
 
         if(this.prepared_question == undefined) //prepare 시도했는데 실패했다면
         {
-            logger.error(`No Prepared quiz, ignore exit step,, guild_id:${this.quiz_session.guild_id}, target_question: ${JSON.stringify(this.target_question)}`);
+            logger.error(`No Prepared quiz, ignore exit step,, guild_id:${this.quiz_session.guild_id}, target_question: ${JSON.stringify(this.target_question.question)}`);
         }
 
         game_data.prepared_question_queue.push(this.prepared_question);
@@ -1475,7 +1475,7 @@ class Prepare extends QuizLifecycle
         {
             const question = target_question['answer_audio'];
 
-            audio_stream = fs.createReadStream(question, {flags:'r'});
+            const audio_stream = fs.createReadStream(question, {flags:'r'});
             this.current_audio_streams.push(audio_stream);
     
             let audio_resource = undefined;
@@ -1572,7 +1572,12 @@ class Prepare extends QuizLifecycle
         let audio_stream_for_close = game_data['audio_stream_for_close'];
         let audio_stream = undefined;
 
-        if(audio_start_point == undefined) audio_start_point = 0;
+        let cut_audio = true;
+        if(audio_start_point == undefined) 
+        {
+            cut_audio = false;
+            audio_start_point = 0;
+        }
         if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + audio_length_sec); //엄격하게 잘라야함
 
         logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
@@ -1580,20 +1585,29 @@ class Prepare extends QuizLifecycle
         const file_audio_stream = fs.createReadStream(question, {flags:'r'});
         this.current_audio_streams.push(file_audio_stream);
         
-        let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
-        ffmpeg_handler.format('webm').
-        setStartTime(audio_start_point).
-        setDuration(audio_length_sec)
-        .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
-            logger.error(`Ffmpeg error:  ${err.message}`);
-            ffmpeg_handler.kill('SIGTERM');
-        });     
-        // ffmpeg는 일정 시간 지나도 안꺼지면 강종
-        setTimeout(function() {
-            ffmpeg_handler.kill();
-        }, SYSTEM_CONFIG.ffmpeg_kill_timeout);
-
-        audio_stream = ffmpeg_handler.stream();
+        if(cut_audio == true) //오디오가 cut 됐을 때만
+        {
+            let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
+            ffmpeg_handler.format('webm').
+            setStartTime(audio_start_point).
+            setDuration(audio_length_sec)
+            .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
+                logger.error(`Ffmpeg error:  ${err.message}`);
+                ffmpeg_handler.kill('SIGTERM');
+            });     
+    
+            // ffmpeg는 일정 시간 지나도 안꺼지면 강종
+            setTimeout(function() {
+                ffmpeg_handler.kill();
+            }, SYSTEM_CONFIG.ffmpeg_kill_timeout);
+    
+            audio_stream = ffmpeg_handler.stream();
+        }
+        else
+        {
+            audio_stream = file_audio_stream;
+        }
+        
         // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
 
         let resource = undefined;
