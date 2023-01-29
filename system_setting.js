@@ -11,7 +11,7 @@ exports.SYSTEM_CONFIG = {
     fade_out_duration: 5000, //fade out 시간(ms)
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
-    max_check_prepared_queue: 100, //prepared queue 최대 확인 횟수
+    max_check_prepared_queue: 150, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 100, //prepared queue 체크 간격
 
     ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
@@ -44,6 +44,8 @@ exports.SYSTEM_CONFIG = {
     log_max_size: '100m', //각 log 파일 최대 크기
     
     ffmpeg_kill_timeout: 70000, //ffmpeg에서 에러 발생 시나, start 안했을 시 안꺼지는 버그 있음. 최대 timeout 설정해서 시간 지나면 강종
+    ffmpeg_aging_manager_criteria: 300, //5분 지나도 안꺼지면 ffmpeg는 강종
+    ffmpeg_aging_manager_interval: 300, //체크 주기(s)
 }
 
 exports.CUSTOM_EVENT_TYPE = {

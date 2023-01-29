@@ -1,5 +1,7 @@
 'use strict';
 
+//voice 용으로 libsodium-wrapper 를 쓸 것! sodium 으로 하면 cpu 사용량 장난아님;;
+
 //#region 외부 모듈 로드
 const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
@@ -112,6 +114,47 @@ exports.getLocalQuizSessionCount = () => {
 
 exports.getMultiplayQuizSessionCount = () => {
     return 0; //TODO 나중에 멀티플레이 만들면 수정
+}
+
+exports.startFFmpegAgingManager = () => 
+{
+  return ffmpegAgingManager();
+}
+
+let ffmpeg_aging_map = new Map();
+//FFmpeg Aging Manager
+function ffmpegAgingManager()
+{
+  const ffmpeg_aging_for_oldkey_value = SYSTEM_CONFIG.ffmpeg_aging_manager_criteria * 1000; //last updated time이 일정 값 이전인 ffmpeg는 종료할거임
+  const ffmpeg_aging_manager = setInterval(()=>{
+      
+    const criteria_value = Date.now() - ffmpeg_aging_for_oldkey_value; //이거보다 이전에 update 된 것은 삭제
+    logger.info(`Aginging FFmpeg... targets: ${ffmpeg_aging_map.size} ,criteria: ${criteria_value}`);
+
+    let kill_count = 0;
+
+    const iter = ffmpeg_aging_map.entries();
+    const target_keys = [];
+    for(let i = 0; i < ffmpeg_aging_map.size; ++i)
+    {
+        const [ffmpeg_handler, created_date] = iter.next().value;
+        if(created_date < criteria_value)
+        {
+            ffmpeg_handler.kill();
+            ++kill_count;
+            target_keys.push(ffmpeg_handler);
+        }
+    }
+
+    target_keys.forEach(key => 
+    {
+        ffmpeg_aging_map.delete(key);
+    });
+
+    logger.info(`Done FFmpeg aging manager... kill count: ${kill_count}`);
+  }, SYSTEM_CONFIG.ffmpeg_aging_manager_interval * 1000); //체크 주기
+
+  return ffmpeg_aging_manager;
 }
 
 //#region 퀴즈 플레이에 사용될 UI
@@ -370,7 +413,7 @@ class QuizSession
 
         for(const cycle of Object.values(this.lifecycle_map))
         {
-            cycle.free();
+            // cycle.free();
         }
 
         delete this.guild;
@@ -550,7 +593,7 @@ class QuizLifecycle
             }catch(err)
             {
                 if(this.force_stop == false)
-                    logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                    logger.error(`Failed enter step of quiz session cycle, guild_id: ${this.quiz_session?.guild_id}, current cycle Type: ${this.quiz_session?.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -573,7 +616,7 @@ class QuizLifecycle
             }catch(err)
             {
                 if(this.force_stop == false)
-                    logger.error(`Failed act step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                    logger.error(`Failed act step of quiz session cycle, guild_id: ${this.quiz_session?.guild_id}, current cycle Type: ${this.quiz_session?.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -596,7 +639,7 @@ class QuizLifecycle
             }catch(err)
             {
                 if(this.force_stop == false)
-                    logger.error(`Failed exit step of quiz session cycle, guild_id: ${this.quiz_session.guild_id}, current cycle Type: ${this.quiz_session.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
+                    logger.error(`Failed exit step of quiz session cycle, guild_id: ${this.quiz_session?.guild_id}, current cycle Type: ${this.quiz_session?.current_cycle_type}, current cycle: ${this.constructor.name}, err: ${err.stack}`);
             }
         }
 
@@ -745,7 +788,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
         const audio_resource = target_question['answer_audio_resource'];
         audio_play_time = target_question['answer_audio_play_time'];
 
-        //audio_player.stop(true); //우선 지금 나오는 거 멈춤
+        audio_player.stop(true); //우선 지금 나오는 거 멈춤
         this.startAudio(audio_player, audio_resource); //오디오 재생
         this.autoFadeOut(audio_player, audio_resource, audio_play_time) //자동 fadeout
 
@@ -1436,7 +1479,13 @@ class Prepare extends QuizLifecycle
         }
         catch(err)
         {
-            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session.guild_id}, target_question: ${target_question.question}, err: ${err.stack ?? err.message}`);
+            if(this.quiz_session == undefined)
+            {
+                logger.error(`Failed prepare step by quiz_session undefined, guess force stop`);
+                this.skip_prepare = true;
+                return;
+            }
+            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, err: ${err.stack ?? err.message}`);
         }
 
         this.prepared_question = target_question;
@@ -1457,7 +1506,7 @@ class Prepare extends QuizLifecycle
 
         if(this.prepared_question == undefined) //prepare 시도했는데 실패했다면
         {
-            logger.error(`No Prepared quiz, ignore exit step,, guild_id:${this.quiz_session.guild_id}, target_question: ${JSON.stringify(this.target_question.question)}`);
+            logger.error(`No Prepared quiz, ignore exit step, guild_id:${this.quiz_session?.guild_id}, target_question: ${JSON.stringify(this.target_question?.question)}`);
         }
 
         game_data.prepared_question_queue.push(this.prepared_question);
@@ -1592,15 +1641,16 @@ class Prepare extends QuizLifecycle
             setStartTime(audio_start_point).
             setDuration(audio_length_sec)
             .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
+                if(err.message.includes("kill")) return;
                 logger.error(`Ffmpeg error:  ${err.message}`);
-                ffmpeg_handler.kill('SIGTERM');
+            })
+            .on('end', function() {
+                ffmpeg_aging_map.delete(ffmpeg_handler);
             });     
     
             // ffmpeg는 일정 시간 지나도 안꺼지면 강종
-            setTimeout(function() {
-                ffmpeg_handler.kill();
-            }, SYSTEM_CONFIG.ffmpeg_kill_timeout);
-    
+            ffmpeg_aging_map.set(ffmpeg_handler, Date.now());
+
             audio_stream = ffmpeg_handler.stream();
         }
         else
@@ -1914,7 +1964,7 @@ class Question extends QuizLifeCycleWithUtility
             return; //더 이상 진행할 게 없다.
         }
 
-        //await this.quiz_session.audio_player.stop(true); //시작 전엔 audio stop 걸고 가자
+        await this.quiz_session.audio_player.stop(true); //시작 전엔 audio stop 걸고 가자
 
         //진행 UI 관련
         utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.ROUND_ALARM);
@@ -2209,7 +2259,7 @@ class Question extends QuizLifeCycleWithUtility
                 clearTimeout(this.progress_bar_timer);
             }
             const audio_player = this.quiz_session.audio_player;
-            //await audio_player.stop(true);
+            await audio_player.stop(true);
             utility.playBGM(audio_player, bgm_type);
             this.startProgressBar(wait_time);
 
@@ -2240,7 +2290,7 @@ class Question extends QuizLifeCycleWithUtility
 
                 if(audio_player.state.status == 'playing') //아직도 오디오 플레이 중이라면
                 {
-                    logger.info(`Failed graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
+                    logger.info(`Graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
                 }
 
                 resolve('done timeover timer');
@@ -2613,7 +2663,7 @@ class QuestionImage extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            //audio_player.stop(true); //BGM 바로 멈춰준다.
+            audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2759,7 +2809,7 @@ class QuestionText extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            //audio_player.stop(true); //BGM 바로 멈춰준다.
+            audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2833,7 +2883,7 @@ class QuestionOX extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            //audio_player.stop(true); //BGM 바로 멈춰준다.
+            audio_player.stop(true); //BGM 바로 멈춰준다.
 
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //ox퀴즈는 스킵만 타임오버가 일찍 끝난다. 그러니 타임오버로~
         }
@@ -3398,6 +3448,7 @@ class Finish extends QuizLifecycle
         const guild_id = this.quiz_session.guild_id;
         const quiz_session = quiz_session_map[guild_id];
         quiz_session.free();
+        delete quiz_session_map[guild_id];
     }
 }
 //#endregion

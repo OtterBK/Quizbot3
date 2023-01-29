@@ -84,6 +84,9 @@ client.on('ready', () => {
   logger.info(`Starting UI Holder Aging Manager`);
   quizbot_ui.startUIHolderAgingManager();
 
+  logger.info(`Starting FFMPEG Aging Manager`);
+  quiz_system.startFFmpegAgingManager();
+
   ///////////
   logger.info(`Register commands...`);
 
