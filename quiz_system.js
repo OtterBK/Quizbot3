@@ -5,6 +5,10 @@ const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes, TeamMemberMembershipState } = require('discord.js');
+const pathToFfmpeg = require('ffmpeg-static');
+process.env.FFMPEG_PATH = pathToFfmpeg;
+const ffmpeg = require('fluent-ffmpeg');
+const stream = require('stream');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -309,8 +313,6 @@ class QuizSession
 
         this.voice_connection = undefined;
         this.audio_player = undefined;
-        this.rotate_audio_player = [];
-        this.rotate_index = 0;
 
         this.lifecycle_map = {};
         this.current_cycle_type = CYCLE_TYPE.UNDEFINED;
@@ -380,7 +382,6 @@ class QuizSession
         delete this.quiz_ui; //직접 새로 UI만들자
         delete this.voice_connection;
         delete this.audio_player;
-        delete this.rotate_audio_player;
 
         delete this.lifecycle_map;
 
@@ -876,19 +877,11 @@ class Initialize extends QuizLifecycle
             }
         });
 
-        let rotate_audio_player_amount = SYSTEM_CONFIG.rotate_audio_player_amount;
-        if(rotate_audio_player_amount < 0) rotate_audio_player_amount = 1; //최소 1개는 있어야함
-        for(let i = 0; i < rotate_audio_player_amount; ++i)
-        {
-            const new_audio_player = createAudioPlayer({
-                behaviors: {
-                    noSubscriber: NoSubscriberBehavior.Stop,
-                },
-            });
-            this.quiz_session.rotate_audio_player.push(new_audio_player);
-        }
-        this.quiz_session.rotate_index = 0;
-        const audio_player = this.quiz_session.rotate_audio_player[0];
+        const audio_player = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Stop,
+            },
+        });
         voice_connection.subscribe(audio_player);
 
         this.quiz_session.voice_connection = voice_connection;
@@ -1481,27 +1474,15 @@ class Prepare extends QuizLifecycle
         if(target_question.hasOwnProperty('answer_audio'))
         {
             const question = target_question['answer_audio'];
-            const audio_stream = fs.createReadStream(question, {flags:'r'});
+
+            audio_stream = fs.createReadStream(question, {flags:'r'});
             this.current_audio_streams.push(audio_stream);
-
+    
             let audio_resource = undefined;
-
-            let inputType = undefined;
-            if(question.endsWith('.webm')) inputType = StreamType.WebmOpus;
-
-            if(inputType != undefined && SYSTEM_CONFIG.use_inline_volume == false) //Inline volume 옵션 켜면 의미 없음
-            {
-                audio_resource = createAudioResource(audio_stream, {
-                    inputType: inputType,
-                    inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-                });
-            }
-            else
-            {
-                audio_resource = createAudioResource(audio_stream, {
-                    inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-                });
-            }
+            audio_resource = createAudioResource(audio_stream, {
+                inputType: StreamType.WebmOpus,
+                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
+            });
 
             if(SYSTEM_CONFIG.use_inline_volume)
             {
@@ -1518,7 +1499,7 @@ class Prepare extends QuizLifecycle
             else if(audio_play_time == undefined) //딱히 지정된게 없다면
             {
                 const audio_info = await utility.getAudioInfoFromPath(question);
-                audio_play_time = ((audio_info.format.duration) ?? 1000) * 1000; //10000000 -> 무조건 오디오 길이 쓰도록
+                audio_play_time = ((audio_info.format.duration) ?? 1000) * 1000; //10000000 -> 무조건 오디오 길이 쓰도록 //TODO 이게 맞나? 재고해보셈
             }
             target_question['answer_audio_play_time'] = audio_play_time;
 
@@ -1537,62 +1518,53 @@ class Prepare extends QuizLifecycle
         const game_data = this.quiz_session.game_data;
 
         const question = target_question['question'];
-        const use_random_start = target_question['use_random_start'] ?? true; //노래 어디서부터 시작할 지 랜덤으로 설정 여부
+        let use_random_start = target_question['use_random_start'] ?? true; //노래 어디서부터 시작할 지 랜덤으로 설정 여부
         const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; //노래 전체 재생 여부
 
         //오디오 정보 가져오기
         const audio_info = await utility.getAudioInfoFromPath(question);
-        const audio_format = audio_info.format.container;
-        const audio_bitrate = audio_info.format.bitrate; //초당 재생 bit
-        const audio_byterate = audio_bitrate / (audio_format == 'MPEG' ? 8 : 1);  //이상하게 WAVE 타입은 bitrate가 그대로 byterate다...
-        const audio_duration = audio_info.format.duration;
-        const audio_byte_size = (audio_byterate * audio_info.format.duration); //오디오 bytes 사이즈
+        const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
         
         //오디오 길이 먼저 넣어주고~
-        const audio_play_time = option_data.quiz.audio_play_time; 
-        let audio_length = (audio_duration == undefined ? audio_play_time : audio_duration * 1000); //10000000 -> 무조건 오디오 길이 쓰도록
-
-        audio_length = (audio_length < audio_play_time) ? audio_length : audio_play_time;
-        target_question['audio_length'] = audio_length;
+        const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
+        let audio_length_sec = audio_play_time_sec; 
+        if(audio_duration_sec < audio_length_sec) //오디오 길이가 재생할 시간보다 작으면
+        {
+            audio_length_sec = audio_duration_sec; //그냥 오디오 길이 사용
+            use_random_start = false; //랜덤 시작 지점도 사용 불가능
+        }
+        target_question['audio_length'] = audio_length_sec * 1000;
 
         let audio_start_point = undefined;
         let audio_end_point = undefined;
         if(ignore_option_audio_play_time == false && use_random_start == true)
         {
-            //노래 재생 시작 지점 파싱
-            const do_begin_start = audio_format == 'MPEG' ? false : true;
-
             //오디오 자르기 기능
             /**
-            mp3 타입아니면 시작을 첨부터 해야함, 별 짓을 다했는데 mp3아니면 몇몇 노래들이 깨짐
-            wav 파일 기준으로 앞 44byte를 metadata로 하여서 별도의 stream으로 만들고 무작위 구간으로 생성한 file_stream으로 생성해서 테스트 해봤는데
-            metadata를 아예 안붙이면 play 조차 안됨, 아마 CreateAudioResource 할 때 변환이 안되는 듯
-            어떤건 잘되고 어떤건 잘 안됨, mp3의 경우는 metadata 안 붙여도 잘돼서 그냥 mp3만 지원하자 
+            오디오 유형을 전부 webm으로 바꿔서 ffmpeg 띄우고 해야함
             **/
-
-            const audio_play_time_sec = audio_play_time / 1000; //계산하기 쉽게 초로 환산 ㄱㄱ
-            let audio_max_start_point = audio_byte_size - (audio_play_time_sec + 2.5) * audio_byterate;  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
-            let audio_min_start_point = 2.5 * audio_byterate;  //앞에도 2.5초 정도 자르고 싶음
-            const audio_play_time_as_byte = (audio_play_time_sec) * audio_byterate;
+            let audio_max_start_point = audio_duration_sec - (audio_length_sec + 2.5);  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+            let audio_min_start_point = 2.5;  //앞에도 2.5초 정도 자르고 싶음
 
             if(audio_max_start_point > audio_min_start_point) //충분히 재생할 수 있는 start point가 있다면
             {
                 if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
                 {
+                    const audio_length_sec_sec_half = (audio_length_sec / 2);
                     const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                    const refined_audio_min_start_point = audio_mid_point - (audio_play_time_as_byte / 2) + audio_byterate;
-                    const refined_audio_max_start_point = audio_mid_point + (audio_play_time_as_byte /2) + audio_byterate;
+                    const refined_audio_min_start_point = audio_mid_point - audio_length_sec_sec_half;
+                    const refined_audio_max_start_point = audio_mid_point + audio_length_sec_sec_half;
     
                     if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
                     {
-                        logger.debug(`Refined audio point, question: ${question}min: ${audio_min_start_point/audio_byterate} -> ${refined_audio_min_start_point/audio_byterate}, max: ${audio_max_start_point/audio_byterate} -> ${refined_audio_max_start_point/audio_byterate}`);
+                        logger.debug(`Refined audio point, question: ${question}min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
                         audio_min_start_point = refined_audio_min_start_point;
                         audio_max_start_point = refined_audio_max_start_point;
                     }
                 }
 
-                audio_start_point = do_begin_start ? 0 : parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); //mp3타입만 랜덤 start point 지원
-                audio_end_point = parseInt(audio_start_point + audio_play_time_as_byte);
+                audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); 
+                audio_end_point = parseInt(audio_start_point + audio_length_sec);
             }
         }
         
@@ -1601,31 +1573,38 @@ class Prepare extends QuizLifecycle
         let audio_stream = undefined;
 
         if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + ((audio_length / 1000)* audio_byterate)); //엄격하게 잘라야함
+        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + audio_length_sec); //엄격하게 잘라야함
 
-        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point/audio_byterate} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point/audio_byterate)}`);
-        audio_stream = fs.createReadStream(question, {flags:'r', start: audio_start_point, end: audio_end_point});
-        this.current_audio_streams.push(audio_stream);
+        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
+
+        const file_audio_stream = fs.createReadStream(question, {flags:'r'});
+        this.current_audio_streams.push(file_audio_stream);
+        
+        let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
+        ffmpeg_handler.format('webm').
+        setStartTime(audio_start_point).
+        setDuration(audio_length_sec)
+        .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
+            logger.error(`Ffmpeg error:  ${err.message}`);
+            ffmpeg_handler.kill('SIGTERM');
+        });     
+        // ffmpeg는 일정 시간 지나도 안꺼지면 강종
+        setTimeout(function() {
+            ffmpeg_handler.kill();
+        }, SYSTEM_CONFIG.ffmpeg_kill_timeout);
+
+        audio_stream = ffmpeg_handler.stream();
+        // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
 
         let resource = undefined;
-        let inputType = undefined;
-        if(question.endsWith('.webm')) inputType = StreamType.WebmOpus;
+        let inputType = StreamType.WebmOpus; //이제는 무조건 webmOpus
 
         //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
-        if(inputType != undefined && SYSTEM_CONFIG.use_inline_volume == false) //Inline volume 옵션 켜면 inputType 설정 의미 없음
-        {
-            resource = createAudioResource(audio_stream, {
-                inputType: inputType,
-                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            });
-        }
-        else
-        {
-            resource = createAudioResource(audio_stream, {
-                inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            });
-        }
+        resource = createAudioResource(audio_stream, {
+            inputType: inputType,
+            inlineVolume: SYSTEM_CONFIG.use_inline_volume,
+        });
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
@@ -1932,14 +1911,14 @@ class Question extends QuizLifeCycleWithUtility
         let current_check_prepared_queue = 0;
         while(game_data.prepared_question_queue.length == 0)
         {
-            if(current_check_prepared_queue >= SYSTEM_CONFIG.max_check_prepared_queue) //최대 체크 횟수 초과 시
+            if(++current_check_prepared_queue >= SYSTEM_CONFIG.max_check_prepared_queue) //최대 체크 횟수 초과 시
             {
-                this.next_cycle = CYCLE_TYPE.ENDING;
-                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${SYSTEM_CONFIG.prepared_queue_check_interval}..., going to ending cycle, guild_id: ${guild_id}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, game_data: ${JSON.stringify(this.quiz_session.game_data)}`);
-                break;
+                this.next_cycle = CYCLE_TYPE.CLEARING; 
+                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${SYSTEM_CONFIG.prepared_queue_check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                return;
             }
 
-            utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
+            await utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
         }
         
         this.current_question = game_data.prepared_question_queue.shift(); //하나 꺼내오자
@@ -2515,7 +2494,7 @@ class QuestionSong extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Song, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
+        logger.info(`Questioning Song, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //오디오 재생 부
         const audio_player = this.quiz_session.audio_player;
@@ -2585,7 +2564,7 @@ class QuestionImage extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Image, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
+        logger.info(`Questioning Image, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //그림 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2664,7 +2643,7 @@ class QuestionIntro extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Intro, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question}`);
+        logger.info(`Questioning Intro, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question}`);
 
         //오디오 재생 부
         const audio_player = this.quiz_session.audio_player;
@@ -2737,7 +2716,7 @@ class QuestionText extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
 
         //텍스트 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2812,7 +2791,7 @@ class QuestionOX extends Question
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
-        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
+        logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
 
         //OX 퀴즈는 카운트다운 BGM만 틀어준다.
         const is_long = current_question['is_long'] ?? false;
@@ -2907,7 +2886,7 @@ class QuestionCustom extends Question
         this.answers = current_question['answers'];
         const question_id = current_question['question_id'];
 
-        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_nunm: ${game_data['question_num']}/${quiz_data['quiz_size']}, question_id: ${question_id}`);
+        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question_id: ${question_id}`);
 
         //이미지 표시
         const image_resource = current_question['image_resource'];
@@ -3219,34 +3198,6 @@ class Clearing extends QuizLifeCycleWithUtility
         const quiz_data = this.quiz_session.quiz_data;
         const game_data = this.quiz_session.game_data;
 
-        const prev_audio_player = this.quiz_session.audio_player;
-        // prev_audio_player.stop(true); 
-        
-        const rotate_audio_player_amount = this.quiz_session.rotate_audio_player.length;
-
-        if(rotate_audio_player_amount > 1) //1개 일때는 rotate 돌릴게 없으니 그냥  패스
-        {
-            if(this.quiz_session.rotate_index >= rotate_audio_player_amount) this.quiz_session.rotate_index = 0;
-            const next_audio_player = this.quiz_session.rotate_audio_player[this.quiz_session.rotate_index];    
-            const voice_connection = this.quiz_session.voice_connection;
-            voice_connection.subscribe(next_audio_player);
-            this.quiz_session.audio_player = next_audio_player;
-        }
-        
-        let quiz_ui = this.quiz_session.quiz_ui;
-        quiz_ui.delete();
-
-        //이전 퀴즈 resource 해제
-        const previous_question = game_data['processing_question'];
-        if(previous_question != undefined)
-        {
-            const fade_out_timer = previous_question['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
-            if(fade_out_timer != undefined)
-            {
-                clearTimeout(fade_out_timer);
-            }
-        }
-
         if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 STREAM 명시적으로 닫음
         {
             const audio_stream_for_close = game_data['audio_stream_for_close'];
@@ -3261,6 +3212,20 @@ class Clearing extends QuizLifeCycleWithUtility
                     if(audio_stream.destroyed == false)
                         audio_stream.destroy();
                 });
+            }
+        }
+
+        let quiz_ui = this.quiz_session.quiz_ui;
+        quiz_ui.delete();
+
+        //이전 퀴즈 resource 해제
+        const previous_question = game_data['processing_question'];
+        if(previous_question != undefined)
+        {
+            const fade_out_timer = previous_question['fade_out_timer']; //이전에 호출한 fadeout이 아직 안끝났을 수도 있다.
+            if(fade_out_timer != undefined)
+            {
+                clearTimeout(fade_out_timer);
             }
         }
 

@@ -11,7 +11,7 @@ exports.SYSTEM_CONFIG = {
     fade_out_duration: 5000, //fade out 시간(ms)
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
-    max_check_prepared_queue: 300, //prepared queue 최대 확인 횟수
+    max_check_prepared_queue: 100, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 100, //prepared queue 체크 간격
 
     ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
@@ -24,7 +24,7 @@ exports.SYSTEM_CONFIG = {
     graceful_timeover_max_try: 5, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
+    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: true, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
@@ -42,8 +42,8 @@ exports.SYSTEM_CONFIG = {
 
     log_max_files: 10, //log로 남길 파일 최대 수
     log_max_size: '100m', //각 log 파일 최대 크기
-
-    rotate_audio_player_amount: 2, //discord voice 라이브러리의 버그인 ffmpeg pcm을 사용하는 audio_resource 재생 중, 중간에 stop 걸거나 다른 resource 실행으로 중지될 시, ffmpeg가 계속 살아서 메모리 먹음
+    
+    ffmpeg_kill_timeout: 70000, //ffmpeg에서 에러 발생 시나, start 안했을 시 안꺼지는 버그 있음. 최대 timeout 설정해서 시간 지나면 강종
 }
 
 exports.CUSTOM_EVENT_TYPE = {

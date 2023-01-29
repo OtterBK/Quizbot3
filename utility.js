@@ -315,6 +315,7 @@ exports.playBGM = async (audio_player, bgm_type) => {
   //23.01.23 use_inline_volume 옵션을 끄니, bgm이 안나오는 버그가 있었다.
   //도저히 왜 그런지는 모르겠으나, file 경로를 createAudioResource로 넘기지 않고, 
   //stream을 만들어 넘기고, bgm 유형을 mp3에서 opus로 변경하니 해결됐다.
+  //버그 맞다. 로컬 파일 재싱 시에는 항상 스트림을 만들어서 넘겨라 https://github.com/discordjs/discord.js/issues/7232
 
   let inputType = StreamType.WebmOpus;
   if(bgm_file_path.endsWith(".opus")) inputType = StreamType.OggOpus;
