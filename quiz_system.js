@@ -123,7 +123,7 @@ exports.startFFmpegAgingManager = () =>
 
 let ffmpeg_aging_map = new Map();
 //FFmpeg Aging Manager
-function ffmpegAgingManager()
+function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 수정해야함
 {
   const ffmpeg_aging_for_oldkey_value = SYSTEM_CONFIG.ffmpeg_aging_manager_criteria * 1000; //last updated time이 일정 값 이전인 ffmpeg는 종료할거임
   const ffmpeg_aging_manager = setInterval(()=>{
@@ -1641,41 +1641,46 @@ class Prepare extends QuizLifecycle
         const file_audio_stream = fs.createReadStream(question, {flags:'r'});
         this.current_audio_streams.push(file_audio_stream);
         
-        if(cut_audio == true) //오디오가 cut 됐을 때만
-        {
-            let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
-            ffmpeg_handler.format('webm').
-            setStartTime(audio_start_point).
-            setDuration(audio_length_sec)
-            .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
-                if(err.message.includes("kill")) return;
-                logger.error(`Ffmpeg error:  ${err.message}`);
-            })
-            .on('end', function() {
-                ffmpeg_aging_map.delete(ffmpeg_handler);
-            });     
+        // TODO 우선 성능 상 discordjs/voice 방식 보다 느린 것 같으니 잠시 빼둠
+        // if(cut_audio == true) //오디오가 cut 됐을 때만
+        // {
+        //     let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
+        //     ffmpeg_handler.format('webm').
+        //     setStartTime(audio_start_point).
+        //     setDuration(audio_length_sec)
+        //     .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
+        //         if(err.message.includes("kill")) return;
+        //         logger.error(`Ffmpeg error:  ${err.message}`);
+        //     })
+        //     .on('end', function() {
+        //         ffmpeg_aging_map.delete(ffmpeg_handler);
+        //     });     
     
-            // ffmpeg는 일정 시간 지나도 안꺼지면 강종
-            ffmpeg_aging_map.set(ffmpeg_handler, Date.now());
+        //     // ffmpeg는 일정 시간 지나도 안꺼지면 강종
+        //     ffmpeg_aging_map.set(ffmpeg_handler, Date.now());
 
-            audio_stream = ffmpeg_handler.stream();
-        }
-        else
-        {
-            audio_stream = file_audio_stream;
-        }
+        //     audio_stream = ffmpeg_handler.stream();
+        // }
+        // else
+        // {
+        //     audio_stream = file_audio_stream;
+        // }
         
         // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
 
+        audio_stream = file_audio_stream;
+
         let resource = undefined;
-        let inputType = StreamType.WebmOpus; //이제는 무조건 webmOpus
+        let inputType = StreamType.Arbitrary; //Arbitrary로 해야지 ffmpeg를 edge로 resource를 만든다.
 
         //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
         resource = createAudioResource(audio_stream, {
             inputType: inputType,
             inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-        });
+            seek: parseInt(audio_start_point),
+            to: parseInt(audio_start_point) + parseInt(audio_length_sec),
+        }); //seek하고 to 옵션은 직접 모듈 수정한거다
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
@@ -2302,7 +2307,7 @@ class Question extends QuizLifeCycleWithUtility
 
                 if(audio_player.state.status == 'playing') //아직도 오디오 플레이 중이라면
                 {
-                    logger.info(`Graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
+                    logger.debug(`Graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
                 }
 
                 resolve('done timeover timer');

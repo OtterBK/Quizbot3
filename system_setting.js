@@ -21,7 +21,7 @@ exports.SYSTEM_CONFIG = {
 
     correct_answer_cycle_wait: 6500, //정답 맞췄을 시, 얼마나 대기할 지
     timeover_cycle_wait: 6500, //타임오버 시, 얼마나 대기할 지
-    graceful_timeover_max_try: 5, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
+    graceful_timeover_max_try: 0, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
     explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
