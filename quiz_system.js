@@ -11,6 +11,7 @@ const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
 const ffmpeg = require('fluent-ffmpeg');
 const stream = require('stream');
+const { SeekStream } = require('play-dl');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -416,25 +417,24 @@ class QuizSession
             // cycle.free();
         }
 
-        delete this.guild;
-        delete this.owner;
-        delete this.channel;
-        delete this.quiz_info;
-        delete this.voice_channel;
+        this.guild = undefined;
+        this.owner = undefined;
+        this.channel = undefined;
+        this.quiz_info = undefined;
+        this.voice_channel = undefined;
 
-        delete this.quiz_ui; //직접 새로 UI만들자
-        delete this.voice_connection;
-        delete this.audio_player;
+        this.quiz_ui = undefined; //직접 새로 UI만들자
 
-        delete this.lifecycle_map;
+        this.voice_connection = undefined;
+        this.audio_player = undefined;
 
-        delete this.quiz_data;
-        delete this.game_data; 
-        delete this.option_data; //옵션
+        this.lifecycle_map = {};
 
-        delete this.scoreboard; //scoreboard 
+        this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
+        this.game_data = undefined; //얘는 자주 바뀐다.
+        this.option_data = undefined; //옵션
 
-        delete quiz_session_map[guild_id];
+        this.scoreboard = undefined; //scoreboard 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -565,7 +565,7 @@ class QuizLifecycle
 
     free()
     {
-        delete this.quiz_session;
+        this.quiz_session = undefined;
     }
 
     do()
@@ -576,6 +576,8 @@ class QuizLifecycle
     async asyncCallCycle(cycle_type) //비동기로 특정 cycle을 호출, PREPARE 같은거
     {
         // logger.debug(`Async call cyle from quiz session, guild_id: ${this.guild_id}, target cycle Type: ${cycle_type}`);
+        if(this.quiz_session?.force_stop == true) return;
+
         const cycle = this.quiz_session.getCycle(cycle_type);
         if(cycle != undefined)
         {
@@ -1446,7 +1448,7 @@ class Prepare extends QuizLifecycle
 
     async act()
     {
-        if(this.skip_prepare == true)
+        if(this.skip_prepare == true || this.quiz_session?.force_stop == true)
         {
             return;
         }
@@ -1578,8 +1580,14 @@ class Prepare extends QuizLifecycle
         const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; //노래 전체 재생 여부
 
         //오디오 정보 가져오기
-        const audio_info = await utility.getAudioInfoFromPath(question);
-        const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
+        // const audio_info = await utility.getAudioInfoFromPath(question);
+        // const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
+
+
+        const stats = fs.statSync(question);
+        const size_in_bytes = stats.size;
+
+        const audio_duration_sec = size_in_bytes / 12800; //getAudioInfoFromPath가 상당한 리소스를 요구하는 것 같다. 고정 값으로 한번 계산해보자
         
         //오디오 길이 먼저 넣어주고~
         const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
@@ -1627,6 +1635,7 @@ class Prepare extends QuizLifecycle
         //오디오 스트림 미리 생성
         let audio_stream_for_close = game_data['audio_stream_for_close'];
         let audio_stream = undefined;
+        let inputType = StreamType.WebmOpus;
 
         let cut_audio = true;
         if(audio_start_point == undefined) 
@@ -1638,8 +1647,8 @@ class Prepare extends QuizLifecycle
 
         logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
 
-        const file_audio_stream = fs.createReadStream(question, {flags:'r'});
-        this.current_audio_streams.push(file_audio_stream);
+        // const file_audio_stream = fs.createReadStream(question, {flags:'r'});
+        // this.current_audio_streams.push(file_audio_stream);
         
         // TODO 우선 성능 상 discordjs/voice 방식 보다 느린 것 같으니 잠시 빼둠
         // if(cut_audio == true) //오디오가 cut 됐을 때만
@@ -1668,18 +1677,42 @@ class Prepare extends QuizLifecycle
         
         // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
 
-        audio_stream = file_audio_stream;
+        //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
+        if(cut_audio == true)
+        {
+            const seek_stream = new SeekStream(
+                question,
+                audio_duration_sec, //duration 
+                0, //header length 안넘겨도됨
+                size_in_bytes,
+                12800 * 8, //TODO BITRATE 정확한 값으로 넘기기
+                question,
+                {
+                    file: true,
+                    seek: audio_start_point,
+                }
+            )
+            audio_stream = seek_stream.stream;
+            inputType = seek_stream.type;
+        }
+        else
+        {
+            audio_stream = fs.createReadStream(question, {flags:'r'});
+        }
+
+        this.current_audio_streams.push(audio_stream);
 
         let resource = undefined;
-        let inputType = StreamType.Arbitrary; //Arbitrary로 해야지 ffmpeg를 edge로 resource를 만든다.
+        // let inputType = StreamType.Arbitrary; //Arbitrary로 해야지 ffmpeg를 edge로 resource를 만든다.
+
 
         //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
         //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
         resource = createAudioResource(audio_stream, {
             inputType: inputType,
             inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            seek: parseInt(audio_start_point),
-            to: parseInt(audio_start_point) + parseInt(audio_length_sec),
+            // seek: parseInt(audio_start_point),
+            // to: parseInt(audio_start_point) + parseInt(audio_length_sec), //seekstream 을 사용하니깐 이제 이 옵션 필요없다
         }); //seek하고 to 옵션은 직접 모듈 수정한거다
 
         if(SYSTEM_CONFIG.use_inline_volume)
@@ -1991,11 +2024,13 @@ class Question extends QuizLifeCycleWithUtility
         const max_try = 40; //고정값으로 테스트해보자
         while(game_data.prepared_question_queue.length == 0)
         {
+            if(this.quiz_session.force_stop == true) return false;
+
             if(++current_check_prepared_queue >= max_try) //최대 체크 횟수 초과 시
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
-                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${max_try}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
-                return;
+                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${500}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                return false;
             }
 
             // await utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
@@ -3463,8 +3498,10 @@ class Finish extends QuizLifecycle
     async exit()
     {
         const guild_id = this.quiz_session.guild_id;
+        
         const quiz_session = quiz_session_map[guild_id];
         quiz_session.free();
+
         delete quiz_session_map[guild_id];
     }
 }
