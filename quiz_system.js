@@ -1580,15 +1580,12 @@ class Prepare extends QuizLifecycle
         const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; //노래 전체 재생 여부
 
         //오디오 정보 가져오기
-        // const audio_info = await utility.getAudioInfoFromPath(question);
-        // const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
-
-
+        const audio_info = await utility.getAudioInfoFromPath(question); //TODO 상당한 리소스를 먹는 것 같은데 확인필요
+        const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
         const stats = fs.statSync(question);
         const size_in_bytes = stats.size;
+        const bitrate = size_in_bytes / audio_duration_sec * 8;
 
-        const audio_duration_sec = size_in_bytes / 12800; //getAudioInfoFromPath가 상당한 리소스를 요구하는 것 같다. 고정 값으로 한번 계산해보자
-        
         //오디오 길이 먼저 넣어주고~
         const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
         let audio_length_sec = audio_play_time_sec; 
@@ -1685,7 +1682,7 @@ class Prepare extends QuizLifecycle
                 audio_duration_sec, //duration 
                 0, //header length 안넘겨도됨
                 size_in_bytes,
-                12800 * 8, //TODO BITRATE 정확한 값으로 넘기기
+                bitrate, //TODO BITRATE 정확한 값으로 넘기기
                 question,
                 {
                     file: true,

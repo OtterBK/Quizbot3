@@ -232,17 +232,17 @@ exports.getBlobLength = () =>
 
 exports.getAudioInfoFromPath = async (file_path) => 
 {
-  return await mm.parseFile(file_path);
+  return await mm.parseFile(file_path, { skipCovers: true, skipPostHeaders: true });
 }
 
 exports.getAudioInfoFromStream = async (stream) => 
 {
-  return await mm.parseStream(stream, {mimeType: 'audio/mpeg'});
+  return await mm.parseStream(stream, { skipCovers: true, skipPostHeaders: true });
 }
 
 exports.getAudioInfoFromBuffer = async (buffer) => 
 {
-  return await mm.parseBuffer(buffer);
+  return await mm.parseBuffer(buffer, { skipCovers: true, skipPostHeaders: true });
 }
 
 exports.getRandom = (min, max) => 
