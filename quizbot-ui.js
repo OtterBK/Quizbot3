@@ -1030,16 +1030,16 @@ class NotesSelectUI extends QuizBotControlComponentUI
   async loadNoteContents(notes_folder_path) 
   {
     //파일 생성일로 정렬
-    const content_list_sorted_by_birthtime = fs.readdirSync(notes_folder_path)
+    const content_list_sorted_by_mtime = fs.readdirSync(notes_folder_path)
         .map(function(v) { 
             return { name:v.replace('.txt', ""),
-                    birthtime:fs.statSync(`${notes_folder_path}/${v}`).birthtime,
+                    mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
                     note_path: `${notes_folder_path}/${v}`
                   }; 
         })
-        .sort(function(a, b) { return b.birthtime - a.birthtime; });
+        .sort(function(a, b) { return b.mtime - a.mtime; });
 
-    return content_list_sorted_by_birthtime;
+    return content_list_sorted_by_mtime;
   }
 
   onInteractionCreate(interaction)
@@ -1105,7 +1105,7 @@ class NoteUI extends QuizbotUI
         text: `제육보끔#1916`,
         icon_url: `https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png`,
       },
-      timestamp: new Date(note_info['birthtime']).toISOString(),
+      timestamp: new Date(note_info['mtime']).toISOString(),
     };
 
 

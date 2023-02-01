@@ -1,3 +1,5 @@
+'use strict'
+
 //외부 modules
 
 
@@ -8,7 +10,7 @@ const logger = require('./logger.js')('OptionManager');
 /** global 변수 **/
 let option_storage_map = {}; //서버별 옵션 값
 
-OPTION_TYPE = {
+const OPTION_TYPE = {
     HINT_TYPE: {
         AUTO: "자동",
         VOTE: "투표",

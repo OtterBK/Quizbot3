@@ -1,3 +1,5 @@
+'use strict'
+
 //외부 modules
 const { ThreadChannel } = require('discord.js');
 const { reject } = require('lodash');
@@ -17,7 +19,7 @@ const pool = new pg.Pool({
   max: SYSTEM_CONFIG.pg_max_pool_size,
 });
 
-is_initialized = false;
+let is_initialized = false;
 
 exports.initialize = () => {
     return new Promise((resolve, reject) => {

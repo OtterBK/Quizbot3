@@ -21,10 +21,9 @@ const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
 const manager = new ClusterManager(`${__dirname}/bot.js`, {
-    totalShards: 8, // or 'auto'
+    totalShards: 1, // or 'auto'
     shardsPerClusters: 2,
-    totalClusters: 4,
-    mode: 'process', // you can also choose "worker"
+    totalClusters: 1,
     token: PRIVATE_CONFIG.BOT.TOKEN,
     restarts: { //최대 자동 재시작 횟수
         max: 5, // Maximum amount of restarts per cluster
@@ -36,7 +35,7 @@ manager.extend(
     //신호가 최대 miss에 달하면 알아서 재시작함
     new HeartbeatManager({
         interval: 10000, // Interval to send a heartbeat
-        maxMissedHeartbeats: 10, // Maximum amount of missed Heartbeats until Cluster will get respawned
+        maxMissedHeartbeats: 10, // Maximum amount of missed Heartbeats until Cluster will get respawn
     })
 )
 
