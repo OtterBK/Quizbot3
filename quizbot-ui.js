@@ -612,11 +612,18 @@ class MainUI extends QuizbotUI
       //   url: undefined,
       // },
       // timestamp: new Date().toISOString(),
-      // footer: {
-      //   text: '제육보끔#1916',
-      //   icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
-      // },
+      footer: {
+        text: `제육보끔#1916`, 
+        icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
+      },
     };
+
+    if(fs.existsSync(SYSTEM_CONFIG.version_info_path)) //TODO 음... 패치 일자 실시간으로 가져오기에는 좀 부담스러운데, 나중에 Manager를 하나 두자
+    {
+      const version_info = fs.readFileSync(SYSTEM_CONFIG.version_info_path, {encoding: 'utf8', flag:'r'});
+      this.embed.footer.text = `${text_contents.main_menu.footer} ${version_info}`
+      this.embed.footer.icon_url = undefined;
+    }
 
     this.components = [select_btn_component, main_ui_component]; //MAIN UI에서는 control component는 필요없다.
   }
@@ -683,7 +690,8 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
 {
 
   static resource_path = SYSTEM_CONFIG.dev_quiz_path;
-  static quiz_contents =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
+  static quiz_contents_sorted_by_name =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
+  static quiz_contents_sorted_by_mtime =  utility.loadLocalDirectoryQuiz(DevQuizSelectUI.resource_path, 'mtime'); //동적 로드할 필요는 딱히 없을듯..? 초기 로드 시, 정적으로 로드하자;
 
   constructor(contents)
   {
@@ -696,7 +704,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
       description: text_contents.dev_select_category.description,
     };
 
-    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents);
+    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents_sorted_by_name);
     if(this.cur_contents == undefined)
     {
       logger.error(`Undefined Current Contents on DevQuizSelectUI guild_id:${this.guild_id}, err: ${"Check Value of Resource Path Option"}`);

@@ -33,7 +33,9 @@ exports.SYSTEM_CONFIG = {
     dev_quiz_path: `${__dirname}/resources/quizdata`, //Dev퀴즈 파일 위치
     log_path: `${__dirname}/log`, //LOG 저장할 위치
     notices_path: `${__dirname}/resources/notices`, //공지사항 파일 위치
-    patch_notes_path: `${__dirname}/resources/patch_notes`, //공지사항 파일 위치
+    patch_notes_path: `${__dirname}/resources/patch_notes`, //패치노트 파일 위치
+    current_notice_path: `${__dirname}/resources/current_notice.txt`, //실시간 공지
+    version_info_path: `${__dirname}/resources/version_info.txt`, //실시간 버전
 
     hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
