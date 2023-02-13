@@ -9,7 +9,7 @@ const { KoreanbotsClient } = require('koreanbots');
 
 //로컬 modules
 const PRIVATE_CONFIG = require('./private_config.json');
-const { CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
 
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
@@ -84,8 +84,8 @@ client.on('ready', () => {
   logger.info(`Starting UI Holder Aging Manager`);
   quizbot_ui.startUIHolderAgingManager();
 
-  logger.info(`Starting FFMPEG Aging Manager`);
-  quiz_system.startFFmpegAgingManager();
+  // logger.info(`Starting FFMPEG Aging Manager`);
+  // quiz_system.startFFmpegAgingManager();
 
   ///////////
   logger.info(`Register commands...`);
@@ -110,10 +110,11 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   {
     const uiHolder = quizbot_ui.createUIHolder(interaction);
     //임시로 잠시 해둠
-    const current_notice = fs.readFileSync(`${__dirname}/resources/current_notice.txt`, {encoding: 'utf8', flag:'r'});
-
-    if(current_notice.length != 0)
+    if(fs.existsSync(SYSTEM_CONFIG.current_notice_path))
+    {
+      const current_notice = fs.readFileSync(SYSTEM_CONFIG.current_notice_path, {encoding: 'utf8', flag:'r'});
       interaction.channel.send({content: '```' + current_notice + '```'});
+    }
 
     return;
   }

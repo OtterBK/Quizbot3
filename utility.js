@@ -20,7 +20,7 @@ exports.initializeBGM = () =>
   });
 }
 
-exports.loadLocalDirectoryQuiz = (contents_path) =>
+exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
 {
   logger.info(`Loading local directory quiz...`);
   
@@ -36,6 +36,7 @@ exports.loadLocalDirectoryQuiz = (contents_path) =>
 
     let quiz_content = this.parseContentInfoFromDirName(content_name);
     quiz_content['content_path'] = content_path;
+    quiz_content['mtime'] = stat.mtime;
 
     // 하위 컨텐츠 있으면 추가 파싱 진행
     const is_quiz = quiz_content['is_quiz'];
@@ -44,7 +45,13 @@ exports.loadLocalDirectoryQuiz = (contents_path) =>
     {
       if(!stat.isFile()) //퀴즈가 아닌데 폴더 타입이면 하위 디렉터리 읽어옴
       {
-        quiz_content['sub_contents'] = this.loadLocalDirectoryQuiz(content_path);
+        const sub_contents = this.loadLocalDirectoryQuiz(content_path);
+        quiz_content['sub_contents'] = sub_contents;
+        let latest_mtime = 0;
+        sub_contents.forEach(sub_content => {
+          if((sub_content.mtime?? 0) > latest_mtime)
+            latest_mtime = sub_content.mtime?? 0;
+        });
       }
     }
     else
@@ -112,6 +119,16 @@ exports.loadLocalDirectoryQuiz = (contents_path) =>
     quiz_contents.push(quiz_content);
 
   })
+
+  //정렬해서 넘겨준다.
+  if(orderby === 'mtime')
+  {
+    //파일 생성일로 정렬
+    const ordered_quiz_contents = quiz_contents
+        .sort(function(a, b) { return b.mtime - a.mtime; });
+
+    return ordered_quiz_contents;
+  }
   
   return quiz_contents;
 }
