@@ -114,7 +114,7 @@ exports.getLocalQuizSessionCount = () => {
 }
 
 exports.getMultiplayQuizSessionCount = () => {
-    return 0; //TODO 나중에 멀티플레이 만들면 수정
+    return 0; //TODO 나중에 멀티플레이 만들면 수정, 멀티플레이 할 때, 퀴즈 정적 로드해두고, 로드 시, 파일 해쉬값 겹치는지 확인해서 중복로드 피할것
 }
 
 exports.startFFmpegAgingManager = () => 

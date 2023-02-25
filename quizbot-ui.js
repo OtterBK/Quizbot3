@@ -704,7 +704,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
       description: text_contents.dev_select_category.description,
     };
 
-    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents_sorted_by_name);
+    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents_sorted_by_mtime);
     if(this.cur_contents == undefined)
     {
       logger.error(`Undefined Current Contents on DevQuizSelectUI guild_id:${this.guild_id}, err: ${"Check Value of Resource Path Option"}`);

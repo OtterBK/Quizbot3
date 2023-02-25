@@ -5,6 +5,7 @@ const mm = require('music-metadata');
 
 //로컬 modules
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('./system_setting.js');
+const { orderBy } = require('lodash');
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
 const logger = require('./logger.js')('Utility');
 
@@ -22,7 +23,7 @@ exports.initializeBGM = () =>
 
 exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
 {
-  logger.info(`Loading local directory quiz...`);
+  logger.info(`Loading local directory quiz... ${contents_path}`);
   
   let content_list = fs.readdirSync(contents_path);
 
@@ -36,7 +37,7 @@ exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
 
     let quiz_content = this.parseContentInfoFromDirName(content_name);
     quiz_content['content_path'] = content_path;
-    quiz_content['mtime'] = stat.mtime;
+    quiz_content['mtime'] = 0;
 
     // 하위 컨텐츠 있으면 추가 파싱 진행
     const is_quiz = quiz_content['is_quiz'];
@@ -45,7 +46,7 @@ exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
     {
       if(!stat.isFile()) //퀴즈가 아닌데 폴더 타입이면 하위 디렉터리 읽어옴
       {
-        const sub_contents = this.loadLocalDirectoryQuiz(content_path);
+        const sub_contents = this.loadLocalDirectoryQuiz(content_path, orderby);
         quiz_content['sub_contents'] = sub_contents;
         let latest_mtime = 0;
         sub_contents.forEach(sub_content => {
@@ -72,7 +73,7 @@ exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
         //info.txt를 찾았다... 이제 이걸 파싱... 난 왜 이런 방식을 사용했던걸까..?
         const info_txt_path = `${content_path}/${quiz_file_name}`;
         const info_data = fs.readFileSync(info_txt_path, 'utf8');
-
+        
         info_data.split('\n').forEach((line) => {
           if(line.startsWith('&topNickname: ')) //1등 별명
           {
@@ -95,6 +96,13 @@ exports.loadLocalDirectoryQuiz = (contents_path, orderby='none') =>
           if(line.startsWith("&quizCount: ")) //퀴즈 수, 우선 이전 코드에 있으니 구현은 해놓는데 실제로 쓰는지는 애매함
           {
             quiz_content['quiz_size'] = line.replace("&quizCount: ", "").trim();
+            return;
+          }
+
+          if(line.startsWith("&createDate: ")) //명시적 퀴즈 생성일
+          {
+            const date_string = line.replace("&createDate: ", "").trim();
+            quiz_content['mtime'] = new Date(date_string).getTime();
             return;
           }
           

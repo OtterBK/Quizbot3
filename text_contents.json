@@ -127,7 +127,7 @@
             "total_server": "서버수",
             "playing_server": "게임중",
             "competitive_server": "경쟁중",
-            "footer": "💬 마지막 업데이트 일자: "
+            "footer": "💬 마지막 업데이트: "
         },
         "select_quiz_type":
         {

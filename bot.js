@@ -108,7 +108,13 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
 
   if(interaction.commandName === '퀴즈' || interaction.commandName === 'quiz') 
   {
+    if(interaction.options.getSubcommand() === '만들기')
+    {
+      await interaction.reply({content: `테스트`, ephemeral: true });
+      return;
+    }
     const uiHolder = quizbot_ui.createUIHolder(interaction);
+
     //임시로 잠시 해둠
     if(fs.existsSync(SYSTEM_CONFIG.current_notice_path))
     {

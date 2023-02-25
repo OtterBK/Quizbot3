@@ -8,7 +8,12 @@ const logger = require('./logger.js')('Commands');
 const commands = [
     new SlashCommandBuilder()
     .setName('퀴즈')
-    .setDescription('퀴즈봇의 메인 메뉴를 표시합니다.'),
+    .setDescription('퀴즈봇의 메인 메뉴를 표시합니다.')
+    .addSubcommand(subcommand =>
+		subcommand
+			.setName('만들기')
+			.setDescription('새로운 퀴즈를 만듭니다.')
+    ),
     // .addChannelOption(option => 
     //     option
     //     .setName("보이스채널")
@@ -41,6 +46,14 @@ const commands = [
     //     .setRequired(true)
     //     .addChannelTypes(ChannelType.GuildVoice)
     // ),
+    new SlashCommandBuilder()
+    .setName('퀴즈제작')
+    .setDescription('현재 제시된 퀴즈의 정답을 제출합니다.')
+    .addStringOption(option =>
+        option
+        .setName("답안")
+        .setDescription('제출할 답')
+    ),
 ];
 
 //길드에 명령어 등록용
