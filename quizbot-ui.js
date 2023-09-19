@@ -142,6 +142,26 @@ function createOptionValueComponents(option_name)
     );
 }
 
+const quiz_info_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('start')
+  .setLabel('시작')
+  .setStyle(ButtonStyle.Success),
+  // new ButtonBuilder()
+  //   .setCustomId('scoreboard')
+  //   .setLabel('순위표')
+  //   .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('settings')
+    .setLabel('설정')
+    .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('back')
+    .setLabel('뒤로가기')
+    .setStyle(ButtonStyle.Secondary),
+)
+
 const note_ui_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
@@ -161,6 +181,24 @@ const only_back_comp = new ActionRowBuilder()
     .setLabel('뒤로가기')
     .setStyle(ButtonStyle.Secondary),
 )
+
+const my_quiz_control_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('quiz_create')
+  .setLabel('퀴즈 새로 만들기')
+  .setStyle(ButtonStyle.Secondary),
+)
+
+
+const quiz_edit_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('quiz_edit')
+  .setLabel('편집하기')
+  .setStyle(ButtonStyle.Secondary),
+)
+
 
 //#endregion
 
@@ -704,7 +742,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
       description: text_contents.dev_select_category.description,
     };
 
-    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents_sorted_by_mtime);
+    this.cur_contents = (contents ?? DevQuizSelectUI.quiz_contents_sorted_by_name);
     if(this.cur_contents == undefined)
     {
       logger.error(`Undefined Current Contents on DevQuizSelectUI guild_id:${this.guild_id}, err: ${"Check Value of Resource Path Option"}`);
@@ -798,25 +836,6 @@ class QuizInfoUI extends QuizbotUI
 
     this.embed.description = description;
 
-    const quiz_info_comp = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-      .setCustomId('start')
-      .setLabel('시작')
-      .setStyle(ButtonStyle.Success),
-      // new ButtonBuilder()
-      //   .setCustomId('scoreboard')
-      //   .setLabel('순위표')
-      //   .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId('settings')
-        .setLabel('설정')
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId('back')
-        .setLabel('뒤로가기')
-        .setStyle(ButtonStyle.Secondary),
-    )
     this.components = [quiz_info_comp]; //여기서는 component를 바꿔서 해주자
   }
 
@@ -1121,3 +1140,232 @@ class NoteUI extends QuizbotUI
   }
 
 }
+
+class UserQuizInfo
+{
+    constructor()
+    {
+        this.quiz_id = undefined;
+        this.creator_id = undefined;
+        this.creator_name = undefined;
+        this.creator_icon_url = undefined;
+        this.quiz_title = undefined;
+        this.thumbnail = undefined;
+        this.simple_description = undefined;
+        this.description = undefined;
+        this.winner_nickname = undefined;
+        this.birthtime = undefined;
+        this.modified_time = undefined;
+        this.played_count = undefined;
+        this.is_private = undefined;
+
+        //DB 추가 로드해야지만 알 수 있는 정보
+        this.question_list = [];
+    }
+}
+
+class MyQuizListUI extends QuizBotControlComponentUI
+{
+  constructor(creator_id)
+  {
+    super();
+
+    this.creator_id = creator_id;
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: text_contents.dev_select_category.title,
+      url: text_contents.dev_select_category.url,
+      description: text_contents.dev_select_category.description,
+    };
+
+    this.main_description = text_contents.dev_select_category.description;
+
+    this.loadUserQuiz(creator_id).then(result => {
+        if(result == false)
+        {
+            this.main_description = "실패";
+            return;
+        }
+        
+        this.displayContents(0);
+    });
+
+    this.components.push(my_quiz_control);
+
+  }
+
+  //DB에서 특정 유저 퀴즈가져오기
+  async loadUserQuiz(creator_id)
+  {
+    if(creator_id == undefined) return undefined;
+
+    const result = await db_manager.selectUserQuiz(creator_id);
+
+    if(result == undefined)
+    {
+        logger.error(`Undefined Current Contents on MyQuizListUI creator_id:${this.creator_id}, err: ${"Database connection"}`);
+        return false;
+    }
+
+    let user_quiz_list = [];
+
+    for(const result_row of result)
+    {
+        let user_quiz_info = new UserQuizInfo();
+        user_quiz_info.id = result_row.id ?? undefined;
+        if(user_quiz_info.id == undefined) // quiz id는 없을 수 없다.
+        {
+            logger.error(`User Quiz Info ID is undefined... pass this`);
+            continue;
+        }
+
+        user_quiz_info.creator_id = result_row.creator_id ?? '';
+        user_quiz_info.creator_name = result_row.creator_name ?? '';
+        user_quiz_info.quiz_title = result_row.quiz_title ?? '';
+        user_quiz_info.thumbnail = result_row.thumbnail ?? '';
+        user_quiz_info.simple_description = result_row.simple_description ?? '';
+        user_quiz_info.description = result_row.description ?? '';
+        user_quiz_info.winner_nickname = result_row.winner_nickname ?? '플레이어';
+        user_quiz_info.birthtime = new Date(result_row.birthtime ?? '0');
+        user_quiz_info.modified_time = new Date(result_row.modified_time ?? '0');
+        user_quiz_info.played_count = parseInt(result_row.played_count ?? 0);
+        user_quiz_info.is_private = utility.parseBool(result_row.is_private ?? 'true');
+
+        user_quiz_list.push(user_quiz_info);
+    }
+    
+    this.cur_contents = user_quiz_list;
+  }
+
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+    if(interaction.customId == 'quiz_create') //퀴즈 만들기 클릭 시
+    {
+      
+      return;
+    }
+
+    const is_page_move = this.checkPageMove(interaction);
+    if(is_page_move == undefined) return;
+    if(is_page_move == true) return this;
+
+    const select_num = parseInt(interaction.customId);
+    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+
+    // 그냥 페이지 계산해서 content 가져오자
+    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    {
+      return;
+    }
+
+    const user_quiz_info = this.cur_contents[index];
+
+    return new UserQuizInfoUI(user_quiz_info);
+    
+  }
+}
+
+//유저 퀴즈 정보 UI
+class UserQuizInfoUI extends QuizbotUI {
+
+    constructor(quiz_info, readonly=false)
+    {
+      super();
+  
+      this.readonly = readonly;
+
+      this.quiz_info = quiz_info;
+  
+      this.embed = {
+        color: 0x87CEEB,
+        title: `${quiz_info['quiz_title']}`,
+        description: undefined,
+        thumbnail: { //퀴즈 섬네일 표시
+          url: quiz_info['thumbnail'] ?? '',
+        },
+        footer: { //퀴즈 제작자 표시
+          text: quiz_info['creator_name'] ?? '',
+          icon_url: quiz_info['creator_icon_url'] ?? '',
+        },
+      };
+  
+      let description = '';
+      description += quiz_info['simple_description'] + "\n\n\n";
+      description += quiz_info['description'] + "\n\n\n";
+
+      description += "만들어진 날짜: " + quiz_info['birthtime'] + "\n\n";
+      description += "업데이트 날짜: " + quiz_info['modified_time'] + "\n\n";
+      
+      description += "플레이된 수: " + quiz_info['played_count'] + "\n\n";
+
+      // description = description.replace('${quiz_type_name}', `${quiz_info['type_name']}`);
+      // description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
+      // description = description.replace('${quiz_description}', `${quiz_info['description']}`);
+
+      this.embed.description = description;
+
+      if(readonly)
+      {
+        this.components = [quiz_info_comp];
+      }
+      else
+      {
+        this.components = [quiz_edit_comp];
+      }
+    }
+
+    onInteractionCreate(interaction)
+    {
+      if(!interaction.isButton()) return;
+
+      const guild = interaction.guild;
+      const owner = interaction.member; //주최자
+      const channel = interaction.channel;
+      const quiz_info = this.quiz_info;
+
+      if(this.readonly == true)
+      {
+        if(interaction.customId == 'start') //시작 버튼 눌렀을 떄
+        {
+          const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
+          if(check_ready == undefined || check_ready.result == false)
+          {
+            const reason = check_ready.reason;
+            let reason_message = text_contents.quiz_info_ui.failed_start;
+            reason_message = reason_message.replace("${reason}", reason);
+            interaction.channel.send({content: reason_message});
+            return;
+          }
+          
+          quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
+    
+          return new AlertQuizStartUI(quiz_info, owner); 
+        }
+    
+        if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 떄
+        {
+          //TODO 순위표 만들기
+        }
+    
+        if(interaction.customId == 'settings') //설정 버튼 눌렀을 떄
+        {
+          return new ServerSettingUI(interaction.guild.id);
+        }
+
+        return;
+      }
+
+      //퀴즈만들기 통해서 왔을 경우임
+      if(interaction.customId == 'quiz_edit') //순위표 버튼 눌렀을 떄
+      {
+
+      }
+
+    }
+
+  }
