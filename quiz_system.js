@@ -921,6 +921,22 @@ class Initialize extends QuizLifecycle
                 await this.quiz_session.forceStop();
             }
         });
+		
+		/*
+		보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185
+		const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+		  const newUdp = Reflect.get(newNetworkState, 'udp');
+		  clearInterval(newUdp?.keepAliveInterval);
+		};
+
+		voice_connection.on('stateChange', (oldState, newState) => {
+		  const oldNetworking = Reflect.get(oldState, 'networking');
+		  const newNetworking = Reflect.get(newState, 'networking');
+
+		  oldNetworking?.off('stateChange', networkStateChangeHandler);
+		  newNetworking?.on('stateChange', networkStateChangeHandler);
+		});
+		*/
 
         const audio_player = createAudioPlayer({
             behaviors: {

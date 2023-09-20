@@ -101,25 +101,44 @@ client.on('ready', () => {
 
 });
 
+//명령어별 처리
+const command_handlers = {};
+
+const start_quiz_handler = async (interaction) => {
+  const uiHolder = quizbot_ui.createUIHolder(interaction);
+
+  //임시로 잠시 해둠
+  if(fs.existsSync(SYSTEM_CONFIG.current_notice_path))
+  {
+    const current_notice = fs.readFileSync(SYSTEM_CONFIG.current_notice_path, {encoding: 'utf8', flag:'r'});
+    interaction.channel.send({content: '```' + current_notice + '```'});
+  }
+};
+const create_quiz_handler = async (interaction) => {
+  interaction.reply({content: `테스트`, ephemeral: true });
+};
+
+command_handlers["시작"] = start_quiz_handler;
+command_handlers["start"] = start_quiz_handler;
+
+command_handlers["만들기"] = create_quiz_handler;
+command_handlers["create"] = create_quiz_handler;
+
+
 // 상호작용 이벤트
 client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
 
   let guildID = interaction.guild.id;
 
-  if(interaction.commandName === '퀴즈' || interaction.commandName === 'quiz') 
+  const main_command = interaction.commandName
+  if(main_command === '퀴즈' || main_command === 'quiz') 
   {
-    if(interaction.options.getSubcommand() === '만들기')
-    {
-      await interaction.reply({content: `테스트`, ephemeral: true });
-      return;
-    }
-    const uiHolder = quizbot_ui.createUIHolder(interaction);
+    const sub_command = interaction.options.getSubcommand();
+    const handler = command_handlers[sub_command];
 
-    //임시로 잠시 해둠
-    if(fs.existsSync(SYSTEM_CONFIG.current_notice_path))
+    if(handler != undefined)
     {
-      const current_notice = fs.readFileSync(SYSTEM_CONFIG.current_notice_path, {encoding: 'utf8', flag:'r'});
-      interaction.channel.send({content: '```' + current_notice + '```'});
+      await handler(interaction);
     }
 
     return;
