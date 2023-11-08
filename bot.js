@@ -105,7 +105,7 @@ client.on('ready', () => {
 const command_handlers = {};
 
 const start_quiz_handler = async (interaction) => {
-  const uiHolder = quizbot_ui.createUIHolder(interaction);
+  const uiHolder = quizbot_ui.createMainUIHolder(interaction);
 
   //임시로 잠시 해둠
   if(fs.existsSync(SYSTEM_CONFIG.current_notice_path))
@@ -114,16 +114,42 @@ const start_quiz_handler = async (interaction) => {
     interaction.channel.send({content: '```' + current_notice + '```'});
   }
 };
+
 const create_quiz_handler = async (interaction) => {
-  interaction.reply({content: `테스트`, ephemeral: true });
+  const uiHolder = quizbot_ui.createQuizToolUIHolder(interaction);
 };
 
+const test_handler = async (interaction) => {
+  console.log("start test");
+
+  let quiz_info = {};
+  quiz_info['title']  = '테스트';
+  quiz_info['icon'] = '👩';
+
+  quiz_info['type_name'] = ''; 
+  quiz_info['description'] = ''; 
+
+  quiz_info['author'] = '제육보끔#1916';
+  quiz_info['author_icon'] = 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png';
+  quiz_info['thumbnail'] = 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg'; //썸네일은 그냥 quizbot으로 해두자
+
+  quiz_info['quiz_size'] = 3; 
+  quiz_info['repeat_count'] = 1; 
+  quiz_info['winner_nickname'] = '테스터';
+  quiz_info['quiz_id'] = 'test';
+  quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
+  quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
+
+  quiz_system.startQuiz(interaction.guild, interaction.member, interaction.channel, quiz_info); //퀴즈 시작
+}
+
+
 command_handlers["시작"] = start_quiz_handler;
-command_handlers["start"] = start_quiz_handler;
+// command_handlers["start"] = start_quiz_handler;
+command_handlers["start"] = test_handler;
 
 command_handlers["만들기"] = create_quiz_handler;
 command_handlers["create"] = create_quiz_handler;
-
 
 // 상호작용 이벤트
 client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
@@ -151,7 +177,14 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
     if(already_deferred == false && interaction.isButton())
     {
       already_deferred = true;
-      await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
+      try
+      {
+        await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
+      }
+      catch(err)
+      {
+        return; //이 경우에는 아마 unknown interaction 에러임
+      }
     } 
     quiz_session.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
   }

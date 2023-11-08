@@ -1634,7 +1634,7 @@ class Prepare extends QuizLifecycle
     
                     if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
                     {
-                        logger.debug(`Refined audio point, question: ${question}min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
+                        logger.debug(`Refined audio point, question: ${question} min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
                         audio_min_start_point = refined_audio_min_start_point;
                         audio_max_start_point = refined_audio_max_start_point;
                     }
@@ -1691,6 +1691,7 @@ class Prepare extends QuizLifecycle
         // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
 
         //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
+        //23.11.08 대충 예상컨데 아마 파일은 ReadStream으로만 읽어올 수 있는데 유튜브용 SeekStream을 파일로도 쓸 수 있게 바꿨던 것 같다
         if(cut_audio == true)
         {
             const seek_stream = new SeekStream(
@@ -1779,31 +1780,33 @@ class Prepare extends QuizLifecycle
         const audio_bitrate = audio_format.averageBitrate;
         const audio_byterate = audio_bitrate / 8;
 
-        let audio_play_time = (target_question['audio_play_time'] ?? 0) <= 0 ? option_data.quiz.audio_play_time / 1000 : target_question['audio_play_time'];
-        if(audio_play_time > 60) audio_play_time = 60; //60초가 넘어가서는 안된다.
+        let audio_play_time = (target_question['audio_play_time'] ?? 0) <= 0 ? option_data.quiz.audio_play_time : target_question['audio_play_time'];
+        if(audio_play_time > 60000) audio_play_time = 60000; //60초가 넘어가서는 안된다.
 
-        const audio_start_sec = target_question['audio_start'];
+        const audio_start_sec = target_question['audio_start'] ?? 0;
         const audio_end_sec = target_question['audio_end'] ?? audio_duration;
         
 
         //오디오 길이가 audio_play_time 보다 작으면 오디오 길이를 audio_length로
-        let audio_length; 
+        let audio_length; //최종 오디오 길이
 
         if(audio_duration == undefined || audio_play_time < audio_duration) 
         {
-            audio_length = audio_play_time * 1000;
+            audio_length = audio_play_time;
         } 
         else
         {
-            audio_length = audio_duration * 1000;
+            audio_length = audio_duration;
         }
-        target_question['audio_length'] = audio_length;
+        target_question['audio_length'] = audio_length; //ms
 
         let audio_min_start_point = audio_start_sec;
-        let audio_max_start_point = audio_end_sec - audio_play_time;
+        let audio_max_start_point = audio_end_sec - audio_length;
 
         let audio_start_point = undefined;
         let audio_end_point = undefined;
+
+        const audio_length_sec = parseInt(audio_length / 1000);
 
         //오디오 자르기 기능
         if(audio_max_start_point > audio_min_start_point) //충분히 재생할 수 있는 start point가 있다면
@@ -1811,27 +1814,26 @@ class Prepare extends QuizLifecycle
             if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
             {
                 const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                const refined_audio_min_start_point = audio_mid_point - (audio_play_time / 2) + 1;
-                const refined_audio_max_start_point = audio_mid_point + (audio_play_time /2) + 1;
+                const refined_audio_min_start_point = audio_mid_point - (audio_length / 2) + 1000; //1000ms는 패딩
+                const refined_audio_max_start_point = audio_mid_point + (audio_length /2) + 1000;
 
                 if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
                 {
-                    logger.debug(`Refined audio point, question: ${question_audio_url}min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
+                    logger.debug(`Refined audio point, question: ${question_audio_url} min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
                     audio_min_start_point = refined_audio_min_start_point;
                     audio_max_start_point = refined_audio_max_start_point;
                 }
             }
 
-            audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point));
-            audio_end_point = parseInt(audio_start_point + audio_play_time);
+            audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point) / 1000);  //second
+            audio_end_point = audio_start_point + audio_length_sec; //second
         }
-
         
         //오디오 스트림 미리 생성
         let audio_stream = undefined;
-
+        
         if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_play_time; 
+        if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_length_sec; 
 
         logger.debug(`cut audio, question: ${question_audio_url}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
         // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} });
@@ -1839,10 +1841,15 @@ class Prepare extends QuizLifecycle
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_play_time}`],
-            seek: audio_start_point,
+            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 5}`], //5초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 WPIPE 에러 뜰 수 있음
+            seek: audio_start_point, 
         });
         this.current_audio_streams.push(audio_stream);
+        /** 
+        23.11.08 확인 결과 
+        -to 옵션이 안먹는다...
+        -> (`-to ${audio_length}`) 에서 ('-t', `${audio_length}`) 로 하니깐 된다.
+        **/
 
         /**
          * 시도해 볼만한 방법들
@@ -2184,6 +2191,11 @@ class Question extends QuizLifeCycleWithUtility
     //진행 bar 시작
     async startProgressBar(audio_play_time)
     {
+        if(audio_play_time < 10) //10초 미만은 지원하지 말자
+        {
+            return;
+        }
+
         //진행 상황 bar, 10%마다 호출하자
         const progress_max_percentage = 10;
         const progress_bar_interval = audio_play_time / progress_max_percentage;

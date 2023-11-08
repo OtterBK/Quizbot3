@@ -1,7 +1,7 @@
 'use strict';
 
 //#region 필요한 외부 모듈
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder  } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
 //#endregion
@@ -203,7 +203,8 @@ const quiz_edit_comp = new ActionRowBuilder()
 //#endregion
 
 /** global 변수 **/
-let uiHolder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
+let main_ui_holder_map = {}; //UI holdermap은 그냥 quizbot-ui 에서 가지고 있게 하자
+let quiztool_ui_holder_map = {}; 
 let bot_client = undefined;
 
 //#region exports 정의
@@ -220,26 +221,41 @@ exports.initialize = (client) => {
   return true;
 }
 
-exports.createUIHolder = (interaction) => {
+//퀴즈 플레이 툴
+exports.createMainUIHolder = (interaction) => {
   const guild_id = interaction.guild.id;
-  if(uiHolder_map.hasOwnProperty(guild_id))
+  if(main_ui_holder_map.hasOwnProperty(guild_id))
   {
-    const prev_uiHolder = uiHolder_map[guild_id];
+    const prev_uiHolder = main_ui_holder_map[guild_id];
     prev_uiHolder.free();
   }
-  const uiHolder = new UIHolder(interaction);
-  uiHolder_map[guild_id] = uiHolder;
+  const uiHolder = new UIHolder(interaction, new MainUI());
+  main_ui_holder_map[guild_id] = uiHolder;
 
   return uiHolder;
-};
+}
+
+//퀴즈 제작 툴
+exports.createQuizToolUIHolder = (interaction) => { 
+  const member_id = interaction.member;
+  if(quiztool_ui_holder_map.hasOwnProperty(member_id))
+  {
+    const prev_uiHolder = quiztool_ui_holder_map[member_id];
+    prev_uiHolder.free();
+  }
+  const uiHolder = new UIHolder(interaction, new QuizToolUI());
+  quiztool_ui_holder_map[member_id] = uiHolder;
+
+  return uiHolder;
+}
 
 exports.getUIHolder = (guild_id) => {
-  if(uiHolder_map.hasOwnProperty(guild_id) == false)
+  if(main_ui_holder_map.hasOwnProperty(guild_id) == false)
   {
     return undefined;
   }
 
-  return uiHolder_map[guild_id];
+  return main_ui_holder_map[guild_id];
 }
 
 exports.startUIHolderAgingManager = () => 
@@ -259,18 +275,18 @@ function uiHolderAgingManager()
   const criteria_value = Date.now() - uiholder_aging_for_oldkey_value; //이거보다 이전에 update 된 것은 삭제
 
     let free_count = 0;
-    const keys = Object.keys(uiHolder_map);
+    const keys = Object.keys(main_ui_holder_map);
 
     logger.info(`Aginging UI Holder... targets: ${keys.length} ,criteria: ${criteria_value}`);
 
       keys.forEach((key) => {
-        const value = uiHolder_map[key];
+        const value = main_ui_holder_map[key];
         if(value.last_update_time < criteria_value)
         {
-          const uiHolder = uiHolder_map[key];
+          const uiHolder = main_ui_holder_map[key];
           uiHolder.free();
           ++free_count;
-          delete uiHolder_map[key]; //삭제~
+          delete main_ui_holder_map[key]; //삭제~
         }
       })
 
@@ -287,12 +303,12 @@ function uiHolderAgingManager()
 class UIHolder 
 {
 
-  constructor(interaction)
+  constructor(interaction, ui)
   {
     this.base_interaction = interaction;
     this.guild = interaction.guild;
     this.guild_id = interaction.guild.id;
-    this.ui = new MainUI();
+    this.ui = ui ?? new MainUI();
 
     this.initialized = false;
     this.prev_ui_stack = []; //뒤로가기용 UI스택
@@ -360,6 +376,11 @@ class UIHolder
   //UI 재전송
   updateUI()
   {
+    if(this.ui == undefined)
+    {
+      return;
+    }
+
     this.last_update_time = Date.now();
 
     if(this.initialized == false)
@@ -396,7 +417,7 @@ class QuizbotUI {
   {
     this.embed = {};
     // this.components = [cloneDeep(select_btn_component), cloneDeep(control_btn_component)]; //내가 clonedeep을 왜 해줬었지?
-    this.components = [select_btn_component ]; //이게 기본 component임
+    this.components = [ select_btn_component ]; //이게 기본 component임
     this.holder = undefined; 
   }
 
@@ -429,6 +450,7 @@ class QuizbotUI {
     }
   }
 
+  //selectmenu 에서 value 값에 해당하는 선택지를 default 활성화해줌
   selectDefaultOptionByValue(select_menu, value)
   {
     const options = select_menu.options;
@@ -1141,6 +1163,189 @@ class NoteUI extends QuizbotUI
 
 }
 
+
+
+
+
+/* Custom quiz 관련 섹션 나중에 다 모듈화하자.........해야하나..?*/
+//퀴즈 만들기
+const modal_create_quiz = new ModalBuilder()
+.setCustomId('modal_create_quiz')
+.setTitle('퀴즈 만들기')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_quiz_title')
+        .setLabel('퀴즈 제목을 입력하세요.')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(4)
+        .setMaxLength(40)
+        .setRequired(true)
+        .setPlaceholder('예시) 2023년 팝송 맞추기')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_quiz_simple_description')
+        .setLabel('어떤 퀴즈인지 간단하게 소개해주세요.')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(60)
+        .setRequired(false)
+        .setPlaceholder('예시) 2023년대에 새로 나온 팝송 맞추기 퀴즈입니다.')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_quiz_simple_description')
+        .setLabel('퀴즈에 대해 자유롭게 소개해주세요.')
+        .setStyle(TextInputStyle.Paragraph)
+        .setMaxLength(300)
+        .setRequired(false)
+        .setPlaceholder('예시) 2023년 인기를 얻었던 팝송 맞추기 퀴즈입니다!\n모건 월렌 , 콤즈 등 유명한 노래가 포함되어 있습니다')
+    )
+)
+
+//문제 만들기
+const modal_create_question = new ModalBuilder()
+.setCustomId('modal_create_question')
+.setTitle('문제 만들기')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_answer')
+        .setLabel('문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder('카트라이더, 카트, kartrider')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_audio_url')
+        .setLabel('문제와 함께 재생할 음악입니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM으로 대체합니다.)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_audio_range')
+        .setLabel('음악 재생 구간을 지정할 수 있습니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('예시) 40~80 (생략 시, 랜덤으로 재생합니다.)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_image_url')
+        .setLabel('문제와 함께 표시할 이미지입니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('이미지 URL 입력 (생략 가능)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_text')
+        .setLabel('문제와 함께 표시할 텍스트입니다.')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
+    )
+)
+
+//문제 추가 설정
+const modal_additional_info_question = new ModalBuilder()
+.setCustomId('modal_additional_info_question')
+.setTitle('문제 정보 설정')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_question_hint')
+        .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! 그 게임의 빌리지 타운 bmg입니다. (생략 가능)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_wait_answer')
+        .setLabel('문제 제출 후 정답을 맞추기까지 여유 시간을 줍니다.(인트로 퀴즈에 사용)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('아니다 이건 버튼으로 제공하자')
+    )
+)
+
+//문제 정답 시 설정
+const modal_answering_question = new ModalBuilder()
+.setCustomId('modal_answering_question')
+.setTitle('문제 정답 공개 시 설정')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_answering_audio_url')
+        .setLabel('정답 공개 시 함께 재생할 오디오입니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('유튜브 URL 입력 (생략 가능)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_answering_audio_range')
+        .setLabel('음악 재생 구간을 지정할 수 있습니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('예시) 40~80 (생략 시, 랜덤으로 재생합니다.)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_answering_image_url')
+        .setLabel('정답 공개 시 함께 표시할 이미지입니다.')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('이미지 URL 입력 (생략 가능)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_answering_text')
+        .setLabel('정답 공개 시 함께 표시할 텍스트입니다.')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
+    )
+)
+
 class UserQuizInfo
 {
     constructor()
@@ -1163,6 +1368,13 @@ class UserQuizInfo
         this.question_list = [];
     }
 }
+
+//////////////
+class QuizToolUI extends QuizbotUI
+{
+  
+}
+
 
 class MyQuizListUI extends QuizBotControlComponentUI
 {
@@ -1191,7 +1403,7 @@ class MyQuizListUI extends QuizBotControlComponentUI
         this.displayContents(0);
     });
 
-    this.components.push(my_quiz_control);
+    this.components.push(my_quiz_control_comp);
 
   }
 
@@ -1244,7 +1456,10 @@ class MyQuizListUI extends QuizBotControlComponentUI
 
     if(interaction.customId == 'quiz_create') //퀴즈 만들기 클릭 시
     {
-      
+      const modal = new ModalBuilder()
+      .setCustomId('modal_create_quiz')
+      .setTile('퀴즈 만들기')
+
       return;
     }
 
