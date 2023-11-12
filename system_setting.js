@@ -14,7 +14,7 @@ exports.SYSTEM_CONFIG = {
     max_check_prepared_queue: 150, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 100, //prepared queue 체크 간격
 
-    ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
+    ui_holder_aging_manager_criteria: 3600, //얼마나 오래된 holder를 삭제할 지(s)
     ui_holder_aging_manager_interval: 600, //체크 주기(s)
 
     guilds_count_manager_interval: 10, //참여 중인 guild 수 체크 주기(s)

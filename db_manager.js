@@ -36,15 +36,16 @@ exports.initialize = () => {
     });
 }
 
-exports.executeQuery = async (query) => {
-    return pool.query(query);
+exports.executeQuery = async (query, values) => {
+    return pool.query(query, values);
 }
 
+//옵션쪽은 어차피 고정값이니깐 placeholder 사용하지 말자, 건드리기 두렵다
 exports.selectOption = async (guild_id, option_fields) => {
 
   const query_string = 
   `select ${option_fields} from tb_option 
-    where guild_id = ${guild_id};`
+    where guild_id = ${guild_id};`;
 
   return sendQuery(query_string);
 
@@ -56,25 +57,78 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
   `insert into tb_option (guild_id,${option_fields}) values (${guild_id},${option_values}) 
     on conflict (guild_id)
     DO UPDATE set (${option_fields}) = (${option_values}) 
-    where tb_option.guild_id = ${guild_id};`
+    where tb_option.guild_id = ${guild_id};`;
 
     return sendQuery(query_string); 
 
 }
 
-exports.getQuestionList = async (quiz_id) => {
+//option이랑 쿼리 날리는 방식이 다르다...쏘리
+exports.selectQuizInfo = async (key_fields, value_fields) => {
+
+  const query_string = 
+  `select * 
+    from tb_quiz_info
+    where creator_id = $1 and is_use = true`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.insertQuizInfo = async (key_fields, value_fields) => {
+
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `insert into tb_quiz_info (${key_fields}) values (${placeholders}) 
+  returning quiz_id`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.updateQuizInfo = async (key_fields, value_fields) => {
+  
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+
+  const query_string = 
+  `UPDATE set (${key_fields}) = (${placeholders}) 
+    where tb_quiz_info.quiz_id = $1;
+    returning quiz_id`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.disableQuizInfo = async (quiz_id) => {
+  
+  const query_string = 
+  `UPDATE tb_quiz_info set is_use = false 
+    where quiz_id = $1;`;
+
+  return sendQuery(query_string, [quiz_id]);
+
+}
+
+exports.selectQuestionInfo = async (quiz_id, key_fields) => {
 
   const query_string =
-  `select * from tb_question_info where quiz_id = '${quiz_id}'`
-
+  `select ${key_fields}
+    from tb_question_info
+    where quiz_id = ${quiz_id}`;
+    
   return sendQuery(query_string);
 
 }
 
-
-
-
-function sendQuery(query_string)
+const sendQuery = (query_string, values=[]) =>
 {
   if(is_initialized == false)
   {
@@ -83,14 +137,14 @@ function sendQuery(query_string)
     });
   }
 
-  return pool.query(query_string)
+  return pool.query(query_string, values)
   .then((result) =>
   {
     return result;
   })
   .catch(err => 
   {
-    logger.error(`query error, query: ${query_string}\nerr: ${err}`);
+    logger.error(`query error, query: ${query_string}, values: ${values}\nerr: ${err}`);
     return undefined;
   });
 }
