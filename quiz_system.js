@@ -1836,7 +1836,7 @@ class Prepare extends QuizLifecycle
         if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_length_sec; 
 
         logger.debug(`cut audio, question: ${question_audio_url}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
-        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} });
+        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); //이건 왜 안쓰지? 아놔 진짜 기억 안나네
         audio_stream = ytdl(question_audio_url, { 
             format: audio_format ,
             opusEncoded: true,
@@ -1928,7 +1928,9 @@ class Prepare extends QuizLifecycle
                 const bitrate = audioFormat.averageBitrate;
                 const byterate = bitrate / 8;
     
-                const answer_audio_stream = ytdl.downloadFromInfo(answer_youtube_info, { format: audio_format, range: { start: 0, end: (answer_audio_play_time * byterate)}});
+                //모르겠다... question audio 준비할 때 이걸로 안한다... 뭔가 이유가 있었겠지?
+                const answer_audio_stream = ytdl.downloadFromInfo(answer_youtube_info, { format: audio_format, range: { start: 0, end: (answer_audio_play_time * byterate)}}); 
+                
     
                 let answer_audio_resource = undefined;
                 answer_audio_resource = createAudioResource(answer_audio_stream, {

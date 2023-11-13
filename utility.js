@@ -1,5 +1,6 @@
 //외부 modules
 const fs = require('fs');
+const { EmbedBuilder } = require('discord.js');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
 const mm = require('music-metadata');
 
@@ -361,4 +362,17 @@ exports.isImageFile = (file_name) => { //그냥 확장자로 확인해도 된다
     return true;
   }
   return false;
+}
+
+exports.isValidURL = (url) => 
+{
+  try
+  {
+    const test_url = new URL(url);
+    return true;
+  }
+  catch(err)
+  {
+    return false;
+  }
 }

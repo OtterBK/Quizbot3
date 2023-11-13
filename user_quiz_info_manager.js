@@ -5,6 +5,7 @@
 const db_manager = require('./db_manager.js');
 const logger = require('./logger.js')('UserQuizInfoManager');
 
+//만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
 const QuizInfoColumn = 
 [
     "creator_id",
@@ -31,6 +32,36 @@ QuizInfoColumn.forEach((field) =>
     quiz_info_key_fields += `${field}`;
 });
 
+//만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
+const QuestionInfoColumn = 
+[
+  "quiz_id",
+  "question_audio_url",
+  "answers",
+  "hint",
+  "audio_start",
+  "audio_end",
+  "audio_play_time",
+  "question_image_url",
+  "question_text",
+  "answer_audio_url",
+  "answer_image_url",
+  "answer_text",
+  "use_answer_timer",
+  "audio_range_row",
+];
+
+let question_info_key_fields = '';
+QuestionInfoColumn.forEach((field) =>
+{
+    if(question_info_key_fields != '')
+    {
+        question_info_key_fields += ', ';
+    }
+    question_info_key_fields += `${field}`;
+});
+
+
 
 class UserQuizInfo //유저 제작 퀴즈 정보
 {
@@ -49,19 +80,19 @@ class UserQuizInfo //유저 제작 퀴즈 정보
       this.question_list = []; //UserQuestionInfo 타입
     }
 
-    async saveDataToDB(is_update=true)
+    async saveDataToDB()
     {
       let quiz_info_value_fields = Object.values(this.data);
 
       let result = undefined;
       //quiz info DB에 저장
-      if(is_update == false)
+      if(this.quiz_id == undefined)
       {
         result = await db_manager.insertQuizInfo(quiz_info_key_fields, quiz_info_value_fields);
       }
       else
       {
-        result = await db_manager.updateQuizInfo(quiz_info_key_fields, quiz_info_value_fields)
+        result = await db_manager.updateQuizInfo(quiz_info_key_fields, quiz_info_value_fields, this.quiz_id)
       }
 
       if(result != undefined && result.rows.length != 0)
@@ -73,14 +104,38 @@ class UserQuizInfo //유저 제작 퀴즈 정보
       return undefined;
     }
 
-    async delete()
+    async delete() //퀴즈 삭제는 정말 삭제하기 보다는 is_use를 false로
     {
       db_manager.disableQuizInfo(this.quiz_id);
     }
 
-    async loadQuestionListFromDB()
+    async loadQuestionListFromDB() //quiz 객체에서 question 목록 로드 가능
     {
-      console.log("do load question list from db");
+      const question_list = [];
+  
+      const result = await db_manager.selectQuestionInfo([this.quiz_id]);
+  
+      for(const result_row of result.rows)
+      {
+          let user_question_info = new UserQuestionInfo();
+  
+          user_question_info.question_id = result_row.question_id;
+  
+          if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
+          {
+              logger.error(`User Question Info ID is undefined... pass this`);
+              continue;
+          }
+  
+          for(const column of QuestionInfoColumn)
+          {
+            user_question_info.data[column] = result_row[column];
+          }
+  
+          question_list.push(user_question_info);
+      }
+  
+      this.question_list = question_list;
     }
 
     async saveQuestionToDB()
@@ -97,37 +152,52 @@ class UserQuestionInfo //유저 제작 문제 정보
 {
   constructor()
   {
-    this.quiz_id == undefined;
+    this.data = {};
 
-    this.data = 
+    for(const column of QuestionInfoColumn)
     {
-      question_id : undefined,
-      question_audio_url : undefined,
-      answers : undefined,
-      hint : undefined,
-      audio_start : undefined,
-      audio_end : undefined,
-      audio_play_time : undefined,
-      question_image_url : undefined,
-      question_text : undefined,
-      answer_audio_url : undefined,
-      answer_image_url : undefined,
-      answer_text : undefined,
+      this.data[column] = undefined;
     }
+
+    this.question_id == undefined;
 
   }
 
   async saveDataToDB()
   {
+    let question_info_value_fields = Object.values(this.data);
 
+    let result = undefined;
+    //quiz info DB에 저장
+    if(this.question_id == undefined)
+    {
+      result = await db_manager.insertQuestionInfo(question_info_key_fields, question_info_value_fields);
+    }
+    else
+    {
+      result = await db_manager.updateQuestionInfo(question_info_key_fields, question_info_value_fields, this.question_id)
+    }
+
+    if(result != undefined && result.rows.length != 0)
+    {
+      this.question_id = result.rows[0].question_id;
+      return this.question_id;
+    }
+
+    return undefined;
+  }
+
+  async delete()
+  {
+    db_manager.deleteQuestionInfo(this.question_id);
   }
 }
 
-const loadUserQuizListFromDB = async (creator_id) => {
+const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로 quiz 목록 로드
 
     let user_quiz_list = [];
 
-    const result = await db_manager.selectQuizInfo(QuizInfoColumn, [creator_id]);
+    const result = await db_manager.selectQuizInfo([creator_id]);
 
     for(const result_row of result.rows)
     {

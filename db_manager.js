@@ -64,12 +64,13 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
 }
 
 //option이랑 쿼리 날리는 방식이 다르다...쏘리
-exports.selectQuizInfo = async (key_fields, value_fields) => {
+exports.selectQuizInfo = async (value_fields) => {
 
   const query_string = 
   `select * 
     from tb_quiz_info
-    where creator_id = $1 and is_use = true`;
+    where creator_id = $1 and is_use = true
+    order by quiz_id asc`;
 
   return sendQuery(query_string, value_fields);
 
@@ -90,7 +91,7 @@ exports.insertQuizInfo = async (key_fields, value_fields) => {
 
 }
 
-exports.updateQuizInfo = async (key_fields, value_fields) => {
+exports.updateQuizInfo = async (key_fields, value_fields, quiz_id) => {
   
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -99,8 +100,8 @@ exports.updateQuizInfo = async (key_fields, value_fields) => {
   }
 
   const query_string = 
-  `UPDATE set (${key_fields}) = (${placeholders}) 
-    where tb_quiz_info.quiz_id = $1;
+  `UPDATE tb_quiz_info set (${key_fields}) = (${placeholders}) 
+    where quiz_id = ${quiz_id}
     returning quiz_id`;
 
   return sendQuery(query_string, value_fields);
@@ -117,14 +118,58 @@ exports.disableQuizInfo = async (quiz_id) => {
 
 }
 
-exports.selectQuestionInfo = async (quiz_id, key_fields) => {
+exports.selectQuestionInfo = async (value_fields) => {
 
   const query_string =
-  `select ${key_fields}
+  `select *
     from tb_question_info
-    where quiz_id = ${quiz_id}`;
+    where quiz_id = $1
+    order by question_id asc`;
     
-  return sendQuery(query_string);
+  return sendQuery(query_string, value_fields);
+
+}
+
+
+exports.insertQuestionInfo = async (key_fields, value_fields) => {
+
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `insert into tb_question_info (${key_fields}) values (${placeholders}) 
+  returning question_id`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.updateQuestionInfo = async (key_fields, value_fields, question_id) => {
+  
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+
+  const query_string = 
+  `UPDATE tb_question_info set (${key_fields}) = (${placeholders}) 
+    where question_id = ${question_id}
+    returning question_id`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.deleteQuestionInfo = async (question_id) => {
+  
+  const query_string = 
+  `delete from tb_question_info
+    where question_id = $1`;
+
+  return sendQuery(query_string, [question_id]);
 
 }
 

@@ -353,28 +353,32 @@ class UIHolder
     if(event_name == CUSTOM_EVENT_TYPE.interactionCreate)
     {
       let interaction = event_object;
-      if(interaction.isButton() && interaction.customId == "back" && this.prev_ui_stack.length > 0) //뒤로가기 버튼 처리
+      if(interaction.isButton() && interaction.customId == 'back')  //뒤로가기 버튼 처리
       {
-        this.ui = this.prev_ui_stack.pop();
-        this.updateUI();
+        this.goToBack();
         return;
       }
     }
 
     const new_ui = this.ui.on(event_name, event_object); //UI가 새로 변경됐다면 업데이트 진행
-    if(new_ui != undefined)
+    this.onUIReceived(new_ui);
+  }
+
+  goToBack()
+  {
+    if(this.prev_ui_stack.length == 0)
     {
-      if(this.ui != new_ui) //ui stack 에 쌓는 것은 새 UI 인스턴스가 생성됐을 때만
-      {
-        this.prev_ui_stack.push(this.ui);
-        this.appendNewUI(ui);
-      }
-      this.updateUI();
+      return;
     }
+
+    this.ui = this.prev_ui_stack.pop();
+    this.ui.awaked(); //페이지 재활성화 됐을 때
+    this.updateUI();
   }
 
   appendNewUI(new_ui)
   {
+    this.prev_ui_stack.push(this.ui);
     this.ui = new_ui;
     this.ui.holder = this; //holder도 등록해준다. strong reference cycle 방지를 위해 weak타입으로...하려 했는데 weak이 설치가 안되네, free()를 믿자
   }
@@ -458,22 +462,28 @@ class UIHolder
     });
   }
 
-  forceSend(ui) //Private 메시지용 메시지 다시 보내기 위해
+  sendDelayedUI(ui, do_resend) //interaction 이벤트 떄만이 아니라 아무 때나 ui update
   {
-    if(this.ui_holder_type != UI_HOLDER_TYPE.PRIVATE)
+    if(do_resend && ui != undefined && this.base_message != undefined)
+    {
+      this.base_message.delete();
+      this.base_message = undefined;
+    }
+
+    this.onUIReceived(ui);
+  }
+
+  onUIReceived(new_ui)
+  {
+    if(new_ui == undefined)
     {
       return;
     }
 
-    this.prev_ui_stack = undefined; //싹~ 날려
-    if(this.base_message != undefined)
+    if(this.ui != new_ui) //ui stack 에 쌓는 것은 새 UI 인스턴스가 생성됐을 때만
     {
-      this.base_message.delete();
+      this.appendNewUI(new_ui);
     }
-
-    this.base_message = undefined;
-
-    this.appendNewUI(ui);
     this.updateUI();
   }
 
@@ -507,6 +517,11 @@ class QuizbotUI {
 
   }
 
+  awaked() //페이지 재활성화 됐을 때
+  {
+
+  }
+
   update()
   {
     if(this.holder != undefined)
@@ -519,15 +534,15 @@ class QuizbotUI {
     }
   }
 
-  forceSend(ui)
+  sendDelayedUI(ui, do_resend)
   {
     if(this.holder != undefined)
     {
-      this.holder.forceSend(ui);
+      this.holder.sendDelayedUI(ui, do_resend);
     }
     else
     {
-      logger.error(`Failed to self force Send UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
+      logger.error(`Failed to self force update delayed UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
     }
   }
 
@@ -542,6 +557,19 @@ class QuizbotUI {
       logger.error(`Failed to self free UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
     }
   }
+
+  goToBack()
+  {
+    if(this.holder != undefined)
+    {
+      this.holder.goToBack();
+    }
+    else
+    {
+      logger.error(`Failed to self Go to back UI guild_id:${this.guild_id}, embeds: ${JSON.stringify(this.embed)}, err: ${'this UI has undefined UI Holder!!!'}`);
+    }
+  }
+
 
   //selectmenu 에서 value 값에 해당하는 선택지를 default 활성화해줌
   selectDefaultOptionByValue(select_menu, value)
@@ -653,7 +681,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
       const index_to_remove = this.components.indexOf(this.page_jump_component);
       if(index_to_remove != -1)
       {
-        this.components.splice(this.page_jump_component, 1); 
+        this.components.splice(index_to_remove, 1); 
       }
       return;
     }
@@ -1285,15 +1313,15 @@ const my_quiz_control_comp = new ActionRowBuilder()
 const quiz_edit_comp = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
-  .setCustomId('request_modal_question_add')
-  .setLabel('문제 추가')
-  .setStyle(ButtonStyle.Success),
-)
-.addComponents(
-  new ButtonBuilder()
   .setCustomId('request_modal_quiz_edit')
   .setLabel('퀴즈 정보 수정')
   .setStyle(ButtonStyle.Primary),
+)
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('quiz_toggle_public')
+  .setLabel('퀴즈 공개/비공개')
+  .setStyle(ButtonStyle.Secondary),
 )
 .addComponents(
   new ButtonBuilder()
@@ -1302,9 +1330,27 @@ const quiz_edit_comp = new ActionRowBuilder()
   .setStyle(ButtonStyle.Danger),
 )
 
-const question_select_menu = new StringSelectMenuBuilder().
-setCustomId('request_modal_question_select').
-setPlaceholder('문제 수정하기');
+const quiz_info_control_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('request_modal_question_add')
+  .setLabel('문제 추가')
+  .setStyle(ButtonStyle.Success),
+)
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('back')
+  .setLabel('뒤로가기')
+  .setStyle(ButtonStyle.Secondary),
+)
+
+
+const question_select_menu_comp =  new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder().
+  setCustomId('question_select_menu').
+  setPlaceholder('수정할 문제 선택하기')
+)
 
 const quiz_delete_confirm_comp = new ActionRowBuilder()
 // .addComponents(
@@ -1375,14 +1421,14 @@ const modal_quiz_info = new ModalBuilder()
 )
 
 //문제 만들기
-const modal_question_info1 = new ModalBuilder()
-.setCustomId('modal_question_info1')
+const modal_question_info = new ModalBuilder()
+.setCustomId('modal_question_info')
 .setTitle('문제 만들기')
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
       new TextInputBuilder()
-        .setCustomId('txt_input_question_answer')
+        .setCustomId('txt_input_question_answers')
         .setLabel('문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
@@ -1397,7 +1443,7 @@ const modal_question_info1 = new ModalBuilder()
         .setLabel('문제와 함께 재생할 음악입니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM으로 대체합니다.)')
+        .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM 사용)')
     )
 )
 .addComponents(
@@ -1405,10 +1451,10 @@ const modal_question_info1 = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_audio_range')
-        .setLabel('음악 재생 구간을 지정할 수 있습니다.')
+        .setLabel('음악 재생 구간을 지정할 수 있습니다. [최대 60초만 재생]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 40~80 (생략 시, 랜덤으로 재생합니다.)')
+        .setPlaceholder('예시) 40~80 또는 40 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1446,18 +1492,18 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! 그 게임의 빌리지 타운 bmg입니다. (생략 가능)')
+        .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! (생략 가능)')
     )
 )
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
       new TextInputBuilder()
-        .setCustomId('txt_input_wait_answer')
+        .setCustomId('txt_input_use_answer_timer')
         .setLabel('문제 제출 후 정답을 맞추기까지 여유 시간을 줍니다.(인트로 퀴즈에 사용)')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 사용 (생략 가능)')
+        .setPlaceholder('예시) 사용 (생략 시, 미사용)')
     )
 )
 
@@ -1476,17 +1522,17 @@ const modal_question_answering_info = new ModalBuilder()
         .setPlaceholder('유튜브 URL 입력 (생략 가능)')
     )
 )
-.addComponents(
-  new ActionRowBuilder()
-    .addComponents(
-      new TextInputBuilder()
-        .setCustomId('txt_input_answering_audio_range')
-        .setLabel('음악 재생 구간을 지정할 수 있습니다.')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setPlaceholder('예시) 40~80 (생략 시, 랜덤으로 재생합니다.)')
-    )
-)
+// .addComponents(
+//   new ActionRowBuilder()
+//     .addComponents(
+//       new TextInputBuilder()
+//         .setCustomId('txt_input_answering_audio_range')
+//         .setLabel('정답용 음악 재생 구간을 지정할 수 있습니다.')
+//         .setStyle(TextInputStyle.Short)
+//         .setRequired(false)
+//         .setPlaceholder('예시) 40~80 (생략 시, 랜덤 재생)')
+//     )
+// )
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
@@ -1503,12 +1549,66 @@ const modal_question_answering_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_answering_text')
-        .setLabel('정답 공개 시 함께 표시할 텍스트입니다.')
+        .setLabel('정답 공개 시 정답과 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
+
+const modal_question_info_edit = cloneDeep(modal_question_info); //문제 수정용 modal
+
+const question_edit_comp = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('request_modal_question_info_edit')
+  .setLabel('기본 정보 설정')
+  .setStyle(ButtonStyle.Primary),
+)
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('request_modal_question_additional_info')
+  .setLabel('추가 정보 설정')
+  .setStyle(ButtonStyle.Primary),
+)
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('request_modal_question_answering_info')
+  .setLabel('정답 이벤트 설정')
+  .setStyle(ButtonStyle.Primary),
+)
+
+const question_edit_comp2 = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('request_modal_question_add')
+  .setLabel('새로운 문제 추가')
+  .setStyle(ButtonStyle.Success),
+)
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('question_delete')
+  .setLabel('현재 문제 삭제')
+  .setStyle(ButtonStyle.Danger),
+)
+
+const question_control_btn_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('prev_question')
+  .setLabel('이전 문제')
+  .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('back')
+    .setLabel('뒤로가기')
+    .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('next_question')
+    .setLabel('다음 문제')
+    .setStyle(ButtonStyle.Secondary),
+);
+
+
 
 ////////////// Quiz 제작 UI 관련, 전부 개인 메시지로 처리됨
 /**
@@ -1576,7 +1676,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     if(interaction.customId == 'modal_quiz_info')
     {
-      this.createNewUserQuiz(interaction)
+      this.addQuiz(interaction)
       return;
     }
 
@@ -1616,10 +1716,11 @@ class UserQuizListUI extends QuizBotControlComponentUI
     }
 
     const user_quiz_info_ui = new UserQuizInfoUI(user_quiz_info, false);
-    this.forceSend(user_quiz_info_ui); //강제로 ui 보냄...
+    const do_resend = !do_load_question; //do_load_question 이 false면 새로만든 퀴즈다, 이 경우에는 do_resend 해줘야함
+    this.sendDelayedUI(user_quiz_info_ui, do_resend); //ui 업데이트 요청
   }
 
-  async createNewUserQuiz(modal_interaction) //제출된 modal interaction에서 정보 가져다 씀
+  async addQuiz(modal_interaction) //제출된 modal interaction에서 정보 가져다 씀
   {
     
     let user_quiz_info = new UserQuizInfo();
@@ -1645,7 +1746,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     user_quiz_info.data.played_count = 0;
     user_quiz_info.data.is_private = true;
 
-    const created_quiz_id = await user_quiz_info.saveDataToDB(false);
+    const created_quiz_id = await user_quiz_info.saveDataToDB();
 
     if(created_quiz_id == undefined) //저장 실패
     {
@@ -1656,6 +1757,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     logger.info(`Created New Quiz... quiz_id: ${user_quiz_info.quiz_id}, title: ${user_quiz_info.data.quiz_title}`);
 
     this.showUserQuizInfoUI(user_quiz_info, false);
+    this.loadUserQuiz(); //나중에 뒤로가기 버튼 눌러서 와도 괜찮게 load 한번 해줌
     return;
   }
 }
@@ -1671,12 +1773,19 @@ class UserQuizInfoUI extends QuizbotUI {
 
     this.quiz_info = quiz_info;
 
+    this.refreshUI();
+  }
+
+  refreshUI() //ui에 quiz_info 재적용
+  {
+    const quiz_info = this.quiz_info;
+
     this.embed = {
       color: 0x87CEEB,
       title: `**${quiz_info.data.quiz_title}**`,
       description: '',
       thumbnail: { //퀴즈 섬네일 표시
-        url: quiz_info.data.thumbnail ?? '',
+        url: utility.isValidURL(quiz_info.data.thumbnail) ? quiz_info.data.thumbnail : '',
       },
       footer: { //퀴즈 제작자 표시
         text: quiz_info.data.creator_name ?? '',
@@ -1685,33 +1794,51 @@ class UserQuizInfoUI extends QuizbotUI {
     };
 
     let description = '';
-    description += '🏷 한줄 소개: ' + quiz_info.data.simple_description + "\n";
-    description += '📦 문제 개수: ' + quiz_info.question_list.length;
+    description += `🏷 한줄 소개: **${quiz_info.data.simple_description}**\n`;
+    description += `📦 문제 개수: **${quiz_info.question_list.length}개**\n`;
     description += "\n\n\n";
 
-    description += '📖 퀴즈 설명:\n' + quiz_info.data.description + "\n\n\n\n";
+    description += `📖 퀴즈 설명:\n${quiz_info.data.description}\n\n\n\n`;
 
     description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     
-    description += "플레이된 횟수: " + quiz_info.data.played_count + "\n";
+    description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n";
 
     // description = description.replace('${quiz_type_name}', `${quiz_info.data.type_name}`);
     // description = description.replace('${quiz_size}', `${quiz_info.data.quiz_size}`);
     // description = description.replace('${quiz_description}', `${quiz_info.data.description}`);
     
-    if(readonly)
+    if(this.readonly)
     {
       description += '⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n';
       this.components = [quiz_info_comp]; //게임 시작 가능한 comp
     }
     else
     {
+      this.embed.title += quiz_info.data.is_private ? ` **[비공개]**` : ` **[공개]**`
+
       this.components = [quiz_edit_comp]; //퀴즈 수정 가능한 comp
-      if(quiz_info.question_list.length > 0)
+
+      let temp_question_select_menu_comp = undefined;
+      let temp_question_select_menu = undefined;
+      const question_list = this.quiz_info.question_list;
+      for(let i = 0; i < question_list.length && i < 50; ++i)
       {
-        this.components.push(question_select_menu);
+        if(i % 25 == 0)
+        {
+          temp_question_select_menu_comp = cloneDeep(question_select_menu_comp);
+          temp_question_select_menu = temp_question_select_menu_comp.components[0];
+          temp_question_select_menu.setCustomId(`question_select_menu`+`#${i/25}`);
+          this.components.push(temp_question_select_menu_comp);
+        }
+
+        const question_info = question_list[i];
+        const option = { label: `${i+1}번째 문제`, description: `${question_info.data.answers}`, value: `${i}` };
+        temp_question_select_menu.addOptions(option);
       }
+
+      this.components.push(quiz_info_control_comp); //뒤로가기 버튼~
     }
 
     this.embed.description = description;
@@ -1729,6 +1856,11 @@ class UserQuizInfoUI extends QuizbotUI {
     {
       return this.doQuizEditorEvent(interaction);
     }
+  }
+
+  awaked() //ui 재활성화 됐을 때, UserQuestionInfo 에서 back 쳐서 돌아왔을 때, select menu 랑 문제 수 갱신해줘야함
+  {
+    this.refreshUI();
   }
   
   doQuizPlayEvent(interaction)
@@ -1776,16 +1908,40 @@ class UserQuizInfoUI extends QuizbotUI {
       return this.doModalSubmitEvent(interaction);
     }
 
+    if(interaction.customId.startsWith('question_select_menu#')) //문제 선택하기 메뉴 눌렀을 때
+    {
+      const select_index = parseInt(interaction.values[0]);
+      return new UserQuestionInfoUI(this.quiz_info, select_index); //선택한 문제의 ui 전달
+    }
+
     if(interaction.customId == 'request_modal_question_add') //문제 추가 눌렀을 떄
     {
-      interaction.showModal(modal_question_info1);
+      interaction.showModal(modal_question_info);
       return;
     }
 
     if(interaction.customId == 'request_modal_quiz_edit') //퀴즈 정보 수정 눌렀을 때
     {
-      interaction.showModal(modal_quiz_info);
+      const modal_current_quiz_info = cloneDeep(modal_quiz_info);
+      const quiz_info = this.quiz_info;
+
+      //현재 적용된 quiz_info 값으로 modal 띄워준다.(편의성)
+      modal_current_quiz_info.components[0].components[0].setValue(quiz_info.data.quiz_title ?? ''); //title
+      modal_current_quiz_info.components[1].components[0].setValue(quiz_info.data.simple_description ?? ''); //simple description
+      modal_current_quiz_info.components[2].components[0].setValue(quiz_info.data.description ?? ''); //description
+      modal_current_quiz_info.components[3].components[0].setValue(quiz_info.data.thumbnail ?? ''); //thumbnail
+
+      interaction.showModal(modal_current_quiz_info);
       return;
+    }
+
+    if(interaction.customId == 'quiz_toggle_public') //퀴즈 공개/비공개 버튼
+    {
+      quiz_info.data.is_private = !quiz_info.data.is_private;
+      quiz_info.saveDataToDB();
+
+      this.refreshUI();
+      return this;
     }
 
     if(interaction.customId == 'quiz_delete') //퀴즈 삭제 버튼
@@ -1795,9 +1951,10 @@ class UserQuizInfoUI extends QuizbotUI {
 
     if(interaction.customId == 'quiz_delete_confirmed') //퀴즈 정말정말정말로 삭제 버튼
     {
-      this.freeHolder(); //더 이상 UI안씀
+      this.freeHolder(); //더 이상 UI 못 쓰도록
       interaction.user.send("```" + `${text_contents.quiz_maker_ui.quiz_deleted}${quiz_info.quiz_id}` + "```");
       interaction.message.delete();
+      quiz_info.delete();
       return;
     }
 
@@ -1805,14 +1962,21 @@ class UserQuizInfoUI extends QuizbotUI {
 
   doModalSubmitEvent(modal_interaction)
   {
-    if(modal_interaction.customId == 'modal_quiz_info')
+    if(modal_interaction.customId == 'modal_quiz_info') //퀴즈 정보 수정 했을 경우임
     {
       this.editQuizInfo(modal_interaction);
       return this;
     }
+
+    if(modal_interaction.customId == 'modal_question_info') //문제 새로 만들기한 경우임
+    {
+      const question_info_ui = new UserQuestionInfoUI(this.quiz_info, -1); //어떤 quiz의 question info ui 인가 전달, -1이면 표시하지 않음
+      question_info_ui.addQuestion(modal_interaction);
+      return question_info_ui;
+    }
   }
 
-  editQuizInfo(modal_interaction)
+  editQuizInfo(modal_interaction) 
   {
     const quiz_info = this.quiz_info;
 
@@ -1821,13 +1985,17 @@ class UserQuizInfoUI extends QuizbotUI {
     const quiz_simple_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_simple_description');
     const quiz_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_description');
     
-    quiz_info.quiz_title = quiz_title;
-    quiz_info.thumbnail = quiz_thumbnail;
-    quiz_info.simple_description = quiz_simple_description;
-    quiz_info.description = quiz_description;
-    quiz_info.modified_time = new Date();
+    quiz_info.data.quiz_title = quiz_title;
+    quiz_info.data.thumbnail = quiz_thumbnail;
+    quiz_info.data.simple_description = quiz_simple_description;
+    quiz_info.data.description = quiz_description;
+    quiz_info.data.modified_time = new Date();
 
-    quiz_info.saveDataToDB(true);
+    quiz_info.saveDataToDB();
+    this.refreshUI();
+
+    modal_interaction.reply(">>> 퀴즈 정보를 수정하였습니다.");
+    // modal_interaction.deferUpdate();
   }
 
 }
@@ -1835,5 +2003,356 @@ class UserQuizInfoUI extends QuizbotUI {
 //퀴즈의 문제 정보
 class UserQuestionInfoUI extends QuizbotUI
 {
+
+  constructor(quiz_info, question_index)
+  {
+    super();
+
+    this.quiz_info = quiz_info;
+    this.question_list = quiz_info.question_list;
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: `**${question_index+1}번째 문제**`,
+      description: '데이터를 불러오는 중...\n잠시만 기다려주세요.',
+      thumbnail: { //문제 이미지 표시
+        url: '',
+      },
+      footer: { //문제 번호 표시
+        text: `📦 ${question_index + 1} / ${this.question_list.length}`,
+      },
+    };
+
+    this.current_question_info = undefined;
+    this.current_question_index = question_index;
+    this.displayQuestionInfo(question_index);
+
+    this.components = [question_edit_comp, question_edit_comp2, question_control_btn_component]; //문제 관련 comp
+  }
+
+  onInteractionCreate(interaction) 
+  {
+    if(interaction.isModalSubmit())
+    {
+      return this.doModalSubmitEvent(interaction);
+    }
+
+    if(interaction.isButton())
+    {
+      return this.doButtonEvent(interaction);
+    }
+  }
+
+  doModalSubmitEvent(modal_interaction)
+  {
+    if(modal_interaction.customId == 'modal_question_info_edit'
+      || modal_interaction.customId == 'modal_question_additional_info'
+      || modal_interaction.customId == 'modal_question_answering_info')
+    {
+      this.editQuestionInfo(this.current_question_info, modal_interaction);
+      return;
+    }
+
+    if(modal_interaction.customId == 'modal_question_info')
+    {
+      this.addQuestion(modal_interaction);
+      return;
+    }
+  }
+
+  doButtonEvent(interaction)
+  {
+    const question_info = this.current_question_info;
+    if(interaction.customId == 'request_modal_question_info_edit')
+    {
+      const modal_current_question_info_edit = cloneDeep(modal_question_info_edit);
+
+      modal_current_question_info_edit.components[0].components[0].setValue(question_info.data.answers ?? ''); 
+      modal_current_question_info_edit.components[1].components[0].setValue(question_info.data.question_audio_url ?? ''); 
+      modal_current_question_info_edit.components[2].components[0].setValue(question_info.data.audio_range_row ?? ''); 
+      modal_current_question_info_edit.components[3].components[0].setValue(question_info.data.question_image_url ?? ''); 
+      modal_current_question_info_edit.components[4].components[0].setValue(question_info.data.question_text ?? ''); 
+
+      interaction.showModal(modal_current_question_info_edit);
+      return;
+    }
+
+    if(interaction.customId == 'request_modal_question_additional_info')
+    {
+      const modal_current_question_additional_info = cloneDeep(modal_question_additional_info);
+
+      modal_current_question_additional_info.components[0].components[0].setValue(question_info.data.hint ?? ''); 
+      modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.use_answer_timer ?? ''); 
+
+      interaction.showModal(modal_current_question_additional_info);
+      return;
+    }
+
+    if(interaction.customId == 'request_modal_question_answering_info')
+    {
+      const modal_current_question_answering_info = cloneDeep(modal_question_answering_info);
+
+      modal_current_question_answering_info.components[0].components[0].setValue(question_info.data.answer_audio_url ?? ''); 
+      modal_current_question_answering_info.components[1].components[0].setValue(question_info.data.answer_image_url ?? ''); 
+      modal_current_question_answering_info.components[2].components[0].setValue(question_info.data.answer_text ?? ''); 
+
+      interaction.showModal(modal_current_question_answering_info);
+      return;
+    }
+
+    if(interaction.customId == 'request_modal_question_add')
+    {
+      interaction.showModal(modal_question_info);
+      return;
+    }
+
+    if(interaction.customId == 'question_delete')
+    {
+      const index_to_remove = this.question_list.indexOf(this.current_question_info);
+      if(index_to_remove != -1)
+      {
+        this.question_list.splice(index_to_remove, 1); 
+      }
+ 
+      const question_info = this.current_question_info;
+      question_info.delete();
+
+      this.current_question_info = undefined;
+      this.current_question_index -= 1;
+
+      const return_ui = this.goToNextQuestion() ?? this.goToPrevQuestion();
+      if(return_ui == undefined)
+      {
+        this.current_question_index = -1;
+        this.goToBack();
+        return;
+      }
+
+      logger.info(`Deleted Question... question_id: ${question_info.question_id}, user_id: ${interaction.user.id}`);
+
+      return return_ui;
+    }
+
+    if(interaction.customId == 'prev_question')
+    {
+      return this.goToPrevQuestion();
+    }
+
+    if(interaction.customId == 'next_question')
+    {
+      return this.goToNextQuestion();
+    }
+  }
+
+  goToPrevQuestion()
+  {
+    if(this.current_question_index > 0)
+    {
+      this.displayQuestionInfo(--this.current_question_index);
+      return this;
+    }
+    return undefined;
+  }
+
+  goToNextQuestion()
+  {
+    if(this.current_question_index < this.question_list.length - 1)
+    {
+      this.displayQuestionInfo(++this.current_question_index);
+      return this;
+    }
+    return undefined;
+  }
+
+  displayQuestionInfo(question_index)
+  {
+    const question_list = this.question_list;
+
+    if(question_index < 0 || question_index >= question_list.length) //이상한거 조회 요청하면
+    {
+      return;
+    }
+
+    const question_info = question_list[question_index];
+    this.current_question_info = question_info;
+
+    this.embed.title = `**${question_index+1}번째 문제**`;
+    this.embed.thumbnail.url = utility.isValidURL(question_info.data.question_image_url) ? question_info.data.question_image_url : '',
+    this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
+
+    let description = '';
+    description += "---- 기본 정보 ----\n\n";
+    description += `🔸 정답: **[${question_info.data.answers}]**\n`;
+    description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n`;
+    description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
+    description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n`;
+    description += `🔸 음악 재생 구간:  **[${question_info.data.audio_range_row ?? '랜덤 구간 재생'}]**\n`;
+
+    description += "---- 추가 정보 ----\n\n";
+    description += `🔸 힌트: **[${question_info.data.hint ?? '자동 지정'}]**\n`;
+    description += `🔸 정답 여유 시간 여부: **[${(question_info.data.use_answer_timer == true ? '예' : '아니요')}]**\n`;
+    description += "\n";
+
+    description += "---- 정답 이벤트 정보 ----\n\n";
+    description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n`;
+    description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
+    description += `🔸 정답용 텍스트:\n**[${question_info.data.answer_text ?? ''}]**\n`;
+    description += `---------------------\n\n`;
+
+    this.embed.description = description;
+
+    if(question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
+    {
+      this.components[1].components[0].setDisabled(true); //이게 새로운 문제 만들기 버튼임
+    }
+  }
+
+  applyQuestionInfo(user_question_info, modal_interaction)
+  {
+    const input_question_answers = modal_interaction.fields.getTextInputValue('txt_input_question_answers');
+    const input_question_audio_url = modal_interaction.fields.getTextInputValue('txt_input_question_audio_url');
+    const input_question_audio_range = modal_interaction.fields.getTextInputValue('txt_input_question_audio_range');
+    const input_question_image_url = modal_interaction.fields.getTextInputValue('txt_input_question_image_url');
+    const input_question_text = modal_interaction.fields.getTextInputValue('txt_input_question_text');
+
+    user_question_info.data.quiz_id = this.quiz_info.quiz_id;
+
+    user_question_info.data.answers = input_question_answers;
+    user_question_info.data.question_audio_url = input_question_audio_url;
+    
+    user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
+    if(input_question_audio_range.length != 0)
+    {
+      const audio_range_split = input_question_audio_range.split('~');
+      let audio_start = undefined;
+      let audio_end = undefined;
+      
+      audio_start = audio_range_split[0].trim();
+      if(audio_range_split.length >= 2)
+      {
+        audio_end = audio_range_split[1].trim();
+      }
+
+      let audio_start_value = isNaN(audio_start) ? undefined : Math.floor(audio_start);
+      let audio_end_value = isNaN(audio_end) ? undefined : Math.floor(audio_end);
+
+      audio_start_value = (audio_start_value != undefined && audio_start_value < 0) ? undefined : audio_start_value; //음수값 처리
+      audio_end_value = (audio_end_value != undefined && audio_end_value < 0) ? undefined : audio_end_value;
+
+      if(audio_start_value!= undefined && audio_start_value != undefined) //start > end 처리
+      {
+        if(audio_start_value > audio_end_value)
+        {
+          const temp = audio_start_value;
+          audio_start_value = audio_end_value;
+          audio_end_value = temp;
+        }
+
+        user_question_info.data.audio_play_time = (audio_end_value - audio_start_value);
+      }
+
+      user_question_info.data.audio_start = audio_start_value;
+      user_question_info.data.audio_end = audio_end_value;
+    }
+
+    user_question_info.data.question_image_url = input_question_image_url;
+    user_question_info.data.question_text = input_question_text;
+  }
+
+  applyQuestionAdditionalInfo(user_question_info, modal_interaction)
+  {
+    const input_question_hint = modal_interaction.fields.getTextInputValue('txt_input_question_hint');
+    const input_use_answer_timer = modal_interaction.fields.getTextInputValue('txt_input_use_answer_timer');
+
+    user_question_info.data.quiz_id = this.quiz_info.quiz_id;
+
+    user_question_info.data.hint = input_question_hint ?? "";
+    user_question_info.data.use_answer_timer = (input_use_answer_timer.length == 0 ? false : true);
+  }
+
+  applyQuestionAnsweringInfo(user_question_info, modal_interaction)
+  {
+    const input_answering_audio_url = modal_interaction.fields.getTextInputValue('txt_input_answering_audio_url');
+    const input_answering_image_url = modal_interaction.fields.getTextInputValue('txt_input_answering_image_url');
+    const input_answering_text = modal_interaction.fields.getTextInputValue('txt_input_answering_text');
+
+    user_question_info.data.quiz_id = this.quiz_info.quiz_id;
+
+    user_question_info.data.answer_audio_url = input_answering_audio_url ?? "";
+    user_question_info.data.answer_image_url = input_answering_image_url ?? "";
+    user_question_info.data.answer_text = input_answering_text ?? "";
+  }
+
+  async saveQuestion(user_question_info)
+  {
+    const question_id = await user_question_info.saveDataToDB();
+
+    if(question_id == undefined) //저장 실패
+    {
+      return undefined;
+    }
+
+    return question_id;
+  }
+
+  async addQuestion(modal_interaction)
+  {
+    let user_question_info = new UserQuestionInfo();
+    
+    this.applyQuestionInfo(user_question_info, modal_interaction); //채우고 저장해주자
+    const question_id = await this.saveQuestion(user_question_info);
+
+    if(question_id == undefined)
+    {
+      modal_interaction.reply(`${this.quiz_info.quiz_id} / ${modal_interaction.user.id} 문제를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`);
+      return;
+    }
+
+    modal_interaction.deferUpdate();
+    logger.info(`Created New Question... question_id: ${user_question_info.question_id}/${question_id}, user_id: ${modal_interaction.user.id}}`);
+
+    this.current_question_index = this.question_list.push(user_question_info) - 1; //새로 추가했으면 무조건 마지막에 넣었을테니
+    this.displayQuestionInfo(this.current_question_index); 
+    // logger.error(`Failed Create New Question... quiz_id: ${this.quiz_info.quiz_id}, user_Id: ${modal_interaction.user.id}, answers: ${input_question_answers}`);
+    this.update(); //ui update
+    
+    return;
+  }
+
+  async editQuestionInfo(user_question_info, modal_interaction)
+  {
+    if(user_question_info == undefined)
+    {
+      logger.info(`Failed edit Question info, current_question_info is undefined quiz_id: ${this.quiz_info.quiz_id}, current_question_index: ${this.current_question_index}`);
+      return;
+    }
+
+    if(modal_interaction.customId == 'modal_question_info_edit')
+    {
+      this.applyQuestionInfo(user_question_info, modal_interaction);
+    }
+    else if(modal_interaction.customId == 'modal_question_additional_info')
+    {
+      this.applyQuestionAdditionalInfo(user_question_info, modal_interaction);
+    }
+    else if(modal_interaction.customId == 'modal_question_answering_info')
+    {
+      this.applyQuestionAnsweringInfo(user_question_info, modal_interaction);
+    }
+
+    const question_id = await this.saveQuestion(user_question_info);
+
+    if(question_id == undefined)
+    {
+      modal_interaction.reply(`${this.quiz_info.quiz_id} 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`);
+      return;
+    }
+
+    modal_interaction.deferUpdate();
+    logger.info(`Edited Question... question_id: ${user_question_info.question_id}/${question_id}`);
+
+    this.displayQuestionInfo(this.current_question_index);
+    this.update(); //ui update
+  }
 
 }
