@@ -74,7 +74,8 @@ exports.QUIZ_TYPE = {
 }
 
 exports.EXPLAIN_TYPE = {
-    ShortAnswerType: "short_answer",
+    SHORT_ANSWER_TYPE: "short_answer",
+    CUSTOM_ANSWER_TYPE: "custom_answer",
 }
 
 exports.BGM_TYPE = {

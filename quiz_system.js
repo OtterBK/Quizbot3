@@ -213,7 +213,11 @@ class QuizPlayUI
   setImage(image_resource)
   {
 
-    if(image_resource == undefined) return;
+    if(image_resource == undefined) 
+    {
+        this.embed.image = { url: '' };
+        return;
+    }
 
     if(image_resource.includes(SYSTEM_CONFIG.dev_quiz_path) == true) //dev path 포함하면 로컬 이미지 취급
     {
@@ -224,7 +228,7 @@ class QuizPlayUI
     else
     {
         this.embed.image = {
-            url: image_resource,
+            url: utility.isValidURL(image_resource) ? image_resource : '표시할 수 없는 이미지 URL 에러',
         }
     }
   }
@@ -803,6 +807,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
         let quiz_ui =  this.quiz_session.quiz_ui
         if(target_question['answer_image_resource'] == undefined) //정답 표시용 이미지 있다면 표시
         {
+            quiz_ui.setImage(undefined);
             return false;
         }
         const image_resource = target_question['answer_image_resource'];
@@ -1328,14 +1333,14 @@ class InitializeCustomQuiz extends Initialize
         let question_list = [];
 
         const quiz_id = quiz_info['quiz_id']; //커스텀 퀴즈는 quiz_id가 있다.
-        const question_row_list = await db_manager.getQuestionList(quiz_id);
+        const question_row_list = quiz_info.question_list;
 
-        if(question_row_list == undefined || question_row_list.rowCount == 0) 
+        if(question_row_list == undefined || question_row_list.length == 0) 
         {
-            throw 'question row list is empty, quiz_id: ' + quiz_id
+            throw 'question row list is empty, quiz_id: ' + quiz_id;
         }
         
-        question_row_list.rows.forEach((question_row) => {
+        question_row_list.forEach((question_row) => {
 
             let question = {};
             question['type']  = QUIZ_TYPE.CUSTOM;
@@ -1401,8 +1406,12 @@ class Explain extends QuizLifecycle
 
         quiz_ui.components = [];
 
-        const explain_type = EXPLAIN_TYPE.ShortAnswerType;
-        //TODO 퀴즈 타입에 따라 설명 다르게
+        let explain_type = EXPLAIN_TYPE.SHORT_ANSWER_TYPE;
+        if(quiz_data.quiz_maker_type == QUIZ_MAKER_TYPE.CUSTOM)
+        {
+            explain_type = EXPLAIN_TYPE.CUSTOM_ANSWER_TYPE;
+        }
+        
 
         const explain_list = text_contents.quiz_explain[explain_type];
         for(let i = 0; i < explain_list.length; ++i)
@@ -1481,24 +1490,27 @@ class Prepare extends QuizLifecycle
         
         try
         {
-            if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.INTRO || question_type == QUIZ_TYPE.SCRIPT)
-            {
-                await this.prepareAudio(target_question);
-            }
-            else if(question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.IMAGE_LONG)
-            {
-                await this.prepareImage(target_question);
-            }
-            else if(question_type == QUIZ_TYPE.TEXT || question_type == QUIZ_TYPE.OX)
-            {
-                await this.prepareText(target_question);
-            }
-            else if(question_type == QUIZ_TYPE.CUSTOM)
+            if(question_type == QUIZ_TYPE.CUSTOM)
             {
                 await this.prepareCustom(target_question);
+                //정답 표시 정보도 prepareCustom에서 한번에 한다
             }
-
-            await this.prepareAnswerAdditionalInfo(target_question); //정답 표시 시, 사용할 추가 정보
+            else
+            {
+                if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.INTRO || question_type == QUIZ_TYPE.SCRIPT)
+                {
+                    await this.prepareAudio(target_question);
+                }
+                else if(question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.IMAGE_LONG)
+                {
+                    await this.prepareImage(target_question);
+                }
+                else if(question_type == QUIZ_TYPE.TEXT || question_type == QUIZ_TYPE.OX)
+                {
+                    await this.prepareText(target_question);
+                }
+                await this.prepareAnswerAdditionalInfo(target_question); //정답 표시 시, 사용할 추가 정보
+            }
         }
         catch(err)
         {
@@ -1508,7 +1520,7 @@ class Prepare extends QuizLifecycle
                 this.skip_prepare = true;
                 return;
             }
-            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, err: ${err.stack ?? err.message}`);
+            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
         }
 
         this.prepared_question = target_question;
@@ -1758,15 +1770,105 @@ class Prepare extends QuizLifecycle
         const option_data = this.quiz_session.option_data;
         const game_data = this.quiz_session.game_data;
 
+        const target_question_data = target_question.data;
+
         /**
          * question_audio_url,
          * audio_start,
          * audio_end,
+         * audio_play_time
          */
-        const question_audio_url = target_question['question_audio_url'];
+        const question_audio_url = target_question_data['question_audio_url'];
+        if(question_audio_url != undefined)
+        {
+            const question_audio_play_time = target_question_data['audio_play_time'];
+            const question_audio_start = target_question_data['audio_start'];
+            const question_audio_end = target_question_data['audio_end'];
+
+            const [question_audio_resource, question_audio_play_time_ms] = 
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end);
+
+            target_question['audio_resource'] = question_audio_resource;
+            target_question['audio_length'] = question_audio_play_time_ms;
+        }
+
+        /**
+         * question_image_url
+         */
+        target_question['image_resource'] = target_question_data['question_image_url'];
+
+        /**
+         * question_answers
+         */
+
+        let answers = [];
+        const answer_string = target_question_data['answers'];
+        if(answer_string != undefined)
+        {
+            answer_string.split(",").forEach((answer_row) => 
+            {
+                let answer = answer_row.trim().replace(/ /g, "");
+                answers.push(answer);
+            });
+            target_question['answers'] = answers;
+        }
+
+        /**
+         * question_hint
+         */
+        target_question['hint'] = target_question_data['hint'];
+        //힌트는 그대로
+
+
+        /**
+         * question_text
+         */
+        target_question['question_text'] = target_question_data['question_text'];
+        //question_text 도 그대로
+
+        /**
+         * answer_audio_url
+         * answer_audio_start
+         * answer_audio_end
+         * answer_audio_play_time
+         */
+        const answer_audio_url = target_question_data['answer_audio_url'];
+        if(answer_audio_url != undefined)
+        {
+            const answer_audio_play_time = target_question_data['answer_audio_play_time'];
+            const answer_audio_start = target_question_data['answer_audio_start'];
+            const answer_audio_end = target_question_data['answer_audio_end'];
+    
+            const [answer_audio_resource, answer_audio_play_time_ms] = 
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end);
+    
+            target_question['answer_audio_resource'] = answer_audio_resource;
+            target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+        }
+        
+
+        /**
+         * answer_image_url
+         */
+        target_question['answer_image_resource'] = target_question_data['answer_image_url'];
+
+        /**
+         * answer_text
+         */
+        target_question['author'] = [ target_question_data['answer_text'] ];
+    }
+
+
+    /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined) 
+    {
+        const option_data = this.quiz_session.option_data;
+
+        let audio_resource; //최종 audio_stream
+        let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(question_audio_url);
+        const youtube_info = await ytdl.getInfo(audio_url_row);
         let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
         if(audio_formats.length == 0) 
         {
@@ -1775,77 +1877,82 @@ class Prepare extends QuizLifecycle
         }
 
         const audio_format = audio_formats[audio_formats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
-        const audio_duration = audio_format.approxDurationMs;
+        const audio_duration_ms = audio_format.approxDurationMs;
         const audio_size = audio_format.contentLength;
         const audio_bitrate = audio_format.averageBitrate;
         const audio_byterate = audio_bitrate / 8;
 
-        let audio_play_time = (target_question['audio_play_time'] ?? 0) <= 0 ? option_data.quiz.audio_play_time : target_question['audio_play_time'];
-        if(audio_play_time > 60000) audio_play_time = 60000; //60초가 넘어가서는 안된다.
-
-        const audio_start_sec = target_question['audio_start'] ?? 0;
-        const audio_end_sec = target_question['audio_end'] ?? audio_duration;
+        let audio_play_time_ms = (audio_play_time_row ?? 0) <= 0 ? option_data.quiz.audio_play_time : (audio_play_time_row * 1000);
         
+        if(audio_start_row != undefined && audio_end_row != undefined
+            && audio_end_row > audio_start_row) //구간을 잘 지정해뒀다면
+        {
+            audio_play_time_ms = (audio_end_row - audio_start_row) * 1000; //딱 구간만큼만 재생
+        }
+
+        if(((audio_start_row ?? 0) * 1000) + audio_play_time_ms > audio_duration_ms) //근데 만약 재생 구간이 오디오 최대치를 넘어섰다면
+        {
+            audio_play_time_ms = audio_duration_ms - (audio_start_row * 1000);
+        }
+
+        if(audio_play_time_ms > 60000) audio_play_time_ms = 60000; //근데 60초가 넘어가서는 안된다.
 
         //오디오 길이가 audio_play_time 보다 작으면 오디오 길이를 audio_length로
-        let audio_length; //최종 오디오 길이
-
-        if(audio_duration == undefined || audio_play_time < audio_duration) 
+        if(audio_duration_ms == undefined || audio_play_time_ms < audio_duration_ms) 
         {
-            audio_length = audio_play_time;
+            audio_length_ms = audio_play_time_ms; //ms
         } 
         else
         {
-            audio_length = audio_duration;
+            audio_length_ms = audio_duration_ms; //ms
         }
-        target_question['audio_length'] = audio_length; //ms
 
-        let audio_min_start_point = audio_start_sec;
-        let audio_max_start_point = audio_end_sec - audio_length;
+        //오디오 시작 지점이 될 수 있는 포인트 범위
+        let audio_length_sec = Math.floor(audio_length_ms/1000);
 
-        let audio_start_point = undefined;
-        let audio_end_point = undefined;
+        const audio_min_start_point_sec = audio_start_row ?? 0;
+        const audio_max_start_point_sec = (audio_end_row ?? Math.floor(audio_duration_ms/1000)) - audio_length_sec;
 
-        const audio_length_sec = parseInt(audio_length / 1000);
+        let audio_final_min_start_point_sec = audio_min_start_point_sec;
+        let audio_final_max_start_point_sec = audio_max_start_point_sec;
+
+        let audio_start_point = audio_min_start_point_sec;
 
         //오디오 자르기 기능
-        if(audio_max_start_point > audio_min_start_point) //충분히 재생할 수 있는 start point가 있다면
+        if(audio_max_start_point_sec - audio_min_start_point_sec > audio_length_sec) //충분히 재생할 수 있는 구간이 지정돼 있어서 오디오 랜덤 구간 재생이 필요하다면
         {
-            if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
+            if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //옵션 켜져있다면 최대한 중간 범위로 좁힌다.
             {
-                const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                const refined_audio_min_start_point = audio_mid_point - (audio_length / 2) + 1000; //1000ms는 패딩
-                const refined_audio_max_start_point = audio_mid_point + (audio_length /2) + 1000;
+                const audio_mid_point_sec = (audio_min_start_point_sec - audio_max_start_point_sec) / 2; //두 지점의 중앙 포인트
 
-                if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
+                //중앙 포인트 부터 audio_length_sec 의 절반씩
+                const audio_guess_min_start_point_sec = audio_mid_point_sec - Math.floor(audio_length_sec/2) + 1; //1s는 패딩
+                const audio_guess_max_start_point_sec = audio_mid_point_sec + Math.floor(audio_length_sec/2) + 1;
+
+                if(audio_min_start_point_sec <= audio_guess_min_start_point_sec && audio_guess_max_start_point_sec <= audio_max_start_point_sec) //좁히기 성공이면
                 {
-                    logger.debug(`Refined audio point, question: ${question_audio_url} min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
-                    audio_min_start_point = refined_audio_min_start_point;
-                    audio_max_start_point = refined_audio_max_start_point;
+                    audio_final_min_start_point_sec = audio_guess_min_start_point_sec;
+                    audio_final_max_start_point_sec = audio_guess_max_start_point_sec;
+                    logger.debug(`Refined audio point, question: ${audio_url_row} min: ${audio_min_start_point} -> ${audio_final_min_start_point_sec}, max: ${audio_max_start_point} -> ${audio_final_max_start_point_sec}`);
                 }
             }
 
-            audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point) / 1000);  //second
-            audio_end_point = audio_start_point + audio_length_sec; //second
+            audio_start_point = utility.getRandom(audio_final_min_start_point_sec, audio_final_max_start_point_sec)  //second
         }
         
-        //오디오 스트림 미리 생성
-        let audio_stream = undefined;
+        //이건 왜 안쓰지? 아놔 진짜 기억 안나네 아마 ffmpeg 프로세스 실행돼서 그럴듯
+        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); 
         
-        if(audio_start_point == undefined) audio_start_point = 0;
-        if(audio_end_point == undefined) audio_end_point = audio_start_point + audio_length_sec; 
-
-        logger.debug(`cut audio, question: ${question_audio_url}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
-        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); //이건 왜 안쓰지? 아놔 진짜 기억 안나네
-        audio_stream = ytdl(question_audio_url, { 
+        logger.debug(`cut audio, question: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
+        let audio_stream = ytdl(audio_url_row, { 
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
             encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 5}`], //5초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 WPIPE 에러 뜰 수 있음
             seek: audio_start_point, 
         });
-        this.current_audio_streams.push(audio_stream);
-        /** 
+
+         /** 
         23.11.08 확인 결과 
         -to 옵션이 안먹는다...
         -> (`-to ${audio_length}`) 에서 ('-t', `${audio_length}`) 로 하니깐 된다.
@@ -1865,8 +1972,7 @@ class Prepare extends QuizLifecycle
          * 이게 되면 veryvery thank u T.T, => 6번으로 해결했다!!!!
          */
 
-        let resource = undefined;
-        resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
+        audio_resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
             inputType: StreamType.Opus,
             inlineVolume: SYSTEM_CONFIG.use_inline_volume,
         });
@@ -1875,92 +1981,12 @@ class Prepare extends QuizLifecycle
         {
             resource.volume.setVolume(0);
         }
-
-        target_question['audio_resource'] = resource;
-
-
-        /**
-         * question_image_url
-         */
-        target_question['image_resource'] = target_question['question_image_url'];
-
-        /**
-         * question_answers
-         */
-
-        let answers = [];
-        const answer_string = target_question['answers'];
-        if(answer_string != undefined)
-        {
-            answer_string.split(",").forEach((answer_row) => 
-            {
-                let answer = answer_row.trim().replace(/ /g, "");
-                answers.push(answer);
-            });
-            target_question['answers'] = answers;
-        }
-
-        /**
-         * question_hint
-         */
-
-        //힌트는 그대로
-
-
-        /**
-         * question_text
-         */
-        //question_text 도 그대로
-
-        /**
-         * answer_audio_url
-         */
-        const answer_audio_url = target_question['answer_audio_url'];
-        if(answer_audio_url != undefined)
-        {
-            const answer_audio_play_time = SYSTEM_CONFIG.correct_answer_cycle_wait;
-
-            const answer_youtube_info = await ytdl.getInfo(answer_audio_url)
-            let audioFormats = ytdl.filterFormats(answer_youtube_info.formats, 'audioonly');
-            if(audioFormats.length > 0)
-            {
-                const audioFormat = audioFormats[audioFormats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
-                const bitrate = audioFormat.averageBitrate;
-                const byterate = bitrate / 8;
-    
-                //모르겠다... question audio 준비할 때 이걸로 안한다... 뭔가 이유가 있었겠지?
-                const answer_audio_stream = ytdl.downloadFromInfo(answer_youtube_info, { format: audio_format, range: { start: 0, end: (answer_audio_play_time * byterate)}}); 
-                
-    
-                let answer_audio_resource = undefined;
-                answer_audio_resource = createAudioResource(answer_audio_stream, {
-                    inputType: WebmOpus,
-                    inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-                });
-    
-                if(SYSTEM_CONFIG.use_inline_volume)
-                {
-                    audio_resource.volume.setVolume(0);
-                }
-    
-                target_question['answer_audio_resource'] = answer_audio_resource;
-                target_question['answer_audio_play_time'] = answer_audio_play_time;
-    
-            }
-        }
         
-
-        /**
-         * answer_image_url
-         */
-        target_question['answer_image_resource'] = target_question['answer_image_url'];
-
-        /**
-         * answer_text
-         */
-        target_question['author'] = target_question['answer_text'];
+        return [audio_resource, audio_length_ms];
     }
 }
+
+
 
 //#endregion
 
@@ -3415,6 +3441,8 @@ class Ending extends QuizLifeCycleWithUtility
                 value: '\u1CBC\n',
             },
         ];
+
+        quiz_ui.setImage(undefined);
 
         utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.BELL);
 

@@ -8,17 +8,7 @@ const logger = require('./logger.js')('Commands');
 const commands = [
     new SlashCommandBuilder()
     .setName('퀴즈')
-    .setDescription('퀴즈봇의 명령어입니다.')
-    .addSubcommand(subcommand =>
-		subcommand
-			.setName('시작')
-			.setDescription('퀴즈를 선택하고 시작합니다')
-    )
-    .addSubcommand(subcommand =>
-		subcommand
-			.setName('만들기')
-			.setDescription('새로운 퀴즈를 만듭니다.')
-    ),
+    .setDescription('퀴즈봇의 메인 메뉴를 표시합니다.'),
     // .addChannelOption(option => 
     //     option
     //     .setName("보이스채널")
@@ -28,18 +18,12 @@ const commands = [
     // ),
 
     new SlashCommandBuilder()
+    .setName('퀴즈만들기')
+    .setDescription('직접 퀴즈를 만들 수 있는 퀴즈툴을 요청합니다.'),
+
+    new SlashCommandBuilder()
     .setName('quiz')
-    .setDescription('Quizbot\'s commands')
-    .addSubcommand(subcommand =>
-		subcommand
-			.setName('start')
-			.setDescription('Select a quiz and start.')
-    )
-    .addSubcommand(subcommand =>
-		subcommand
-			.setName('create')
-			.setDescription('make a quiz.')
-    ),
+    .setDescription('Quizbot\'s commands'),
 
     new SlashCommandBuilder()
     .setName('답')

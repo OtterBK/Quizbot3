@@ -368,6 +368,11 @@ exports.isValidURL = (url) =>
 {
   try
   {
+    if(url.startsWith("http://") == false && url.startsWith("https://") == false)
+    {
+      return false;
+    }
+
     const test_url = new URL(url);
     return true;
   }

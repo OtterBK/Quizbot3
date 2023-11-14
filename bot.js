@@ -109,7 +109,7 @@ const start_quiz_handler = async (interaction) => {
 
   if(interaction.guild == undefined)
   {
-    interaction.reply("개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.");
+    interaction.reply({conet: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.', ephemeral: true});
     return;
   }
 
@@ -138,22 +138,22 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   const main_command = interaction.commandName
   if(main_command === '퀴즈' || main_command === 'quiz') 
   {
-    const sub_command = interaction.options.getSubcommand();
-    const handler = command_handlers[sub_command];
-
-    if(handler != undefined)
-    {
-      await handler(interaction);
-    }
-
+    await start_quiz_handler(interaction);
     return;
   }
 
+  if(main_command === '퀴즈만들기') 
+  {
+    await create_quiz_handler(interaction);
+    return;
+  }
+
+  //그 외의 명령어
   let already_deferred = false;
   const quiz_session = (interaction.guild == undefined ? undefined : quiz_system.getQuizSession(interaction.guild.id));
   if(quiz_session != undefined)
   {
-    if(already_deferred == false && interaction.isButton())
+    if(already_deferred == false && interaction.isButton()) //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
     {
       already_deferred = true;
       try
@@ -168,6 +168,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
     quiz_session.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
   }
 
+  //ui button, select menu, modal 이벤트
   const holder_id = (interaction.guild == undefined ? interaction.user.id : interaction.guild.id);
   const uiHolder = quizbot_ui.getUIHolder(holder_id);
   if(uiHolder != undefined)

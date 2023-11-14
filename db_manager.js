@@ -21,6 +21,27 @@ const pool = new pg.Pool({
 
 let is_initialized = false;
 
+const sendQuery = (query_string, values=[]) =>
+{
+  if(is_initialized == false)
+  {
+    return new Promise((resolve, reject) => {
+      resolve(undefined);
+    });
+  }
+
+  return pool.query(query_string, values)
+  .then((result) =>
+  {
+    return result;
+  })
+  .catch(err => 
+  {
+    logger.error(`query error, query: ${query_string}, values: ${values}\nerr: ${err}`);
+    return undefined;
+  });
+}
+
 exports.initialize = () => {
     return new Promise((resolve, reject) => {
       pool.connect(err => {
@@ -40,6 +61,7 @@ exports.executeQuery = async (query, values) => {
     return pool.query(query, values);
 }
 
+/** 옵션 */
 //옵션쪽은 어차피 고정값이니깐 placeholder 사용하지 말자, 건드리기 두렵다
 exports.selectOption = async (guild_id, option_fields) => {
 
@@ -63,16 +85,29 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
 
 }
 
+/** User Quiz info */
 //option이랑 쿼리 날리는 방식이 다르다...쏘리
-exports.selectQuizInfo = async (value_fields) => {
+exports.selectQuizInfo = async (creator_id) => {
 
-  const query_string = 
+  let query_string = 
   `select * 
     from tb_quiz_info
-    where creator_id = $1 and is_use = true
-    order by quiz_id asc`;
+    where is_use = true and creator_id = $1
+    order by quiz_id desc`
 
-  return sendQuery(query_string, value_fields);
+  return sendQuery(query_string, [creator_id]);
+
+}
+
+exports.selectAllQuizInfo = async () => {
+
+  let query_string = 
+  `select * 
+    from tb_quiz_info
+    where is_use = true and is_private = false
+    order by modified_time asc`
+
+  return sendQuery(query_string);
 
 }
 
@@ -115,9 +150,20 @@ exports.disableQuizInfo = async (quiz_id) => {
     where quiz_id = $1;`;
 
   return sendQuery(query_string, [quiz_id]);
+}
+
+exports.addQuizInfoPlayedCount = async (quiz_id) => {
+
+  const query_string = 
+  `UPDATE tb_quiz_info set played_count = played_count + 1
+    where quiz_id = $1;`;
+
+  return sendQuery(query_string, [quiz_id]);
 
 }
 
+
+/** User QuestioN Info */ 
 exports.selectQuestionInfo = async (value_fields) => {
 
   const query_string =
@@ -171,25 +217,4 @@ exports.deleteQuestionInfo = async (question_id) => {
 
   return sendQuery(query_string, [question_id]);
 
-}
-
-const sendQuery = (query_string, values=[]) =>
-{
-  if(is_initialized == false)
-  {
-    return new Promise((resolve, reject) => {
-      resolve(undefined);
-    });
-  }
-
-  return pool.query(query_string, values)
-  .then((result) =>
-  {
-    return result;
-  })
-  .catch(err => 
-  {
-    logger.error(`query error, query: ${query_string}, values: ${values}\nerr: ${err}`);
-    return undefined;
-  });
 }

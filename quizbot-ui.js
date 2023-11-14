@@ -7,7 +7,7 @@ const fs = require('fs');
 //#endregion
 
 //#region 로컬 modules
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE, QUIZ_TYPE } = require('./system_setting.js');
 const option_system = require("./quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
@@ -312,7 +312,9 @@ class UIHolder
 
     this.last_update_time = Date.now(); //uiholder aging manager에서 삭제 기준이될 값
 
-    this.ui.holder = this;    
+    this.ui.holder = this;
+
+    this.ui.onReady();
   }
 
   free() //자원 정리
@@ -364,7 +366,7 @@ class UIHolder
     this.onUIReceived(new_ui);
   }
 
-  goToBack()
+  goToBack() //뒤로가기
   {
     if(this.prev_ui_stack.length == 0)
     {
@@ -372,15 +374,31 @@ class UIHolder
     }
 
     this.ui = this.prev_ui_stack.pop();
-    this.ui.awaked(); //페이지 재활성화 됐을 때
+    this.ui.onAwaked(); //페이지 재활성화 됐을 때
     this.updateUI();
   }
 
-  appendNewUI(new_ui)
+  appendNewUI(new_ui) 
   {
     this.prev_ui_stack.push(this.ui);
     this.ui = new_ui;
     this.ui.holder = this; //holder도 등록해준다. strong reference cycle 방지를 위해 weak타입으로...하려 했는데 weak이 설치가 안되네, free()를 믿자
+
+    new_ui.onReady(); //ui 등록 완료됐을 때 이벤트
+  }
+
+  onUIReceived(new_ui)
+  {
+    if(new_ui == undefined)
+    {
+      return;
+    }
+
+    if(this.ui != new_ui) //ui stack 에 쌓는 것은 새 UI 인스턴스가 생성됐을 때만
+    {
+      this.appendNewUI(new_ui);
+    }
+    this.updateUI();
   }
 
   //UI 재전송
@@ -473,20 +491,6 @@ class UIHolder
     this.onUIReceived(ui);
   }
 
-  onUIReceived(new_ui)
-  {
-    if(new_ui == undefined)
-    {
-      return;
-    }
-
-    if(this.ui != new_ui) //ui stack 에 쌓는 것은 새 UI 인스턴스가 생성됐을 때만
-    {
-      this.appendNewUI(new_ui);
-    }
-    this.updateUI();
-  }
-
 }
 
 //QuizBotUI 
@@ -512,12 +516,17 @@ class QuizbotUI {
     }
   }
 
+  onReady() //ui 최초 등록 됐을 때
+  {
+
+  }
+
   onInteractionCreate() //더미용 이벤트 콜백
   {
 
   }
 
-  awaked() //페이지 재활성화 됐을 때
+  onAwaked() //페이지 재활성화 됐을 때
   {
 
   }
@@ -652,30 +661,11 @@ class QuizBotControlComponentUI extends QuizbotUI {
     return false;
   }
 
-  selectDefaultOptionByValue(select_menu, value)
-  {
-    const options = select_menu.options;
-    for(let index = 0; index < options.length; ++index)
-    {
-      let option = options[index].data;
-      if(option.value == value)
-      {
-        option['default'] = true;
-      }
-      else
-      {
-        option['default'] = false;
-      }
-    }
-
-    return select_menu;
-  }
-
   setPageSelectMenuMax(max_page)
   {
     //selectmenu component의 options는 readonly 라서 다시 만들어야함
 
-    if(max_page == 1)
+    if(max_page <= 1)
     {
       // this.components = [select_btn_component, this.control_btn_component]; //페이지가 1개면 페이지 이동 menu 뺌
       const index_to_remove = this.components.indexOf(this.page_jump_component);
@@ -871,7 +861,7 @@ class SelectQuizTypeUI extends QuizbotUI {
     
     if(interaction.customId == '2') //유저 제작 퀴즈 눌렀을 때
     {
-
+      return new UserQuizSelectUI();
     }
   }
 
@@ -1300,7 +1290,7 @@ class NoteUI extends QuizbotUI
 
 
 
-/* Custom quiz 관련 섹션 나중에 다 모듈화하자.........해야하나..?*/
+/**  Custom quiz 관련 섹션 나중에 다 모듈화하자.........굳이 해야하나..?*/
 const my_quiz_control_comp = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
@@ -1353,12 +1343,12 @@ const question_select_menu_comp =  new ActionRowBuilder()
 )
 
 const quiz_delete_confirm_comp = new ActionRowBuilder()
-// .addComponents(
-//   new ButtonBuilder()
-//   .setCustomId('quiz_delete_cancel')
-//   .setLabel('취소')
-//   .setStyle(ButtonStyle.Secondary),
-// )
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('quiz_delete_cancel')
+  .setLabel('아니요, 퀴즈를 삭제하지 않습니다.')
+  .setStyle(ButtonStyle.Success),
+)
 .addComponents(
   new ButtonBuilder()
   .setCustomId('quiz_delete_confirmed')
@@ -1402,7 +1392,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_description')
         .setLabel('퀴즈에 대해 자유롭게 소개해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(300)
+        .setMaxLength(250)
         .setRequired(false)
         .setPlaceholder('예시) 2023년 인기를 얻었던 팝송 맞추기 퀴즈입니다!\n모건 월렌, 콤즈 등 유명한 노래가 포함되어 있습니다')
     )
@@ -1414,7 +1404,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_thumbnail')
         .setLabel('퀴즈의 썸네일 이미지 URL을 입력해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(300)
+        .setMaxLength(250)
         .setRequired(false)
         .setPlaceholder('예시) https://buly.kr/D3b6HK6')
     )
@@ -1432,6 +1422,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
+        .setMaxLength(100)
         .setPlaceholder('카트라이더, 카트, kartrider')
     )
 )
@@ -1443,6 +1434,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 재생할 음악입니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM 사용)')
     )
 )
@@ -1451,9 +1443,10 @@ const modal_question_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_audio_range')
-        .setLabel('음악 재생 구간을 지정할 수 있습니다. [최대 60초만 재생]')
+        .setLabel('음악 재생 구간을 지정할 수 있습니다. [최대 60초]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(40)
         .setPlaceholder('예시) 40~80 또는 40 (생략 시, 랜덤 재생)')
     )
 )
@@ -1465,6 +1458,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 이미지입니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1476,6 +1470,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
@@ -1492,6 +1487,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! (생략 가능)')
     )
 )
@@ -1503,6 +1499,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('문제 제출 후 정답을 맞추기까지 여유 시간을 줍니다.(인트로 퀴즈에 사용)')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(10)
         .setPlaceholder('예시) 사용 (생략 시, 미사용)')
     )
 )
@@ -1519,20 +1516,21 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 재생할 오디오입니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('유튜브 URL 입력 (생략 가능)')
     )
 )
-// .addComponents(
-//   new ActionRowBuilder()
-//     .addComponents(
-//       new TextInputBuilder()
-//         .setCustomId('txt_input_answering_audio_range')
-//         .setLabel('정답용 음악 재생 구간을 지정할 수 있습니다.')
-//         .setStyle(TextInputStyle.Short)
-//         .setRequired(false)
-//         .setPlaceholder('예시) 40~80 (생략 시, 랜덤 재생)')
-//     )
-// )
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_answering_audio_range')
+        .setLabel('정답용 음악 재생 구간을 지정할 수 있습니다. [최대 10초]')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('예시) 40~50 (생략 시, 랜덤 재생)')
+    )
+)
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
@@ -1541,6 +1539,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 표시할 이미지입니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1552,11 +1551,13 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 정답과 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
+        .setMaxLength(250)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
 
 const modal_question_info_edit = cloneDeep(modal_question_info); //문제 수정용 modal
+modal_question_info_edit.setCustomId('modal_question_info_edit');
 
 const question_edit_comp = new ActionRowBuilder()
 .addComponents(
@@ -1638,6 +1639,11 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     this.components.push(my_quiz_control_comp);
 
+
+  }
+
+  onReady()
+  {
     //조회 속도가 빠르면 메시지 생성되기 전에 updateUI 해버려서 그냥 조회 후 ui 전송되게함
     this.loadUserQuiz()
     .then(() => 
@@ -1648,26 +1654,6 @@ class UserQuizListUI extends QuizBotControlComponentUI
     {
       logger.error(`Undefined Current Contents on UserQuizListUI, creator_id:${this.creator_id}, err: ${err.stack}`);
     });
-  }
-
-  //DB에서 특정 유저 퀴즈가져오기
-  async loadUserQuiz()
-  {
-    const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
-
-    if(user_quiz_list.length == 0)
-    {
-      this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
-      return;
-    }
-
-    this.cur_contents = [];
-    for(const quiz_info of user_quiz_list)
-    {
-      quiz_info.name = quiz_info.data.quiz_title;
-      this.cur_contents.push(quiz_info);
-    }
-    this.displayContents(0);
   }
 
   onInteractionCreate(interaction)
@@ -1701,23 +1687,46 @@ class UserQuizListUI extends QuizBotControlComponentUI
       return;
     }
 
+    const user_id = interaction.user.id;
     const user_quiz_info = this.cur_contents[index];
-    this.showUserQuizInfoUI(user_quiz_info, true);
-
-    return;
-    
+    return this.showEditor(user_id, user_quiz_info);
   }
 
-  async showUserQuizInfoUI(user_quiz_info, do_load_question=true)
+  onAwaked() //ui 재활성화 됐을 때
   {
-    if(do_load_question)
+    this.loadUserQuiz(); //퀴즈 목록 재로드
+  }
+
+  //DB에서 특정 유저 퀴즈가져오기
+  async loadUserQuiz()
+  {
+    const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
+
+    if(user_quiz_list.length == 0)
     {
-      const result = await user_quiz_info.loadQuestionListFromDB();
+      this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
+      return;
+    }
+
+    this.cur_contents = [];
+    for(const quiz_info of user_quiz_list)
+    {
+      quiz_info.name = quiz_info.data.quiz_title;
+      this.cur_contents.push(quiz_info);
+    }
+    this.displayContents(0);
+  }
+
+  showEditor(user_id, user_quiz_info)
+  {
+    if(user_id != user_quiz_info.data.creator_id)
+    {
+      modal_interaction.reply({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
+      return;
     }
 
     const user_quiz_info_ui = new UserQuizInfoUI(user_quiz_info, false);
-    const do_resend = !do_load_question; //do_load_question 이 false면 새로만든 퀴즈다, 이 경우에는 do_resend 해줘야함
-    this.sendDelayedUI(user_quiz_info_ui, do_resend); //ui 업데이트 요청
+    this.sendDelayedUI(user_quiz_info_ui, true); //ui 업데이트 요청, 메시지 resend를 위해서
   }
 
   async addQuiz(modal_interaction) //제출된 modal interaction에서 정보 가져다 씀
@@ -1730,7 +1739,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     const quiz_simple_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_simple_description');
     const quiz_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_description');
 
-    modal_interaction.reply(`>>> ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.`);
+    modal_interaction.reply({content: `>>> ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.}`, ephemeral: true});
 
     //이건 어쩔 수 없음 직접 하드코딩으로 데이터 넣어야함
     user_quiz_info.data.creator_id = modal_interaction.user.id;
@@ -1750,15 +1759,14 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     if(created_quiz_id == undefined) //저장 실패
     {
-      modal_interaction.user.send(`${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`);
+      modal_interaction.user.send({content: `>>> ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true});
       return;
     }
 
     logger.info(`Created New Quiz... quiz_id: ${user_quiz_info.quiz_id}, title: ${user_quiz_info.data.quiz_title}`);
 
-    this.showUserQuizInfoUI(user_quiz_info, false);
-    this.loadUserQuiz(); //나중에 뒤로가기 버튼 눌러서 와도 괜찮게 load 한번 해줌
-    return;
+    const user_id = modal_interaction.user.id;
+    return this.showEditor(user_id, user_quiz_info);
   }
 }
 
@@ -1773,7 +1781,47 @@ class UserQuizInfoUI extends QuizbotUI {
 
     this.quiz_info = quiz_info;
 
+    this.embed = {
+      color: 0x87CEEB,
+      title: `**${quiz_info.data.quiz_title}**`,
+      description: '퀴즈 정보를 불러오는 중...\n잠시만 기다려주세요.',
+    };
+
+    
+  }
+
+  onReady() //ui 등록 됐을 때
+  {
+    this.loadQuestionList(); //여기서 ui 업데이트함
+  }
+
+  onInteractionCreate(interaction) //TODO QuizInfoUI랑 event는 중복이긴 한데... 귀찮으니 나중에 따로 빼자
+  {
+    if(!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
+
+    if(this.readonly == true)
+    {
+      return this.doQuizPlayEvent(interaction);
+    }
+    else
+    {
+      return this.doQuizEditorEvent(interaction);
+    }
+  }
+
+  onAwaked() //ui 재활성화 됐을 때, UserQuestionInfo 에서 back 쳐서 돌아왔을 때, select menu 랑 문제 수 갱신해줘야함
+  {
     this.refreshUI();
+  }
+
+
+  async loadQuestionList()
+  {
+    await this.quiz_info.loadQuestionListFromDB();
+
+    this.refreshUI();
+
+    this.update();
   }
 
   refreshUI() //ui에 quiz_info 재적용
@@ -1843,25 +1891,6 @@ class UserQuizInfoUI extends QuizbotUI {
 
     this.embed.description = description;
   }
-
-  onInteractionCreate(interaction) //TODO QuizInfoUI랑 event는 중복이긴 한데... 귀찮으니 나중에 따로 빼자
-  {
-    if(!interaction.isButton() && !interaction.isModalSubmit() && !interaction.isStringSelectMenu()) return;
-
-    if(this.readonly == true)
-    {
-      return this.doQuizPlayEvent(interaction);
-    }
-    else
-    {
-      return this.doQuizEditorEvent(interaction);
-    }
-  }
-
-  awaked() //ui 재활성화 됐을 때, UserQuestionInfo 에서 back 쳐서 돌아왔을 때, select menu 랑 문제 수 갱신해줘야함
-  {
-    this.refreshUI();
-  }
   
   doQuizPlayEvent(interaction)
   {
@@ -1881,6 +1910,8 @@ class UserQuizInfoUI extends QuizbotUI {
         interaction.channel.send({content: reason_message});
         return;
       }
+      
+      this.fillInfoAsDevQuizInfo(); 
       
       quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
 
@@ -1946,15 +1977,22 @@ class UserQuizInfoUI extends QuizbotUI {
 
     if(interaction.customId == 'quiz_delete') //퀴즈 삭제 버튼
     {
-      interaction.user.send({ content: `>>> **${text_contents.quiz_maker_ui.confirm_quiz_delete}**`, components: [quiz_delete_confirm_comp] });
+      interaction.user.send({ content: `>>> **${text_contents.quiz_maker_ui.confirm_quiz_delete}**`, components: [quiz_delete_confirm_comp], ephemeral: true });
+      return;
     }
 
     if(interaction.customId == 'quiz_delete_confirmed') //퀴즈 정말정말정말로 삭제 버튼
     {
       this.freeHolder(); //더 이상 UI 못 쓰도록
-      interaction.user.send("```" + `${text_contents.quiz_maker_ui.quiz_deleted}${quiz_info.quiz_id}` + "```");
+      interaction.user.send({ content: "```" + `${text_contents.quiz_maker_ui.quiz_deleted}${quiz_info.quiz_id}` + "```", ephemeral: true });
       interaction.message.delete();
       quiz_info.delete();
+      return;
+    }
+
+    if(interaction.customId == 'quiz_delete_cancel') //퀴즈 삭제 취소 버튼
+    {
+      interaction.message.delete();
       return;
     }
 
@@ -1994,9 +2032,34 @@ class UserQuizInfoUI extends QuizbotUI {
     quiz_info.saveDataToDB();
     this.refreshUI();
 
-    modal_interaction.reply(">>> 퀴즈 정보를 수정하였습니다.");
+    modal_interaction.reply({ content: ">>> 퀴즈 정보를 수정하였습니다.", ephemeral: true });
     // modal_interaction.deferUpdate();
   }
+
+  //TODO 컬럼미스
+  /**  컬럼명을 고려하지 않은 명백한 설계미스다... 나중에 고쳐둬... */
+  fillInfoAsDevQuizInfo() 
+  {
+    const quiz_info = this.quiz_info;
+
+    quiz_info['title']  = quiz_info.data.quiz_title;
+    quiz_info['icon'] = text_contents.icon.ICON_CUSTOM_QUIZ;
+
+    quiz_info['type_name'] = quiz_info.data.simple_description; 
+    quiz_info['description'] = quiz_info.data.description; 
+
+    quiz_info['author'] = quiz_info.data.creator_name;
+    quiz_info['author_icon'] = quiz_info.data.creator_icon_url;
+    quiz_info['thumbnail'] = utility.isValidURL(quiz_info.data.thumbnail) ? quiz_info.data.thumbnail : ''; //썸네일은 그냥 quizbot으로 해두자
+
+    quiz_info['quiz_size'] = quiz_info.question_list.length; 
+    quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
+    quiz_info['winner_nickname'] = quiz_info.data.winner_nickname;
+    quiz_info['quiz_path'] = undefined;//dev quiz는 quiz_path 필요
+    quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
+    quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
+  }
+
 
 }
 
@@ -2176,27 +2239,43 @@ class UserQuestionInfoUI extends QuizbotUI
     const question_info = question_list[question_index];
     this.current_question_info = question_info;
 
+    const is_valid_question_image_url = utility.isValidURL(question_info.data.question_image_url);
+    const is_valid_answer_image_url = utility.isValidURL(question_info.data.answer_image_url);
+
     this.embed.title = `**${question_index+1}번째 문제**`;
-    this.embed.thumbnail.url = utility.isValidURL(question_info.data.question_image_url) ? question_info.data.question_image_url : '',
+    this.embed.thumbnail.url = is_valid_question_image_url ? question_info.data.question_image_url : '',
     this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
 
     let description = '';
     description += "---- 기본 정보 ----\n\n";
-    description += `🔸 정답: **[${question_info.data.answers}]**\n`;
-    description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n`;
+    description += `🔸 정답: **[${question_info.data.answers}]**\n\n`;
+    description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n\n`;
     description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
-    description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n`;
-    description += `🔸 음악 재생 구간:  **[${question_info.data.audio_range_row ?? '랜덤 구간 재생'}]**\n`;
+    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? '').length != 0)
+    {
+      description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
+    }
+    description += "\n\n";
+
+    description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n\n`;
+    description += `🔸 음악 재생 구간:  **[${ ( (question_info.data.audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.audio_range_row) }]**\n\n`;
 
     description += "---- 추가 정보 ----\n\n";
-    description += `🔸 힌트: **[${question_info.data.hint ?? '자동 지정'}]**\n`;
+    description += `🔸 힌트: **[${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]**\n`;
     description += `🔸 정답 여유 시간 여부: **[${(question_info.data.use_answer_timer == true ? '예' : '아니요')}]**\n`;
     description += "\n";
 
     description += "---- 정답 이벤트 정보 ----\n\n";
-    description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n`;
+    description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n\n`;
+    description += `🔸 정답용 음악 재생 구간:  **[${ ( (question_info.data.answer_audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.answer_audio_range_row) }]**\n\n`;
     description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
-    description += `🔸 정답용 텍스트:\n**[${question_info.data.answer_text ?? ''}]**\n`;
+    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? '').length != 0)
+    {
+      description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
+    }
+    description += "\n\n";
+
+    description += `🔸 정답용 텍스트:\n**[${question_info.data.answer_text ?? ''}]**\n\n`;
     description += `---------------------\n\n`;
 
     this.embed.description = description;
@@ -2223,36 +2302,11 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
     if(input_question_audio_range.length != 0)
     {
-      const audio_range_split = input_question_audio_range.split('~');
-      let audio_start = undefined;
-      let audio_end = undefined;
-      
-      audio_start = audio_range_split[0].trim();
-      if(audio_range_split.length >= 2)
-      {
-        audio_end = audio_range_split[1].trim();
-      }
-
-      let audio_start_value = isNaN(audio_start) ? undefined : Math.floor(audio_start);
-      let audio_end_value = isNaN(audio_end) ? undefined : Math.floor(audio_end);
-
-      audio_start_value = (audio_start_value != undefined && audio_start_value < 0) ? undefined : audio_start_value; //음수값 처리
-      audio_end_value = (audio_end_value != undefined && audio_end_value < 0) ? undefined : audio_end_value;
-
-      if(audio_start_value!= undefined && audio_start_value != undefined) //start > end 처리
-      {
-        if(audio_start_value > audio_end_value)
-        {
-          const temp = audio_start_value;
-          audio_start_value = audio_end_value;
-          audio_end_value = temp;
-        }
-
-        user_question_info.data.audio_play_time = (audio_end_value - audio_start_value);
-      }
+      const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_question_audio_range);
 
       user_question_info.data.audio_start = audio_start_value;
       user_question_info.data.audio_end = audio_end_value;
+      user_question_info.data.audio_play_time = audio_play_time;
     }
 
     user_question_info.data.question_image_url = input_question_image_url;
@@ -2273,6 +2327,7 @@ class UserQuestionInfoUI extends QuizbotUI
   applyQuestionAnsweringInfo(user_question_info, modal_interaction)
   {
     const input_answering_audio_url = modal_interaction.fields.getTextInputValue('txt_input_answering_audio_url');
+    const input_answering_audio_range = modal_interaction.fields.getTextInputValue('txt_input_answering_audio_range');
     const input_answering_image_url = modal_interaction.fields.getTextInputValue('txt_input_answering_image_url');
     const input_answering_text = modal_interaction.fields.getTextInputValue('txt_input_answering_text');
 
@@ -2281,18 +2336,43 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.answer_audio_url = input_answering_audio_url ?? "";
     user_question_info.data.answer_image_url = input_answering_image_url ?? "";
     user_question_info.data.answer_text = input_answering_text ?? "";
+
+    user_question_info.data.answer_audio_range_row = input_answering_audio_range;
+    if(input_answering_audio_range.length != 0)
+    {
+      const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_answering_audio_range);
+
+      user_question_info.data.answer_audio_start = audio_start_value;
+      user_question_info.data.answer_audio_end = audio_end_value;
+      user_question_info.data.answer_audio_play_time = audio_play_time;
+    }
   }
 
-  async saveQuestion(user_question_info)
+  parseAudioRangePoints(audio_range_row)
   {
-    const question_id = await user_question_info.saveDataToDB();
+    const audio_range_split = audio_range_row.split('~');
+    
+    let audio_start = audio_range_split[0].trim();
+    let audio_end = (audio_range_split.length >= 2 ? audio_range_split[1].trim() : undefined);
+    let audio_play_time = undefined;
 
-    if(question_id == undefined) //저장 실패
+    let audio_start_value = (isNaN(audio_start) || audio_start < 0) ? undefined : Math.floor(audio_start); //소수점과 음수값일 경우 처리
+    let audio_end_value = (isNaN(audio_end) || audio_end < 0) ? undefined : Math.floor(audio_end);
+
+    if(audio_start_value != undefined 
+      && audio_start_value != undefined) 
     {
-      return undefined;
+      if(audio_start_value > audio_end_value) //start > end 처리
+      {
+        const temp = audio_start_value;
+        audio_start_value = audio_end_value;
+        audio_end_value = temp;
+      }
+
+      audio_play_time = (audio_end_value - audio_start_value);
     }
 
-    return question_id;
+    return [audio_start_value, audio_end_value, audio_play_time];
   }
 
   async addQuestion(modal_interaction)
@@ -2300,11 +2380,11 @@ class UserQuestionInfoUI extends QuizbotUI
     let user_question_info = new UserQuestionInfo();
     
     this.applyQuestionInfo(user_question_info, modal_interaction); //채우고 저장해주자
-    const question_id = await this.saveQuestion(user_question_info);
+    const question_id = await user_question_info.saveDataToDB();
 
     if(question_id == undefined)
     {
-      modal_interaction.reply(`${this.quiz_info.quiz_id} / ${modal_interaction.user.id} 문제를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`);
+      modal_interaction.reply({ content: `>>> ${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true });
       return;
     }
 
@@ -2340,11 +2420,11 @@ class UserQuestionInfoUI extends QuizbotUI
       this.applyQuestionAnsweringInfo(user_question_info, modal_interaction);
     }
 
-    const question_id = await this.saveQuestion(user_question_info);
+    const question_id = await user_question_info.saveDataToDB();
 
     if(question_id == undefined)
     {
-      modal_interaction.reply(`${this.quiz_info.quiz_id} 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`);
+      modal_interaction.reply({content: `>>> ${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true});
       return;
     }
 
@@ -2353,6 +2433,69 @@ class UserQuestionInfoUI extends QuizbotUI
 
     this.displayQuestionInfo(this.current_question_index);
     this.update(); //ui update
+  }
+
+}
+
+//사용자 개발 퀴즈 선택 UI
+class UserQuizSelectUI extends QuizBotControlComponentUI  
+{
+  constructor()
+  {
+    super();
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: text_contents.user_select_category.title,
+      url: text_contents.user_select_category.url,
+      description: '퀴즈 목록을 불러오는 중...\n잠시만 기다려주세요.🙂',
+    };
+  }
+
+  onReady() //ui 등록 됐을 때
+  {
+    this.loadAllUserQuizList(undefined); //여기서 ui 업데이트함
+  }
+
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+    const is_page_move = this.checkPageMove(interaction);
+    if(is_page_move == undefined) return;
+    if(is_page_move == true) return this;
+
+    const select_num = parseInt(interaction.customId);
+    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+
+    // 그냥 페이지 계산해서 content 가져오자
+    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    {
+      return;
+    }
+
+    const user_quiz_info = this.cur_contents[index]; //퀴즈를 선택했을 경우
+
+    return new UserQuizInfoUI(user_quiz_info, true); //readonly true로 넘겨야함
+    
+  }
+
+  async loadAllUserQuizList()
+  {
+    const user_quiz_list = await loadUserQuizListFromDB(undefined); //전체 조회
+
+    for(let user_quiz_info of user_quiz_list) 
+    {
+      user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n${user_quiz_info.data.simple_description}`;
+    }
+
+    this.cur_contents = user_quiz_list ?? [];
+    this.main_description = text_contents.user_select_category.description;
+
+    this.displayContents(0);
+    this.update();
   }
 
 }
