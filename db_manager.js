@@ -175,8 +175,6 @@ exports.selectQuestionInfo = async (value_fields) => {
   return sendQuery(query_string, value_fields);
 
 }
-
-
 exports.insertQuestionInfo = async (key_fields, value_fields) => {
 
   let placeholders = '';
@@ -206,7 +204,16 @@ exports.updateQuestionInfo = async (key_fields, value_fields, question_id) => {
     returning question_id`;
 
   return sendQuery(query_string, value_fields);
+}
 
+/** User QuestioN Info */ 
+exports.updateQuizInfoModifiedTime = async (quiz_id) => {
+
+  const query_string = 
+  `UPDATE tb_quiz_info set modified_time = now()
+    where quiz_id = $1;`;
+
+  return sendQuery(query_string, [quiz_id]);
 }
 
 exports.deleteQuestionInfo = async (question_id) => {

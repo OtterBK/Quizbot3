@@ -22,6 +22,7 @@ const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language];
 const utility = require('./utility.js');
 const logger = require('./logger.js')('QuizSystem');
 const db_manager = require('./db_manager.js');
+const { initial } = require('lodash');
 
 //#endregion
 
@@ -228,7 +229,7 @@ class QuizPlayUI
     else
     {
         this.embed.image = {
-            url: utility.isValidURL(image_resource) ? image_resource : '표시할 수 없는 이미지 URL 에러',
+            url: utility.isValidURL(image_resource) ? image_resource : '',
         }
     }
   }
@@ -732,7 +733,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
             }
 
             if(resource.volume != undefined)
-                resource.volume.volume = 1.0;
+                resource.volume.setVolume(1.0);
         }
         
         audio_player.play(resource); 
@@ -781,7 +782,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
     }
 
     //target_question에서 정답 표시용 노래 꺼내서 재생
-    applyAnswerAudioInfo(target_question)
+    async applyAnswerAudioInfo(target_question)
     {
         let audio_play_time = undefined;
 
@@ -794,7 +795,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
         const audio_resource = target_question['answer_audio_resource'];
         audio_play_time = target_question['answer_audio_play_time'];
 
-        audio_player.stop(true); //우선 지금 나오는 거 멈춤
+        await audio_player.stop(true); //우선 지금 나오는 거 멈춤
         this.startAudio(audio_player, audio_resource); //오디오 재생
         this.autoFadeOut(audio_player, audio_resource, audio_play_time) //자동 fadeout
 
@@ -1000,6 +1001,11 @@ class Initialize extends QuizLifecycle
     //정답 인정 목록 뽑아내기
     makeAnswers(answers_row)
     {
+        if(answers_row == undefined)
+        {
+            return [];
+        }
+
         const option_data = this.quiz_session.option_data;        
 
         let answers = [];
@@ -1346,12 +1352,31 @@ class InitializeCustomQuiz extends Initialize
             question['type']  = QUIZ_TYPE.CUSTOM;
             question['hint_used'] = false;
             question['skip_used'] = false;
-            question['play_bgm_on_question_finish'] = true;
+            question['play_bgm_on_question_finish'] = false; //custom 퀴즈에서는 상황에 따라 다르다
 
             Object.keys(question_row).forEach((key) => {
                 const value = question_row[key];
                 question[key] = value;
             });
+
+            const question_data = question_row.data;
+
+            //정답 값 처리
+            const answer_string = question_data['answers'];
+            const answers_row = answer_string.split(","); //custom quiz는 ,로 끊는다
+            const answers = this.makeAnswers(answers_row);
+            question['answers'] = answers;
+
+            //힌트 값 처리
+            const hint = question_data['hint'];
+            if((hint == undefined || hint === '') && answers.length > 0)
+            {
+                question['hint'] = this.makeHint(answers[0]) //힌트 없으면 알아서 만들기
+            }
+            else
+            {
+                question['hint'] = question_data['hint']; //지정된 값 있으면 그대로
+            }
 
             question_list.push(question);
 
@@ -1552,7 +1577,7 @@ class Prepare extends QuizLifecycle
         return;
     }
 
-    async prepareAnswerAdditionalInfo(target_question)
+    async prepareAnswerAdditionalInfo(target_question) //dev퀴즈용으로만 사용
     {
         const option_data = this.quiz_session.option_data;
         const game_data = this.quiz_session.game_data;
@@ -1585,7 +1610,7 @@ class Prepare extends QuizLifecycle
             else if(audio_play_time == undefined) //딱히 지정된게 없다면
             {
                 const audio_info = await utility.getAudioInfoFromPath(question);
-                audio_play_time = ((audio_info.format.duration) ?? 1000) * 1000; //10000000 -> 무조건 오디오 길이 쓰도록 //TODO 이게 맞나? 재고해보셈
+                audio_play_time = ((audio_info.format.duration) ?? SYSTEM_CONFIG.max_answer_audio_play_time) * 1000; //오디오 길이 값 있으면 무조건 오디오 길이 쓰도록 //TODO 이게 맞나? 재고해보셈
             }
             target_question['answer_audio_play_time'] = audio_play_time;
 
@@ -1609,7 +1634,7 @@ class Prepare extends QuizLifecycle
 
         //오디오 정보 가져오기
         const audio_info = await utility.getAudioInfoFromPath(question); //TODO 상당한 리소스를 먹는 것 같은데 확인필요
-        const audio_duration_sec = audio_info.format.duration ?? 100000; //duration 없으면 무조건 서버 설정 값 따르게 할거임
+        const audio_duration_sec = audio_info.format.duration ?? SYSTEM_CONFIG.max_question_audio_play_time; //duration 없으면 무조건 서버 설정 값 따르게 할거임
         const stats = fs.statSync(question);
         const size_in_bytes = stats.size;
         const bitrate = size_in_bytes / audio_duration_sec * 8;
@@ -1708,7 +1733,7 @@ class Prepare extends QuizLifecycle
         {
             const seek_stream = new SeekStream(
                 question,
-                audio_duration_sec, //duration 
+                (audio_duration_sec + 5), //duration, 5는 패딩
                 0, //header length 안넘겨도됨
                 size_in_bytes,
                 bitrate, //TODO BITRATE 정확한 값으로 넘기기
@@ -1773,74 +1798,66 @@ class Prepare extends QuizLifecycle
         const target_question_data = target_question.data;
 
         /**
-         * question_audio_url,
-         * audio_start,
-         * audio_end,
-         * audio_play_time
+         * question_audio_url, 문제용 오디오 url
+         * audio_start, 최소 시작 구간
+         * audio_end, 최대 재생
+         * audio_play_time. 재생 시간
          */
         const question_audio_url = target_question_data['question_audio_url'];
-        if(question_audio_url != undefined)
+        if(question_audio_url != undefined && question_audio_url !== '' && utility.isValidURL(question_audio_url))
         {
             const question_audio_play_time = target_question_data['audio_play_time'];
             const question_audio_start = target_question_data['audio_start'];
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end);
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question');
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
         }
 
         /**
-         * question_image_url
+         * question_image_url, 문제용 오디오 url
          */
         target_question['image_resource'] = target_question_data['question_image_url'];
 
         /**
-         * question_answers
+         * question_answers. 문제 정답
          */
-
-        let answers = [];
-        const answer_string = target_question_data['answers'];
-        if(answer_string != undefined)
-        {
-            answer_string.split(",").forEach((answer_row) => 
-            {
-                let answer = answer_row.trim().replace(/ /g, "");
-                answers.push(answer);
-            });
-            target_question['answers'] = answers;
-        }
+        //Initial 할 때 이미 처리됨 target_question_data['answers'];
 
         /**
-         * question_hint
+         * question_hint, 문제 힌트
          */
-        target_question['hint'] = target_question_data['hint'];
-        //힌트는 그대로
-
+        //Initial 할 때 이미 처리됨 target_question_data['hint'];
 
         /**
-         * question_text
+         * question_text, 문제용 텍스트
          */
         target_question['question_text'] = target_question_data['question_text'];
         //question_text 도 그대로
 
         /**
-         * answer_audio_url
-         * answer_audio_start
+         * use_answer_timer, 타임 오버 됐을 때 10초의 여유 시간 줄지 여부
+         */
+        target_question['use_answer_timer'] = target_question_data['use_answer_timer'];
+
+        /**
+         * answer_audio_url, 정답 공개용 오디오 url
+         * answer_audio_start, 
          * answer_audio_end
          * answer_audio_play_time
          */
         const answer_audio_url = target_question_data['answer_audio_url'];
-        if(answer_audio_url != undefined)
+        if(answer_audio_url != undefined && answer_audio_url !== '' && utility.isValidURL(answer_audio_url))
         {
             const answer_audio_play_time = target_question_data['answer_audio_play_time'];
             const answer_audio_start = target_question_data['answer_audio_start'];
             const answer_audio_end = target_question_data['answer_audio_end'];
     
             const [answer_audio_resource, answer_audio_play_time_ms] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end);
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer');
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
@@ -1848,23 +1865,31 @@ class Prepare extends QuizLifecycle
         
 
         /**
-         * answer_image_url
+         * answer_image_url, 정답 공개용 이미지 url
          */
         target_question['answer_image_resource'] = target_question_data['answer_image_url'];
 
         /**
-         * answer_text
+         * answer_text, 정답 공개용 텍스트
          */
         target_question['author'] = [ target_question_data['answer_text'] ];
     }
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined) 
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question') 
     {
+        if(ytdl.validateURL(audio_url_row) == false)
+        {
+            logger.warn(`${audio_url_row} is not validateURL`);
+            return [undefined, undefined];
+        }
+
         const option_data = this.quiz_session.option_data;
 
-        let audio_resource; //최종 audio_stream
+        const max_play_time_sec = (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->10s
+
+        let audio_resource; //최종 audio_resource
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
@@ -1873,43 +1898,54 @@ class Prepare extends QuizLifecycle
         if(audio_formats.length == 0) 
         {
             logger.error(`cannot found audio format from ${youtube_info}`);
-            return;
+            return [undefined, undefined];
         }
 
         const audio_format = audio_formats[audio_formats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
         const audio_duration_ms = audio_format.approxDurationMs;
+        const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
         const audio_size = audio_format.contentLength;
         const audio_bitrate = audio_format.averageBitrate;
         const audio_byterate = audio_bitrate / 8;
 
-        let audio_play_time_ms = (audio_play_time_row ?? 0) <= 0 ? option_data.quiz.audio_play_time : (audio_play_time_row * 1000);
-        
-        if(audio_start_row != undefined && audio_end_row != undefined
-            && audio_end_row > audio_start_row) //구간을 잘 지정해뒀다면
+        if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
-            audio_play_time_ms = (audio_end_row - audio_start_row) * 1000; //딱 구간만큼만 재생
+            logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
+            return [undefined, undefined];
         }
 
-        if(((audio_start_row ?? 0) * 1000) + audio_play_time_ms > audio_duration_ms) //근데 만약 재생 구간이 오디오 최대치를 넘어섰다면
+        //최종 재생 길이 구하기
+        let audio_length_sec = (audio_play_time_row ?? 0) <= 0 ? Math.floor(option_data.quiz.audio_play_time / 1000) : audio_play_time_row; //얼만큼 재생할지
+
+        if(audio_start_row == undefined || audio_start_row >= audio_duration_sec) //시작 요청 값 없거나, 시작 요청 구간이 오디오 범위 넘어서면
         {
-            audio_play_time_ms = audio_duration_ms - (audio_start_row * 1000);
+            audio_start_row = undefined; //구간 요청값 무시
+            audio_end_row = undefined;
         }
-
-        if(audio_play_time_ms > 60000) audio_play_time_ms = 60000; //근데 60초가 넘어가서는 안된다.
-
-        //오디오 길이가 audio_play_time 보다 작으면 오디오 길이를 audio_length로
-        if(audio_duration_ms == undefined || audio_play_time_ms < audio_duration_ms) 
-        {
-            audio_length_ms = audio_play_time_ms; //ms
-        } 
         else
         {
-            audio_length_ms = audio_duration_ms; //ms
+            if(audio_end_row == undefined || audio_end_row > audio_duration_sec) //끝 요청 값 없거나, 오디오 길이 초기화면 자동으로 최대치
+            {
+                audio_end_row = audio_duration_sec;
+            }
+
+            audio_length_sec = audio_end_row - audio_start_row; //우선 딱 구간만큼만 재생
         }
 
-        //오디오 시작 지점이 될 수 있는 포인트 범위
-        let audio_length_sec = Math.floor(audio_length_ms/1000);
+        if(audio_length_sec > audio_duration_sec) 
+        {
+            audio_length_sec = audio_duration_sec; //오디오 길이보다 더 재생할 순 없다.
+        }
 
+        if(audio_length_sec > max_play_time_sec) 
+        {
+            audio_length_sec = max_play_time_sec; //최대치를 넘어설 순 없다
+        }
+
+        audio_length_ms = audio_length_sec * 1000;
+
+
+        //오디오 시작 지점이 될 수 있는 포인트 범위
         const audio_min_start_point_sec = audio_start_row ?? 0;
         const audio_max_start_point_sec = (audio_end_row ?? Math.floor(audio_duration_ms/1000)) - audio_length_sec;
 
@@ -1923,7 +1959,7 @@ class Prepare extends QuizLifecycle
         {
             if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //옵션 켜져있다면 최대한 중간 범위로 좁힌다.
             {
-                const audio_mid_point_sec = (audio_min_start_point_sec - audio_max_start_point_sec) / 2; //두 지점의 중앙 포인트
+                const audio_mid_point_sec = Math.floor(audio_min_start_point_sec + (audio_max_start_point_sec - audio_min_start_point_sec) / 2); //두 지점의 중앙 포인트
 
                 //중앙 포인트 부터 audio_length_sec 의 절반씩
                 const audio_guess_min_start_point_sec = audio_mid_point_sec - Math.floor(audio_length_sec/2) + 1; //1s는 패딩
@@ -1933,7 +1969,7 @@ class Prepare extends QuizLifecycle
                 {
                     audio_final_min_start_point_sec = audio_guess_min_start_point_sec;
                     audio_final_max_start_point_sec = audio_guess_max_start_point_sec;
-                    logger.debug(`Refined audio point, question: ${audio_url_row} min: ${audio_min_start_point} -> ${audio_final_min_start_point_sec}, max: ${audio_max_start_point} -> ${audio_final_max_start_point_sec}`);
+                    logger.debug(`Refined audio point, question: ${audio_url_row} min: ${audio_min_start_point_sec} -> ${audio_final_min_start_point_sec}, max: ${audio_max_start_point_sec} -> ${audio_final_max_start_point_sec}`);
                 }
             }
 
@@ -1943,12 +1979,15 @@ class Prepare extends QuizLifecycle
         //이건 왜 안쓰지? 아놔 진짜 기억 안나네 아마 ffmpeg 프로세스 실행돼서 그럴듯
         // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); 
         
-        logger.debug(`cut audio, question: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
+        logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
         let audio_stream = ytdl(audio_url_row, { 
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 5}`], //5초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 WPIPE 에러 뜰 수 있음
+
+            //2초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
+            //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
+            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 2}`], 
             seek: audio_start_point, 
         });
 
@@ -1956,6 +1995,17 @@ class Prepare extends QuizLifecycle
         23.11.08 확인 결과 
         -to 옵션이 안먹는다...
         -> (`-to ${audio_length}`) 에서 ('-t', `${audio_length}`) 로 하니깐 된다.
+
+        23.11.15 
+        ytdl-core 를 업데이트했더니 getInfo가 안된다.
+        ytdl-core 를 원래 쓰던 버전인 4.9.1로 롤백했다(이후 버전은 버그가 많음)
+
+        23.11.16
+        ytdl-core 4.9.1 버전은 youtube 데이터 다운로드가 매우매우 느린 문제가 있다.
+        따라서 다시 최신 버전으로 업데이트 후, 아래의 이슈 확인하여 sig.js를 패치하였다.
+        https://github.com/fent/node-ytdl-core/issues/1250#issuecomment-1712550800 
+
+        getInfo 정상 동작 및 4.9.1 보다 youtube 데이터 다운로드 속도도 빠른걸 확인함
         **/
 
         /**
@@ -1979,7 +2029,7 @@ class Prepare extends QuizLifecycle
 
         if(SYSTEM_CONFIG.use_inline_volume)
         {
-            resource.volume.setVolume(0);
+            // resource.volume.setVolume(0);
         }
         
         return [audio_resource, audio_length_ms];
@@ -2213,13 +2263,13 @@ class Question extends QuizLifeCycleWithUtility
         quiz_ui.setButtonStatus(1, false); //스킵 버튼 비활성화
         quiz_ui.update();
         
-        this.stopTimeoverTimer(); //그리고 다음으로 진행 가능하게 타임오버 타이머를 중지해줌
+        await this.stopTimeoverTimer(); //그리고 다음으로 진행 가능하게 타임오버 타이머를 중지해줌
     }
 
     //진행 bar 시작
     async startProgressBar(audio_play_time)
     {
-        if(audio_play_time < 10) //10초 미만은 지원하지 말자
+        if(audio_play_time < 10000) //10초 미만은 지원하지 말자
         {
             return;
         }
@@ -2287,7 +2337,7 @@ class Question extends QuizLifeCycleWithUtility
         {
             this.current_question['answer_members'] = [ member ];
 
-            this.stopTimeoverTimer(); //맞췄으니 타임오버 타이머 중지!
+            await this.stopTimeoverTimer(); //맞췄으니 타임오버 타이머 중지!
 
             let score = 1;
             if(option_data.quiz.score_type == OPTION_TYPE.SCORE_TYPE.TIME) //남은 시간 비례 가산점 방식이면
@@ -2367,6 +2417,7 @@ class Question extends QuizLifeCycleWithUtility
             await audio_player.stop(true);
             utility.playBGM(audio_player, bgm_type);
             this.startProgressBar(wait_time);
+            this.is_playing_bgm = true;
 
         }, delay_time);
         return this.wait_for_answer_timer;
@@ -2393,9 +2444,9 @@ class Question extends QuizLifeCycleWithUtility
                     await utility.sleep(SYSTEM_CONFIG.graceful_timeover_interval);
                 }
 
-                if(audio_player.state.status == 'playing') //아직도 오디오 플레이 중이라면
+                if(audio_player.state.status == 'playing' && SYSTEM_CONFIG.graceful_timeover_max_try > 0) //아직도 오디오 플레이 중이고 graceful 옵션 사용 중이면
                 {
-                    logger.debug(`Graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
+                    logger.warn(`Graceful timeover, guild_id:${this.quiz_session.guild_id}, graceful_count: ${graceful_timeover_try}/${SYSTEM_CONFIG.graceful_timeover_max_try}`);
                 }
 
                 resolve('done timeover timer');
@@ -2768,7 +2819,7 @@ class QuestionImage extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(true); //BGM 바로 멈춰준다.
+            await audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2814,7 +2865,7 @@ class QuestionIntro extends Question
 
         logger.info(`Questioning Intro, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question}`);
 
-        //오디오 재생 부
+        //오디오 재생 부분
         const audio_player = this.quiz_session.audio_player;
         const resource = current_question['audio_resource'];
         const audio_play_time = (current_question['audio_length'] ?? option_data.quiz.audio_play_time) + 1000; //인트로 퀴는 1초 더 준다.
@@ -2822,7 +2873,8 @@ class QuestionIntro extends Question
         this.startAudio(audio_player, resource, false); //인트로 퀴즈는 fadeIn, fadeout 안 쓴다.
 
         const wait_for_answer_time = 10000; //인트로 퀴즈는 문제 내고 10초 더 준다.
-        const wait_for_answer_timer = this.createWaitForAnswerTimer(audio_play_time, wait_for_answer_time, BGM_TYPE.COUNTDOWN_10);
+        //이건 단순히 progress_bar 띄우고 10초 브금 재생하는 역할이다.
+        const wait_for_answer_timer = this.createWaitForAnswerTimer(audio_play_time, wait_for_answer_time, BGM_TYPE.COUNTDOWN_10); 
         
         const timeover_time = audio_play_time + wait_for_answer_time;
         this.checkAutoHint(timeover_time); //자동 힌트 체크
@@ -2914,7 +2966,7 @@ class QuestionText extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(true); //BGM 바로 멈춰준다.
+            await audio_player.stop(true); //BGM 바로 멈춰준다.
 
             if(this.current_question['answer_members'] != undefined) //정답자가 있다?
             {
@@ -2988,7 +3040,7 @@ class QuestionOX extends Question
 
         if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
         {
-            audio_player.stop(true); //BGM 바로 멈춰준다.
+            await audio_player.stop(true); //BGM 바로 멈춰준다.
 
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //ox퀴즈는 스킵만 타임오버가 일찍 끝난다. 그러니 타임오버로~
         }
@@ -3030,12 +3082,15 @@ class QuestionOX extends Question
 }
 
 //Custom Type Question
+/** 23.11.16 답이 없다... 리팩터링 안할거면 걍 유지보수 포기하자*/
 class QuestionCustom extends Question
 {
     static cycle_type = CYCLE_TYPE.QUESTIONING;
     constructor(quiz_session)
     {
         super(quiz_session);
+
+        this.is_playing_bgm = false;
     }
 
     async act()
@@ -3059,34 +3114,55 @@ class QuestionCustom extends Question
 
         //이미지 표시
         const image_resource = current_question['image_resource'];
+        let quiz_ui = this.quiz_session.quiz_ui; 
+        quiz_ui.setImage(image_resource);
+
         if(image_resource != undefined)
         {
-            let quiz_ui = this.quiz_session.quiz_ui; 
-            quiz_ui.setImage(image_resource);
-            await quiz_ui.update(); //대기 해줘야한다. 안그러면 타이밍 이슈 땜에 이미지가 2번 올라간다.
+            await quiz_ui.update(); //await로 대기 해줘야한다. 안그러면 타이밍 이슈 땜에 이미지가 2번 올라간다.
         }
 
         //텍스트 표시
         const question_text = current_question['question_text'];
-        if(question_text != undefined)
-        {
-            this.progress_bar_fixed_text = question_text; //텍스트 퀴즈는 progress bar 위에 붙여주면 된다.
-        }
+        this.progress_bar_fixed_text = question_text; //텍스트 퀴즈는 progress bar 위에 붙여주면 된다.
 
         //오디오 재생
         const audio_player = this.quiz_session.audio_player;
         const resource = current_question['audio_resource'];
-        const audio_play_time = current_question['audio_length'] ?? option_data.quiz.audio_play_time;
+        let audio_play_time = current_question['audio_length'] ?? 0;
 
         let fade_in_end_time = undefined; 
-        this.startAudio(audio_player, resource)
-        .then((result) => fade_in_end_time = result); //비동기로 오디오 재생 시켜주고
 
-        this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
-        this.checkAutoHint(audio_play_time); //자동 힌트 체크
+        if(audio_play_time != 0) //오디오 재생해야하면
+        {
+            this.is_playing_bgm = false;
+            this.startAudio(audio_player, resource)
+            .then((result) => fade_in_end_time = result); //비동기로 오디오 재생 시켜주고
+            this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+        }
+        else //오디오 없으면 10초 타이머로 대체
+        {
+            this.is_playing_bgm = true;
+            audio_play_time = 10000; //오디오 재생 시간 10초로 변경
+            utility.playBGM(audio_player, BGM_TYPE.COUNTDOWN_10); //10초 카운트다운 브금
+        }
         this.startProgressBar(audio_play_time); //진행 bar 시작
 
-        const timeover_promise = this.createTimeoverTimer(audio_play_time); //audio_play_time 후에 실행되는 타임오버 타이머 만들어서
+        let timeover_time = audio_play_time;
+        if(this.current_question['use_answer_timer'] == true) //타임 오버 돼도 10초의 여유를 준다면(인트로 퀴즈등)
+        {
+            const wait_for_answer_time = 10000; //인트로 퀴즈는 문제 내고 10초 더 준다.
+            timeover_time += wait_for_answer_time; //타임오버 되기까지 10초 더 줌
+            const wait_for_answer_timer = this.createWaitForAnswerTimer(audio_play_time, wait_for_answer_time, BGM_TYPE.COUNTDOWN_10); 
+            //audio_play_time 이후에 wait_for_answer_time 만큼 추가 대기임
+            this.checkAutoHint(audio_play_time*2); //자동 힌트 체크, 이 경우에는 음악 끝나면 바로 자동 힌트라는 뜻
+        }
+        else
+        {
+            this.checkAutoHint(timeover_time); //자동 힌트 체크
+        }
+
+        const timeover_promise = this.createTimeoverTimer(timeover_time); //audio_play_time 후에 실행되는 타임오버 타이머 만들어서
         await Promise.race([timeover_promise]); //race로 돌려서 타임오버 타이머가 끝나는걸 기다림
 
         //어쨋든 타임오버 타이머가 끝났다.
@@ -3109,8 +3185,13 @@ class QuestionCustom extends Question
         }
         else //타임오버거나 정답자 없다면
         {
-            current_question['play_bgm_on_question_finish'] = true; //탄식을 보내주자~
+            this.is_playing_bgm = true;
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+        }
+
+        if(this.is_playing_bgm) //브금 재생 중이었다면
+        {
+            current_question['play_bgm_on_question_finish'] = true; //탄식이나 박수를 보내주자~
         }
     }
 }
@@ -3173,7 +3254,10 @@ class TimeOver extends QuizLifeCycleWithUtility
         if(author_list.length > 0)
         {
             author_list.forEach((author) => {
-                author_list_message += author + "\n";
+                if(author != undefined)
+                {
+                    author_list_message += author + "\n";
+                }
             });
         }
 
@@ -3202,7 +3286,7 @@ class TimeOver extends QuizLifeCycleWithUtility
 
         quiz_ui.embed.fields = scoreboard_fields;
 
-        this.custom_wait = this.applyAnswerAudioInfo(processing_question);
+        this.custom_wait = await this.applyAnswerAudioInfo(processing_question);
         const image_exist = this.applyAnswerImageInfo(processing_question);
 
         quiz_ui.send(false, false);
@@ -3216,12 +3300,8 @@ class TimeOver extends QuizLifeCycleWithUtility
         {
             utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.FAIL); //bgm 재생
         }
-        const wait_time = this.custom_wait != undefined ? this.custom_wait : SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 보여줄 지
-        await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                resolve();
-            }, wait_time);
-        });
+        const wait_time = this.custom_wait ?? SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 들려줄 지
+        await utility.sleep(wait_time);
     }
 
     async exit()
@@ -3280,7 +3360,10 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
         let author_list_message = '';
         const author_list = processing_question['author'] ?? [];
         author_list.forEach((author) => {
-            author_list_message += author + "\n";
+            if(author != undefined)
+            {
+                author_list_message += author + "\n";
+            }
         });
 
         let description_message = text_contents.correct_answer_ui.description;
@@ -3309,7 +3392,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
 
         quiz_ui.embed.fields = scoreboard_fields;
 
-        this.custom_wait = this.applyAnswerAudioInfo(processing_question);
+        this.custom_wait = await this.applyAnswerAudioInfo(processing_question);
         const image_exist = this.applyAnswerImageInfo(processing_question);
 
         quiz_ui.send(false, false);
@@ -3323,12 +3406,8 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
         {
             utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.SUCCESS); //bgm 재생
         }
-        const wait_time = this.custom_wait != undefined ? this.custom_wait : SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 보여줄 지
-        await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                resolve();
-            }, wait_time);
-        });
+        const wait_time = this.custom_wait ?? SYSTEM_CONFIG.timeover_cycle_wait; //정답 얼마동안 들려줄 지
+        await utility.sleep(wait_time);
     }
 
     async exit()

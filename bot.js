@@ -94,7 +94,7 @@ client.on('ready', () => {
 
   ///////////
   logger.info(`Setting bot Status...`);
-  client.user.setActivity(`/퀴즈 | 퀴즈 만들기 기능이 추가됐습니다!`);
+  client.user.setActivity(`/퀴즈 | /퀴즈만들기`);
 
   ///////////
   logger.info(`Started Quizbot! tag name: ${client.user.tag}!`);

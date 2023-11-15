@@ -133,7 +133,7 @@ class UserQuizInfo //유저 제작 퀴즈 정보
 
         for(const column of QuestionInfoColumn)
         {
-          user_question_info.data[column] = result_row[column];
+          user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
         }
 
         question_list.push(user_question_info);
@@ -153,7 +153,12 @@ class UserQuizInfo //유저 제작 퀴즈 정보
 
   async addPlayedCount()
   {
-    db_manager.addQuizInfoPlayedCount();
+    db_manager.addQuizInfoPlayedCount(this.quiz_id);
+  }
+
+  async updateModifiedTime()
+  {
+    db_manager.updateQuizInfoModifiedTime(this.quiz_id);
   }
 }
 
@@ -236,7 +241,7 @@ const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로
 
       for(const column of QuizInfoColumn)
       {
-        user_quiz_info.data[column] = result_row[column];
+        user_quiz_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
       }
 
       user_quiz_list.push(user_quiz_info);

@@ -1,9 +1,18 @@
 'use strict';
 
+/** 23.11.15 
+ * 버그 고치려고 이걸 보고 있는 미래의 나에게
+ * 미안하다. js는 처음이라 소스코드 하나에 다 때려 박았다...
+ * 근데 이게 보기는 힘들어도 만들긴 편하더라
+ * vscode 에서 개요 창 띄우고 보면 그나마 낫다..
+ * 팟팅...!
+ */
+
 //#region 필요한 외부 모듈
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
+const ytdl = require('discord-ytdl-core');
 //#endregion
 
 //#region 로컬 modules
@@ -1431,7 +1440,7 @@ const modal_question_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_audio_url')
-        .setLabel('문제와 함께 재생할 음악입니다.')
+        .setLabel('문제와 함께 재생할 음악입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(250)
@@ -1513,7 +1522,7 @@ const modal_question_answering_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_answering_audio_url')
-        .setLabel('정답 공개 시 함께 재생할 오디오입니다.')
+        .setLabel('정답 공개 시 함께 재생할 오디오입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(250)
@@ -1614,6 +1623,7 @@ const question_control_btn_component = new ActionRowBuilder()
 ////////////// Quiz 제작 UI 관련, 전부 개인 메시지로 처리됨
 /**
  * 23.11.10 text_contents 를 사용한 텍스트 관리가 매우 귀찮고 어차피 영문 텍스트 지원도 당장 할 계획 없으니 QuizToolUI 관련은 하드코딩하겠음
+ * 23.11.16 답이 없다... 리팩터링 안할거면 걍 유지보수 포기하자
  */
 class UserQuizListUI extends QuizBotControlComponentUI
 {
@@ -1914,6 +1924,7 @@ class UserQuizInfoUI extends QuizbotUI {
       this.fillInfoAsDevQuizInfo(); 
       
       quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
+      quiz_info.addPlayedCount(); //플레이 횟수 + 1
 
       return new AlertQuizStartUI(quiz_info, owner); 
     }
@@ -2145,7 +2156,7 @@ class UserQuestionInfoUI extends QuizbotUI
       const modal_current_question_additional_info = cloneDeep(modal_question_additional_info);
 
       modal_current_question_additional_info.components[0].components[0].setValue(question_info.data.hint ?? ''); 
-      modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.use_answer_timer ?? ''); 
+      modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.use_answer_timer === true ? '사용' : ''); 
 
       interaction.showModal(modal_current_question_additional_info);
       return;
@@ -2179,21 +2190,23 @@ class UserQuestionInfoUI extends QuizbotUI
  
       const question_info = this.current_question_info;
       question_info.delete();
+      this.quiz_info.updateModifiedTime();
+      
+      logger.info(`Deleted Question... question_id: ${question_info.question_id}, user_id: ${interaction.user.id}`);
 
       this.current_question_info = undefined;
-      this.current_question_index -= 1;
 
-      const return_ui = this.goToNextQuestion() ?? this.goToPrevQuestion();
-      if(return_ui == undefined)
+      if(this.question_list.length == 0) //더 이상 표시할게 없다면
       {
         this.current_question_index = -1;
         this.goToBack();
         return;
       }
-
-      logger.info(`Deleted Question... question_id: ${question_info.question_id}, user_id: ${interaction.user.id}`);
-
-      return return_ui;
+      else
+      {
+        this.current_question_index = (this.current_question_index + 1) > this.question_list.length ? this.question_list.length : this.current_question_index + 1;
+        return this.goToPrevQuestion();
+      }
     }
 
     if(interaction.customId == 'prev_question')
@@ -2239,7 +2252,9 @@ class UserQuestionInfoUI extends QuizbotUI
     const question_info = question_list[question_index];
     this.current_question_info = question_info;
 
+    const is_valid_question_audio_url = ytdl.validateURL(question_info.data.question_audio_url);
     const is_valid_question_image_url = utility.isValidURL(question_info.data.question_image_url);
+    const is_valid_answer_audio_url = ytdl.validateURL(question_info.data.answer_audio_url);
     const is_valid_answer_image_url = utility.isValidURL(question_info.data.answer_image_url);
 
     this.embed.title = `**${question_index+1}번째 문제**`;
@@ -2249,9 +2264,15 @@ class UserQuestionInfoUI extends QuizbotUI
     let description = '';
     description += "---- 기본 정보 ----\n\n";
     description += `🔸 정답: **[${question_info.data.answers}]**\n\n`;
-    description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n\n`;
+    description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n`;
+    if(is_valid_question_audio_url == false && (question_info.data.question_audio_url ?? 0).length != 0)
+    {
+      description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
+    }
+    description += "\n\n";
+
     description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
-    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? '').length != 0)
+    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? 0).length != 0)
     {
       description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
     }
@@ -2266,10 +2287,16 @@ class UserQuestionInfoUI extends QuizbotUI
     description += "\n";
 
     description += "---- 정답 이벤트 정보 ----\n\n";
-    description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n\n`;
+    description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n`;
+    if(is_valid_answer_audio_url == false && (question_info.data.answer_audio_url ?? 0).length != 0)
+    {
+      description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
+    }
+    description += "\n\n";
+
     description += `🔸 정답용 음악 재생 구간:  **[${ ( (question_info.data.answer_audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.answer_audio_range_row) }]**\n\n`;
     description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
-    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? '').length != 0)
+    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? 0).length != 0)
     {
       description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
     }
@@ -2388,6 +2415,8 @@ class UserQuestionInfoUI extends QuizbotUI
       return;
     }
 
+    this.quiz_info.updateModifiedTime();
+
     modal_interaction.deferUpdate();
     logger.info(`Created New Question... question_id: ${user_question_info.question_id}/${question_id}, user_id: ${modal_interaction.user.id}}`);
 
@@ -2427,6 +2456,8 @@ class UserQuestionInfoUI extends QuizbotUI
       modal_interaction.reply({content: `>>> ${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true});
       return;
     }
+
+    this.quiz_info.updateModifiedTime();
 
     modal_interaction.deferUpdate();
     logger.info(`Edited Question... question_id: ${user_question_info.question_id}/${question_id}`);
@@ -2488,7 +2519,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     for(let user_quiz_info of user_quiz_list) 
     {
-      user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n${user_quiz_info.data.simple_description}`;
+      user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n🔸) ${user_quiz_info.data.simple_description}`;
     }
 
     this.cur_contents = user_quiz_list ?? [];
