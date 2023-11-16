@@ -755,7 +755,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
             scoreboard_fields.push(
                 {
                     name: text_contents.scoreboard.title,
-                    value: '\u1CBC\n',
+                    value: ' \n',
                 },
                 // {
                 //     name: '\u200b',
@@ -1427,7 +1427,7 @@ class Explain extends QuizLifecycle
         quiz_ui.embed.color = 0xFED049,
 
         quiz_ui.embed.title = text_contents.quiz_explain.title;
-        quiz_ui.embed.description = '\u1CBC\n\u1CBC\n';
+        quiz_ui.embed.description = ' \n \n';
 
         quiz_ui.components = [];
 
@@ -1785,7 +1785,7 @@ class Prepare extends QuizLifecycle
     async prepareText(target_question)
     {
         const question = target_question['question'];
-        target_question['question'] = "\u1CBC\n" + question + "\u1CBC\n"
+        target_question['question'] = " \n" + question + " \n"
         const question_type = target_question['type'];
         target_question['is_long'] = ((question_type == QUIZ_TYPE.TEXT_LONG || question_type == QUIZ_TYPE.OX_LONG) ? true : false);
     }
@@ -2193,7 +2193,7 @@ class Question extends QuizLifeCycleWithUtility
 
         quiz_ui.embed.color = 0xFED049;
 
-        quiz_ui.embed.title = `[\u1CBC${quiz_data['icon']} ${quiz_data['title']}\u1CBC]`;
+        quiz_ui.embed.title = `[ ${quiz_data['icon']} ${quiz_data['title']} ]`;
         
         let footer_message = text_contents.quiz_play_ui.footer;
         footer_message = footer_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
@@ -2283,7 +2283,7 @@ class Question extends QuizLifeCycleWithUtility
 
         let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
         quiz_ui.embed.description = this.progress_bar_fixed_text ?? '';
-        quiz_ui.embed.description += `\u1CBC\n\u1CBC\n🕛\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+        quiz_ui.embed.description += ` \n \n🕛 **${progress_bar_string}**\n \n \n`;
         quiz_ui.update(); // 우선 한 번은 그냥 시작해주고~
 
         const progress_bar_timer = setInterval(() => {
@@ -2293,7 +2293,7 @@ class Question extends QuizLifeCycleWithUtility
             let progress_bar_string = this.getProgressBarString(progress_percentage, progress_max_percentage);
 
             quiz_ui.embed.description = this.progress_bar_fixed_text ?? '';
-            quiz_ui.embed.description += `\u1CBC\n\u1CBC\n⏱\u1CBC**${progress_bar_string}**\n\u1CBC\n\u1CBC\n`;
+            quiz_ui.embed.description += ` \n \n⏱ **${progress_bar_string}**\n \n \n`;
             quiz_ui.update();
 
         }, progress_bar_interval);
@@ -3511,13 +3511,13 @@ class Ending extends QuizLifeCycleWithUtility
         quiz_ui.embed.color = 0xFED049,
 
         quiz_ui.embed.title = text_contents.ending_ui.title;
-        quiz_ui.embed.description = `${quiz_data['icon']} ${quiz_data['title']}\n\u1CBC\n\u1CBC\n`;
+        quiz_ui.embed.description = `${quiz_data['icon']} ${quiz_data['title']}\n \n \n`;
         quiz_ui.embed.footer = undefined //footer 없앰
 
         quiz_ui.embed.fields = [ //페이크 필드
             {
-                name: '\u1CBC\n',
-                value: '\u1CBC\n',
+                name: ' \n',
+                value: ' \n',
             },
         ];
 
@@ -3561,12 +3561,12 @@ class Ending extends QuizLifeCycleWithUtility
 
                 if(i == 3) //3등과 간격 벌려서
                 {
-                    quiz_ui.embed.description += `\u1CBC\n\u1CBC\n`;
+                    quiz_ui.embed.description += ` \n \n`;
                 }
-                quiz_ui.embed.description += `${medal} ${member.displayName} \u1CBC\u1CBC ${score}${text_contents.scoreboard.point_name}\n`;
+                quiz_ui.embed.description += `${medal} ${member.displayName}    ${score}${text_contents.scoreboard.point_name}\n`;
                 if(i < 3) //3등까지는 하나씩 보여줌
                 {
-                    quiz_ui.embed.description += `\u1CBC\n`; //3등까지는 간격도 늘려줌
+                    quiz_ui.embed.description += ` \n`; //3등까지는 간격도 늘려줌
                     utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.SCORE_ALARM);
                     quiz_ui.update();
                     await utility.sleep(SYSTEM_CONFIG.ending_wait);
@@ -3582,7 +3582,7 @@ class Ending extends QuizLifeCycleWithUtility
             }
 
             //1등 칭호 보여줌
-            quiz_ui.embed.description += `\u1CBC\n\u1CBC\n`;
+            quiz_ui.embed.description += ` \n \n`;
             let top_score_description_message = text_contents.ending_ui.winner_user_message;
             top_score_description_message = top_score_description_message.replace('${winner_nickname}', quiz_data['winner_nickname']);
             top_score_description_message = top_score_description_message.replace('${winner_username}', winner_member.displayName);

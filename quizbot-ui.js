@@ -761,11 +761,11 @@ class QuizBotControlComponentUI extends QuizbotUI {
     {
       const cur_content = page_contents[i];
       let message = text_contents.icon["ICON_NUM_"+(i+1)];
-      contents_message += `${message})\u1CBC\u1CBC${cur_content.icon ?? ""} ${cur_content.name}\n\n`;
+      contents_message += `${message})  ${cur_content.icon ?? ""} ${cur_content.name}\n\n`;
     }
 
-    // contents_message += "\u1CBC\u1CBC\n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
-    this.embed.description = contents_message + "\u1CBC\n";
+    // contents_message += "  \n" + `${text_contents.icon.ICON_BOX} ${contents.length}` //굳이 항목 수를 표시해야할까..?
+    this.embed.description = contents_message + " \n";
 
     let page_message = `${text_contents.icon.ICON_PAGE} ${page_num + 1} / ${total_page} ${text_contents.icon.PAGE_TEXT}`;
     // page_message += `| ${text_contents.icon.ICON_FOLDER} ${page_num + 1}`;
@@ -1691,7 +1691,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
       color: 0x05f1f1,
       title: `📑 보유한 퀴즈 목록`,
       url: text_contents.dev_select_category.url,
-      description: `🛠 **${creator.displayName}**님이 제작하신 퀴즈 목록입니다!\n\u1CBC\n\u1CBC\n`,
+      description: `🛠 **${creator.displayName}**님이 제작하신 퀴즈 목록입니다!\n \n \n`,
 
       footer: {
         text: creator.displayName, 
