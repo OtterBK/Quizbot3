@@ -1,7 +1,7 @@
 'use strict';
 
 //외부 modules
-const { Client, GatewayIntentBits, } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
@@ -110,6 +110,12 @@ const start_quiz_handler = async (interaction) => {
   if(interaction.guild == undefined)
   {
     interaction.reply({conet: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.', ephemeral: true});
+    return;
+  }
+
+  if((interaction.guild.members.me).permissionsIn(interaction.channel.id).has(PermissionsBitField.Flags.SendMessages) == false)
+  {
+    interaction.reply({conet: '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요', ephemeral: true});
     return;
   }
 

@@ -105,7 +105,7 @@ exports.selectAllQuizInfo = async () => {
   `select * 
     from tb_quiz_info
     where is_use = true and is_private = false
-    order by modified_time asc`
+    order by birthtime desc`
 
   return sendQuery(query_string);
 
@@ -155,7 +155,7 @@ exports.disableQuizInfo = async (quiz_id) => {
 exports.addQuizInfoPlayedCount = async (quiz_id) => {
 
   const query_string = 
-  `UPDATE tb_quiz_info set played_count = played_count + 1
+  `UPDATE tb_quiz_info set played_count = played_count + 1, played_count_of_week = played_count_of_week + 1
     where quiz_id = $1;`;
 
   return sendQuery(query_string, [quiz_id]);
@@ -170,7 +170,7 @@ exports.selectQuestionInfo = async (value_fields) => {
   `select *
     from tb_question_info
     where quiz_id = $1
-    order by question_id asc`;
+    order by question_id desc`;
     
   return sendQuery(query_string, value_fields);
 

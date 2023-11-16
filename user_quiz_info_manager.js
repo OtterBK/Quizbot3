@@ -20,6 +20,7 @@ const QuizInfoColumn =
     "modified_time",
     "played_count",
     "is_private",
+    "played_count_of_week",
 ];
 
 let quiz_info_key_fields = '';

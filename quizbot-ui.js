@@ -9,7 +9,7 @@
  */
 
 //#region 필요한 외부 모듈
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, RESTJSONErrorCodes, SelectMenuOptionBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const cloneDeep = require("lodash/cloneDeep.js");
 const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
@@ -191,6 +191,35 @@ const only_back_comp = new ActionRowBuilder()
     .setLabel('뒤로가기')
     .setStyle(ButtonStyle.Secondary),
 )
+
+const sort_by_select_menu = new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder().
+  setCustomId('sort_by_select').
+  setPlaceholder('정렬 방식 선택')
+  .addOptions(
+    new StringSelectMenuOptionBuilder()
+    .setLabel('최신 생성순')
+    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
+    .setDefault(true)
+    .setValue('birthtime'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('주간 인기순')
+    .setDescription('이번주에 가장 많이 플레이된 퀴즈부터 표시합니다.')
+    .setValue('played_count_of_week'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('전체 인기순')
+    .setDescription('가장 많이 플레이된 퀴즈부터 표시합니다.')
+    .setValue('played_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('업데이트순')
+    .setDescription('가장 최근에 업데이트된 퀴즈부터 표시합니다.')
+    .setValue('modified_time'),
+  )
+);
 
 //#endregion
 
@@ -825,8 +854,7 @@ class MainUI extends QuizbotUI
 
     if(interaction.customId == '3') //퀴즈만들기 눌렀을 때
     {
-      interaction.channel.send({content:"```조금만 기다려주세요. 열심히 만들고 있습니다.```"});
-      return;
+      return new QuizToolGuide(); //퀴즈만들기 방법 안내
     }
 
     if(interaction.customId == '4') //서버 설정 눌렀을 때
@@ -1034,7 +1062,6 @@ class QuizInfoUI extends QuizbotUI
 //Quiz 시작 알림 UI
 class AlertQuizStartUI extends QuizbotUI
 {
-
   constructor(quiz_info, owner)
   {
     super();
@@ -1064,6 +1091,33 @@ class AlertQuizStartUI extends QuizbotUI
     return; //AlertQuizStartUI 에서는 이벤트 핸들링을 하지 않음
   }
 
+}
+
+//퀴즈 만들기 Guide
+class QuizToolGuide extends QuizbotUI
+{
+  constructor()
+  {
+    super();
+
+    this.embed = {
+      color: 0x05f1f1,
+      title: text_contents.quiz_tool_guide_ui.title,
+      description: text_contents.quiz_tool_guide_ui.description,
+      url: undefined,
+      fields: [
+        text_contents.quiz_tool_guide_ui.fields1,
+        text_contents.quiz_tool_guide_ui.fields2,
+      ]
+    };
+
+    this.components = [ only_back_comp ];
+  }
+
+  onInteractionCreate(interaction)
+  {
+    return; //QuizToolGuide 에서는 이벤트 핸들링을 하지 않음
+  }
 }
 
 //서버 설정 UI
@@ -1634,7 +1688,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     this.creator_id = creator.id;
 
     this.embed = {
-      color: 0x190482,
+      color: 0x05f1f1,
       title: `📑 보유한 퀴즈 목록`,
       url: text_contents.dev_select_category.url,
       description: `🛠 **${creator.displayName}**님이 제작하신 퀴즈 목록입니다!\n\u1CBC\n\u1CBC\n`,
@@ -1792,7 +1846,7 @@ class UserQuizInfoUI extends QuizbotUI {
     this.quiz_info = quiz_info;
 
     this.embed = {
-      color: 0x87CEEB,
+      color: 0x05f1f1,
       title: `**${quiz_info.data.quiz_title}**`,
       description: '퀴즈 정보를 불러오는 중...\n잠시만 기다려주세요.',
     };
@@ -1839,7 +1893,7 @@ class UserQuizInfoUI extends QuizbotUI {
     const quiz_info = this.quiz_info;
 
     this.embed = {
-      color: 0x87CEEB,
+      color: 0x05f1f1,
       title: `**${quiz_info.data.quiz_title}**`,
       description: '',
       thumbnail: { //퀴즈 섬네일 표시
@@ -2086,7 +2140,7 @@ class UserQuestionInfoUI extends QuizbotUI
     this.question_list = quiz_info.question_list;
 
     this.embed = {
-      color: 0x87CEEB,
+      color: 0x05f1f1,
       title: `**${question_index+1}번째 문제**`,
       description: '데이터를 불러오는 중...\n잠시만 기다려주세요.',
       thumbnail: { //문제 이미지 표시
@@ -2475,12 +2529,17 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
   {
     super();
 
+    this.selected_sort_by_value = 'birthtime';
+    this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
+
     this.embed = {
-      color: 0x87CEEB,
+      color: 0x05f1f1,
       title: text_contents.user_select_category.title,
       url: text_contents.user_select_category.url,
       description: '퀴즈 목록을 불러오는 중...\n잠시만 기다려주세요.🙂',
     };
+
+    this.components.push(this.sort_by_select_menu);
   }
 
   onReady() //ui 등록 됐을 때
@@ -2491,6 +2550,11 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
   onInteractionCreate(interaction)
   {
     if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+    if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
+    {
+      return this.reorderQuizInfoList(interaction); //재정렬 ㄱㄱ
+    }
 
     const is_page_move = this.checkPageMove(interaction);
     if(is_page_move == undefined) return;
@@ -2527,6 +2591,20 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.displayContents(0);
     this.update();
+  }
+
+  reorderQuizInfoList(interaction)
+  {
+    const selected_sort_by_value = interaction.values[0];
+    if(this.selected_sort_by_value == selected_sort_by_value) return; //바뀐게 없다면 return
+    
+    this.selected_sort_by_value = selected_sort_by_value;
+
+    this.selectDefaultOptionByValue(this.sort_by_select_menu.components[0], selected_sort_by_value);
+
+    this.cur_contents.sort((a, b) => b.data[this.selected_sort_by_value] - a.data[this.selected_sort_by_value]); //내림차순
+
+    return this;
   }
 
 }
