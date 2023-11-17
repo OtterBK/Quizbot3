@@ -170,7 +170,7 @@ exports.selectQuestionInfo = async (value_fields) => {
   `select *
     from tb_question_info
     where quiz_id = $1
-    order by question_id desc`;
+    order by question_id asc`;
     
   return sendQuery(query_string, value_fields);
 

@@ -2393,12 +2393,15 @@ class UserQuestionInfoUI extends QuizbotUI
     
     user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
 
-    if(input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
+    if(input_question_audio_range != undefined
+      && input_question_audio_range != ''
+      && input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
     {
       user_question_info.data.audio_range_row += " ~ "; //물결 붙여줌
     }
 
-    if(input_question_audio_range.length != 0)
+    if(input_question_audio_range != undefined
+      && input_question_audio_range.length != 0)
     {
       const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_question_audio_range);
 
