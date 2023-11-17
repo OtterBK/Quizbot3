@@ -2164,9 +2164,10 @@ class UserQuestionInfoUI extends QuizbotUI
 
     this.current_question_info = undefined;
     this.current_question_index = question_index;
-    this.displayQuestionInfo(question_index);
 
     this.components = [question_edit_comp, question_edit_comp2, question_control_btn_component]; //문제 관련 comp
+
+    this.displayQuestionInfo(question_index);
   }
 
   onInteractionCreate(interaction) 
@@ -2478,6 +2479,12 @@ class UserQuestionInfoUI extends QuizbotUI
 
   async addQuestion(modal_interaction)
   {
+    if(question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
+    {
+        modal_interaction.reply({ content: `>>> 하나의 퀴즈에는 최대 50개까지만 문제를 만들 수 있습니다..`, ephemeral: true });
+      return;
+    }
+
     let user_question_info = new UserQuestionInfo();
     
     this.applyQuestionInfo(user_question_info, modal_interaction); //채우고 저장해주자
