@@ -1906,8 +1906,10 @@ class UserQuizInfoUI extends QuizbotUI {
     };
 
     let description = '';
+    description += `⚒️ 퀴즈 제작: **${(quiz_info.data.creator_name ?? '')}**\n`;
+
     description += `🏷 한줄 소개: **${quiz_info.data.simple_description}**\n`;
-    description += `📦 문제 개수: **${quiz_info.question_list.length}개**\n`;
+    description += `📦 문제 개수: **${quiz_info.question_list.length}개 [최대 50개]**\n`;
     description += "\n\n\n";
 
     description += `📖 퀴즈 설명:\n${quiz_info.data.description}\n\n\n\n`;
