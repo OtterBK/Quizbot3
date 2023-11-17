@@ -1751,9 +1751,9 @@ class UserQuizListUI extends QuizBotControlComponentUI
       return;
     }
 
-    const user_id = interaction.user.id;
+    const user = interaction.user;
     const user_quiz_info = this.cur_contents[index];
-    return this.showEditor(user_id, user_quiz_info);
+    return this.showEditor(user, user_quiz_info);
   }
 
   onAwaked() //ui 재활성화 됐을 때
@@ -1781,11 +1781,11 @@ class UserQuizListUI extends QuizBotControlComponentUI
     this.displayContents(0);
   }
 
-  showEditor(user_id, user_quiz_info)
+  showEditor(user, user_quiz_info)
   {
-    if(user_id != user_quiz_info.data.creator_id)
+    if(user.id != user_quiz_info.data.creator_id)
     {
-      modal_interaction.reply({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
+      user.send({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
       return;
     }
 
@@ -1803,7 +1803,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     const quiz_simple_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_simple_description');
     const quiz_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_description');
 
-    modal_interaction.reply({content: `>>> ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.}`, ephemeral: true});
+    modal_interaction.reply({content: `>>> ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.`, ephemeral: true});
 
     //이건 어쩔 수 없음 직접 하드코딩으로 데이터 넣어야함
     user_quiz_info.data.creator_id = modal_interaction.user.id;
@@ -1829,8 +1829,8 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     logger.info(`Created New Quiz... quiz_id: ${user_quiz_info.quiz_id}, title: ${user_quiz_info.data.quiz_title}`);
 
-    const user_id = modal_interaction.user.id;
-    return this.showEditor(user_id, user_quiz_info);
+    const user = modal_interaction.user;
+    return this.showEditor(user, user_quiz_info);
   }
 }
 
@@ -1917,6 +1917,11 @@ class UserQuizInfoUI extends QuizbotUI {
     
     description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n";
 
+    if(quiz_info.data.is_private)
+    {
+      description += "\n\n__**❗ 퀴즈를 다 만드신 후에는 꼭 [공개]로 설정해주세요!**__";
+    }
+
     // description = description.replace('${quiz_type_name}', `${quiz_info.data.type_name}`);
     // description = description.replace('${quiz_size}', `${quiz_info.data.quiz_size}`);
     // description = description.replace('${quiz_description}', `${quiz_info.data.description}`);
@@ -1928,7 +1933,7 @@ class UserQuizInfoUI extends QuizbotUI {
     }
     else
     {
-      this.embed.title += quiz_info.data.is_private ? ` **[비공개]**` : ` **[공개]**`
+      this.embed.title += quiz_info.data.is_private ? ` **[비공개🔒]**` : ` **[공개]**`
 
       this.components = [quiz_edit_comp]; //퀴즈 수정 가능한 comp
 
@@ -1972,6 +1977,12 @@ class UserQuizInfoUI extends QuizbotUI {
         let reason_message = text_contents.quiz_info_ui.failed_start;
         reason_message = reason_message.replace("${reason}", reason);
         interaction.channel.send({content: reason_message});
+        return;
+      }
+
+      if(quiz_info.question_list.length == 0)
+      {
+        interaction.channel.send({content: `>>> 이 퀴즈는 문제 수가 아직 0개여서 시작할 수 없습니다...😥`});
         return;
       }
       
@@ -2311,22 +2322,22 @@ class UserQuestionInfoUI extends QuizbotUI
     const is_valid_answer_audio_url = ytdl.validateURL(question_info.data.answer_audio_url);
     const is_valid_answer_image_url = utility.isValidURL(question_info.data.answer_image_url);
 
-    this.embed.title = `**${question_index+1}번째 문제**`;
+    this.embed.title = `**[ 📁 ${question_index+1}번째 문제** ]`;
     this.embed.thumbnail.url = is_valid_question_image_url ? question_info.data.question_image_url : '',
     this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
 
     let description = '';
-    description += "---- 기본 정보 ----\n\n";
+    description += "------ 기본 정보 ------\n\n";
     description += `🔸 정답: **[${question_info.data.answers}]**\n\n`;
     description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n`;
-    if(is_valid_question_audio_url == false && (question_info.data.question_audio_url ?? 0).length != 0)
+    if(is_valid_question_audio_url == false && (question_info.data.question_audio_url ?? '').length != 0)
     {
       description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
     }
     description += "\n\n";
 
     description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
-    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? 0).length != 0)
+    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? '').length != 0)
     {
       description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
     }
@@ -2335,14 +2346,14 @@ class UserQuestionInfoUI extends QuizbotUI
     description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n\n`;
     description += `🔸 음악 재생 구간:  **[${ ( (question_info.data.audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.audio_range_row) }]**\n\n`;
 
-    description += "---- 추가 정보 ----\n\n";
+    description += "------ 추가 정보 ------\n\n";
     description += `🔸 힌트: **[${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]**\n`;
     description += `🔸 정답 여유 시간 여부: **[${(question_info.data.use_answer_timer == true ? '예' : '아니요')}]**\n`;
     description += "\n";
 
-    description += "---- 정답 이벤트 정보 ----\n\n";
+    description += "------ 정답 이벤트 정보 ------\n\n";
     description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n`;
-    if(is_valid_answer_audio_url == false && (question_info.data.answer_audio_url ?? 0).length != 0)
+    if(is_valid_answer_audio_url == false && (question_info.data.answer_audio_url ?? '').length != 0)
     {
       description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
     }
@@ -2350,7 +2361,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
     description += `🔸 정답용 음악 재생 구간:  **[${ ( (question_info.data.answer_audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.answer_audio_range_row) }]**\n\n`;
     description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
-    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? 0).length != 0)
+    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? '').length != 0)
     {
       description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
     }
@@ -2381,6 +2392,12 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.question_audio_url = input_question_audio_url;
     
     user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
+
+    if(input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
+    {
+      user_question_info.data.audio_range_row += " ~ "; //물결 붙여줌
+    }
+
     if(input_question_audio_range.length != 0)
     {
       const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_question_audio_range);
@@ -2441,7 +2458,7 @@ class UserQuestionInfoUI extends QuizbotUI
     let audio_end_value = (isNaN(audio_end) || audio_end < 0) ? undefined : Math.floor(audio_end);
 
     if(audio_start_value != undefined 
-      && audio_start_value != undefined) 
+      && audio_end_value != undefined) 
     {
       if(audio_start_value > audio_end_value) //start > end 처리
       {
