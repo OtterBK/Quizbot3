@@ -131,7 +131,7 @@ const create_quiz_handler = async (interaction) => {
   //나중에 시간마다 조회하는 방식으로 변경할 것
   if(fs.existsSync(`${__dirname}/resources/banned_user.txt`)) //퀴즈만들기 ban 시스템
   {
-    const banned_list = fs.readFileSync(`${__dirname}/resources/banned_user.txt', {encoding: 'utf8', flag:'r'});
+    const banned_list = fs.readFileSync(`${__dirname}/resources/banned_user.txt`, {encoding: 'utf8', flag:'r'});
     const user_id = interaction.user.id;
 
     const banned_list_array = banned_list.split('\n');
