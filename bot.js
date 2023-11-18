@@ -105,13 +105,13 @@ client.on('ready', () => {
 const command_handlers = {};
 
 const start_quiz_handler = async (interaction) => {
-  const uiHolder = quizbot_ui.createMainUIHolder(interaction);
-
   if(interaction.guild == undefined)
   {
     interaction.reply({content: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.', ephemeral: true});
     return;
   }
+
+  const uiHolder = quizbot_ui.createMainUIHolder(interaction); //메인 메뉴 전송
 
   if((interaction.guild.members.me).permissionsIn(interaction.channel.id).has(PermissionsBitField.Flags.SendMessages) == false)
   {
