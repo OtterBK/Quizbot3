@@ -270,12 +270,15 @@ exports.createQuizToolUIHolder = (interaction) => {
   uiHolder.holder_id = user_id;
   ui_holder_map[user_id] = uiHolder;
 
+  console.log('id: ' + user_id);
+
   //uiHolder.updateUI(); 얘는 따로
 
   return uiHolder;
 }
 
 exports.getUIHolder = (holder_id) => {
+  console.log('find :' + holder_id);
   if(ui_holder_map.hasOwnProperty(holder_id) == false)
   {
     return undefined;
