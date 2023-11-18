@@ -2481,7 +2481,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
   async addQuestion(modal_interaction)
   {
-    if(question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
+    if(this.question_list != undefined && this.question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
     {
         modal_interaction.reply({ content: `>>> 하나의 퀴즈에는 최대 50개까지만 문제를 만들 수 있습니다..`, ephemeral: true });
       return;
