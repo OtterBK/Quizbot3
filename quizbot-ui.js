@@ -250,6 +250,7 @@ exports.createMainUIHolder = (interaction) => {
     prev_uiHolder.free();
   }
   const uiHolder = new UIHolder(interaction, new MainUI(), UI_HOLDER_TYPE.PUBLIC);
+  uiHolder.holder_id = guild_id;
   ui_holder_map[guild_id] = uiHolder; 
 
   uiHolder.updateUI();
@@ -259,13 +260,14 @@ exports.createMainUIHolder = (interaction) => {
 
 //퀴즈 제작 툴
 exports.createQuizToolUIHolder = (interaction) => { 
-  const user_id = interaction.user.id;
+  const user_id = interaction.user.id ?? interaction.member.id;
   if(ui_holder_map.hasOwnProperty(user_id))
   {
     const prev_uiHolder = ui_holder_map[user_id];
     prev_uiHolder.free();
   }
   const uiHolder = new UIHolder(interaction, new UserQuizListUI(interaction.user), UI_HOLDER_TYPE.PRIVATE);
+  uiHolder.holder_id = user_id;
   ui_holder_map[user_id] = uiHolder;
 
   //uiHolder.updateUI(); 얘는 따로
@@ -338,6 +340,7 @@ class UIHolder
   {
     this.base_interaction = interaction; //Public 용 interaction, Public은 명령어에 의해 생성되기 때문에 있음
     this.base_message = undefined; //Private 용 Message, 얘는 개인 메시지로 보내야해서 interaction이 없다
+    this.holder_id = undefined;
     this.guild = interaction.guild;
     this.guild_id = interaction.guild?.id;
     this.user = interaction.user;
