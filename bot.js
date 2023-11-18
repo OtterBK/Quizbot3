@@ -109,13 +109,13 @@ const start_quiz_handler = async (interaction) => {
 
   if(interaction.guild == undefined)
   {
-    interaction.reply({conet: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.', ephemeral: true});
+    interaction.reply({content: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.', ephemeral: true});
     return;
   }
 
   if((interaction.guild.members.me).permissionsIn(interaction.channel.id).has(PermissionsBitField.Flags.SendMessages) == false)
   {
-    interaction.reply({conet: '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요', ephemeral: true});
+    interaction.reply({content: '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n퀴즈 시스템이 정상적으로 동작하지 않을겁니다.\n서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.', ephemeral: true});
     return;
   }
 
@@ -128,8 +128,15 @@ const start_quiz_handler = async (interaction) => {
 };
 
 const create_quiz_handler = async (interaction) => {
+  if(interaction.guild != undefined && interaction.guild !== null) //샤딩돼 있어서 길드에서 요청할경우 ui_holder_map 주소가 달라 못찾음
+  {
+    interaction.reply({content: '>>> 퀴즈 제작에 참여해주셔서 감사합니다!\n퀴즈봇이 메시지를 보낼거에요. 확인해보세요!', ephemeral: true});
+    interaction.member.send({content: '>>> **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력해주세요!', ephemeral: true});
+    return;
+  }
+  
   const uiHolder = quizbot_ui.createQuizToolUIHolder(interaction);
-  interaction.reply({content: '>>> 개인 메시지로 퀴즈 제작 화면을 보내드렸어요!\n퀴즈봇과의 개인 메시지를 확인해주세요 🛠', ephemeral: true})
+  interaction.reply({content: '>>> 개인 메시지로 퀴즈 제작 화면을 보내드렸어요!\n퀴즈봇과의 개인 메시지를 확인해주세요 🛠', ephemeral: true});
 };
 
 command_handlers["시작"] = start_quiz_handler;
