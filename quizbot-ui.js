@@ -1821,6 +1821,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     user_quiz_info.data.modified_time = new Date();
     user_quiz_info.data.played_count = 0;
     user_quiz_info.data.is_private = true;
+    user_quiz_info.data.played_count_of_week = 0;
 
     const created_quiz_id = await user_quiz_info.saveDataToDB();
 
@@ -2585,7 +2586,9 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
     {
-      return this.reorderQuizInfoList(interaction); //재정렬 ㄱㄱ
+      this.reorderQuizInfoList(interaction); //재정렬 ㄱㄱ
+      this.displayContents(this.cur_page);
+      return this;
     }
 
     const is_page_move = this.checkPageMove(interaction);
@@ -2636,7 +2639,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.cur_contents.sort((a, b) => b.data[this.selected_sort_by_value] - a.data[this.selected_sort_by_value]); //내림차순
 
-    return this;
+    this.displayContents(this.current_question_index);
   }
 
 }
