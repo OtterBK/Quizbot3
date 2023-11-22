@@ -2227,6 +2227,8 @@ class Question extends QuizLifeCycleWithUtility
         quiz_ui.setButtonStatus(1, true); 
         quiz_ui.setButtonStatus(2, true);
 
+        quiz_ui.setImage(undefined); //이미지 초기화
+
         await quiz_ui.send(false);
 
         return quiz_ui;
