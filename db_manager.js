@@ -105,7 +105,7 @@ exports.selectAllQuizInfo = async () => {
   `select * 
     from tb_quiz_info
     where is_use = true and is_private = false
-    order by birthtime desc`
+    order by modified_time desc`
 
   return sendQuery(query_string);
 

@@ -199,10 +199,10 @@ const sort_by_select_menu = new ActionRowBuilder()
   setPlaceholder('정렬 방식 선택')
   .addOptions(
     new StringSelectMenuOptionBuilder()
-    .setLabel('최신 생성순')
-    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
+    .setLabel('업데이트순')
+    .setDescription('가장 최근에 업데이트된 퀴즈부터 표시합니다.')
     .setDefault(true)
-    .setValue('birthtime'),
+    .setValue('modified_time'),
 
     new StringSelectMenuOptionBuilder()
     .setLabel('주간 인기순')
@@ -210,14 +210,14 @@ const sort_by_select_menu = new ActionRowBuilder()
     .setValue('played_count_of_week'),
 
     new StringSelectMenuOptionBuilder()
+    .setLabel('최신 생성순')
+    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
+    .setValue('birthtime'),
+
+    new StringSelectMenuOptionBuilder()
     .setLabel('전체 인기순')
     .setDescription('가장 많이 플레이된 퀴즈부터 표시합니다.')
     .setValue('played_count'),
-
-    new StringSelectMenuOptionBuilder()
-    .setLabel('업데이트순')
-    .setDescription('가장 최근에 업데이트된 퀴즈부터 표시합니다.')
-    .setValue('modified_time'),
   )
 );
 
@@ -2562,7 +2562,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
   {
     super();
 
-    this.selected_sort_by_value = 'birthtime';
+    this.selected_sort_by_value = 'modified_time';
     this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
 
     this.embed = {
