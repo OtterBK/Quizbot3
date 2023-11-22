@@ -251,7 +251,7 @@ class QuizPlayUI
         this.ui_instance = ui_instance;
     })
     .catch(err => {
-        if(err.code === RESTJSONErrorCodes.UnknownChannel)
+        if(err.code === RESTJSONErrorCodes.UnknownChannel || err.code === RESTJSONErrorCodes.MissingPermissions)
         {
             const guild_id = this.channel.guild.id;
             const quiz_session = exports.getQuizSession(guild.id);
@@ -260,6 +260,12 @@ class QuizPlayUI
             {
                 quiz_session.forceStop();
             }
+		
+	    if(err.code === RESTJSONErrorCodes.MissingPermissions) //권한 부족해서 종료된거면 알려주자
+	    {
+		quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.`});
+	    }
+	
             return;
         }
         logger.error(`Failed to Send QuizPlayUI, guild_id:${this.guild_id}, embed: ${JSON.stringify(this.embed)}, objects:${JSON.stringify(objects)}, err: ${err.stack}`);
