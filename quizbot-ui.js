@@ -2477,7 +2477,7 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.answer_audio_start = audio_start_value;
     user_question_info.data.answer_audio_end = audio_end_value;
     user_question_info.data.answer_audio_play_time = audio_play_time;
-}
+  }
 
   parseAudioRangePoints(audio_range_row)
   {
