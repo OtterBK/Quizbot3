@@ -2171,7 +2171,7 @@ class UserQuestionInfoUI extends QuizbotUI
     this.current_question_info = undefined;
     this.current_question_index = question_index;
 
-    this.components = [question_edit_comp, question_edit_comp2, question_control_btn_component]; //문제 관련 comp
+    this.components = [question_edit_comp, cloneDeep(question_edit_comp2), question_control_btn_component]; //문제 관련 comp
 
     this.displayQuestionInfo(question_index);
   }
@@ -2477,10 +2477,26 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.answer_audio_start = audio_start_value;
     user_question_info.data.answer_audio_end = audio_end_value;
     user_question_info.data.answer_audio_play_time = audio_play_time;
-  }
+}
 
   parseAudioRangePoints(audio_range_row)
   {
+    if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
+    {
+      return [undefined, undefined, undefined];
+    }
+
+    audio_range_row = audio_range_row.trim();
+    if(audio_range_row.endsWith('~')) //25 ~ 이런식으로 쳤으면 ~ 제거
+    {
+      audio_range_row = audio_range_row.slice(0, audio_range_row.length - 1);
+    }
+
+    if(audio_range_row.length == 0) //정제 후에도 생략 시,
+    {
+      return [undefined, undefined, undefined];
+    }
+
     if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
     {
       return [undefined, undefined, undefined];

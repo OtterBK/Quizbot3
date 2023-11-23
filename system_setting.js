@@ -12,7 +12,7 @@ exports.SYSTEM_CONFIG = {
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
     max_question_audio_play_time: 60, //문제용 오디오 최대 허용 길이(s)
-    max_answer_audio_play_time: 10, //정답용 오디오 최대 허용 길이(s)
+    max_answer_audio_play_time: 12, //정답용 오디오 최대 허용 길이(s)
 
     max_check_prepared_queue: 150, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 100, //prepared queue 체크 간격
