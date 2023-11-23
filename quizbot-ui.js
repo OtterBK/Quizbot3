@@ -92,7 +92,7 @@ const main_ui_component = new ActionRowBuilder()
   .setStyle(ButtonStyle.Link),
   new ButtonBuilder()
   .setLabel('봇 공유')
-  .setURL('https://discord.com/api/oauth2/authorize?client_id=788060831660114012&permissions=2150681600&scope=bot')
+  .setURL('https://discord.com/application-directory/788060831660114012')
   .setStyle(ButtonStyle.Link),
 );
 
@@ -1509,7 +1509,7 @@ const modal_question_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_audio_range')
-        .setLabel('음악 재생 구간을 지정할 수 있습니다. [최대 60초]')
+        .setLabel(`음악 재생 구간을 지정할 수 있습니다. [최대 ${SYSTEM_CONFIG.max_question_audio_play_time}초만 재생됨]`)
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(40)
@@ -1591,7 +1591,7 @@ const modal_question_answering_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_answering_audio_range')
-        .setLabel('정답용 음악 재생 구간을 지정할 수 있습니다. [최대 10초]')
+        .setLabel(`정답용 음악 재생 구간을 지정할 수 있습니다. [최대 ${SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생됨]`)
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setPlaceholder('예시) 40~50 (생략 시, 랜덤 재생)')
@@ -2239,8 +2239,9 @@ class UserQuestionInfoUI extends QuizbotUI
       const modal_current_question_answering_info = cloneDeep(modal_question_answering_info);
 
       modal_current_question_answering_info.components[0].components[0].setValue(question_info.data.answer_audio_url ?? ''); 
-      modal_current_question_answering_info.components[1].components[0].setValue(question_info.data.answer_image_url ?? ''); 
-      modal_current_question_answering_info.components[2].components[0].setValue(question_info.data.answer_text ?? ''); 
+      modal_current_question_answering_info.components[1].components[0].setValue(question_info.data.answer_audio_range_row ?? ''); 
+      modal_current_question_answering_info.components[2].components[0].setValue(question_info.data.answer_image_url ?? ''); 
+      modal_current_question_answering_info.components[3].components[0].setValue(question_info.data.answer_text ?? ''); 
 
       interaction.showModal(modal_current_question_answering_info);
       return;
@@ -2343,6 +2344,8 @@ class UserQuestionInfoUI extends QuizbotUI
     }
     description += "\n\n";
 
+    description += `🔸 음악 재생 구간: **${this.convertAudioRangeToString(question_info.data.audio_start, question_info.data.audio_end, 'question')}**\n\n`;
+
     description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
     if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? '').length != 0)
     {
@@ -2351,7 +2354,7 @@ class UserQuestionInfoUI extends QuizbotUI
     description += "\n\n";
 
     description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n\n`;
-    description += `🔸 음악 재생 구간:  **[${ ( (question_info.data.audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.audio_range_row) }]**\n\n`;
+
 
     description += "------ 추가 정보 ------\n\n";
     description += `🔸 힌트: **[${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]**\n`;
@@ -2366,15 +2369,17 @@ class UserQuestionInfoUI extends QuizbotUI
     }
     description += "\n\n";
 
-    description += `🔸 정답용 음악 재생 구간:  **[${ ( (question_info.data.answer_audio_range_row ?? '').length == 0 ? '랜덤 구간 재생' : question_info.data.answer_audio_range_row) }]**\n\n`;
+    description += `🔸 정답용 음악 재생 구간: **${this.convertAudioRangeToString(question_info.data.answer_audio_start, question_info.data.answer_audio_end, 'answer')}**\n\n`;
+
     description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
     if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? '').length != 0)
     {
       description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
     }
     description += "\n\n";
-
+    
     description += `🔸 정답용 텍스트:\n**[${question_info.data.answer_text ?? ''}]**\n\n`;
+
     description += `---------------------\n\n`;
 
     this.embed.description = description;
@@ -2383,6 +2388,29 @@ class UserQuestionInfoUI extends QuizbotUI
     {
       this.components[1].components[0].setDisabled(true); //이게 새로운 문제 만들기 버튼임
     }
+  }
+
+  convertAudioRangeToString(audio_start, audio_end, type) //range value 값 받아서 info 표시용 string 으로 변환
+  {
+    let audio_range_string = '[랜덤 구간 재생]'; //이게 디폴트
+
+    if(audio_start != undefined)
+    {
+      audio_range_string = `[${audio_start}초 ~ `;
+
+      if(audio_end == undefined)
+      {
+        audio_range_string += '끝까지]';
+      }
+      else
+      {
+        audio_range_string += `${audio_end}초]`;
+      }
+
+      audio_range_string += `\n(이 구간 내에서 무작위로 최대 ${type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생)`;
+    }
+
+    return audio_range_string;
   }
 
   applyQuestionInfo(user_question_info, modal_interaction)
@@ -2400,22 +2428,19 @@ class UserQuestionInfoUI extends QuizbotUI
     
     user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
 
-    if(input_question_audio_range != undefined
-      && input_question_audio_range != ''
-      && input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
-    {
-      user_question_info.data.audio_range_row += " ~ "; //물결 붙여줌
-    }
+    // 필요 없다
+    // if(input_question_audio_range != undefined
+    //   && input_question_audio_range != ''
+    //   && input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
+    // {
+    //   user_question_info.data.audio_range_row += " ~ "; //물결 붙여줌
+    // }
 
-    if(input_question_audio_range != undefined
-      && input_question_audio_range.length != 0)
-    {
-      const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_question_audio_range);
+    const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_question_audio_range);
 
-      user_question_info.data.audio_start = audio_start_value;
-      user_question_info.data.audio_end = audio_end_value;
-      user_question_info.data.audio_play_time = audio_play_time;
-    }
+    user_question_info.data.audio_start = audio_start_value;
+    user_question_info.data.audio_end = audio_end_value;
+    user_question_info.data.audio_play_time = audio_play_time;
 
     user_question_info.data.question_image_url = input_question_image_url;
     user_question_info.data.question_text = input_question_text;
@@ -2446,18 +2471,32 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.answer_text = input_answering_text ?? "";
 
     user_question_info.data.answer_audio_range_row = input_answering_audio_range;
-    if(input_answering_audio_range.length != 0)
-    {
-      const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_answering_audio_range);
 
-      user_question_info.data.answer_audio_start = audio_start_value;
-      user_question_info.data.answer_audio_end = audio_end_value;
-      user_question_info.data.answer_audio_play_time = audio_play_time;
-    }
+    const [audio_start_value, audio_end_value, audio_play_time] = this.parseAudioRangePoints(input_answering_audio_range);
+
+    user_question_info.data.answer_audio_start = audio_start_value;
+    user_question_info.data.answer_audio_end = audio_end_value;
+    user_question_info.data.answer_audio_play_time = audio_play_time;
   }
 
   parseAudioRangePoints(audio_range_row)
   {
+    if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
+    {
+      return [undefined, undefined, undefined];
+    }
+
+    audio_range_row = audio_range_row.trim();
+    if(audio_range_row.endsWith('~')) //25 ~ 이런식으로 쳤으면 ~ 제거
+    {
+      audio_range_row = audio_range_row.slice(0, audio_range_row.length - 1);
+    }
+
+    if(audio_range_row.length == 0) //정제하니깐 생략 시,
+    {
+      return [undefined, undefined, undefined];
+    }
+
     const audio_range_split = audio_range_row.split('~');
     
     let audio_start = audio_range_split[0].trim();
