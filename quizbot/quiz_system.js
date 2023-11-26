@@ -261,10 +261,10 @@ class QuizPlayUI
                 quiz_session.forceStop();
             }
 		
-	    if(err.code === RESTJSONErrorCodes.MissingPermissions) //권한 부족해서 종료된거면 알려주자
-	    {
-		quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.`});
-	    }
+            if(err.code === RESTJSONErrorCodes.MissingPermissions) //권한 부족해서 종료된거면 알려주자
+            {
+                quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.`});
+            }
 	
             return;
         }
@@ -2124,8 +2124,9 @@ class Question extends QuizLifeCycleWithUtility
 
         //아직 prepared queue에 아무것도 없다면
         let current_check_prepared_queue = 0;
-        // const max_try = SYSTEM_CONFIG.max_check_prepared_queue;
-        const max_try = 40; //고정값으로 테스트해보자
+        const max_try = SYSTEM_CONFIG.max_check_prepared_queue;
+        const check_interval = SYSTEM_CONFIG.prepared_queue_check_interval
+        // const max_try = 40; //고정값으로 테스트해보자
         while(game_data.prepared_question_queue.length == 0)
         {
             if(this.quiz_session.force_stop == true) return false;
@@ -2133,12 +2134,12 @@ class Question extends QuizLifeCycleWithUtility
             if(++current_check_prepared_queue >= max_try) //최대 체크 횟수 초과 시
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
-                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${500}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
                 return false;
             }
 
-            // await utility.sleep(SYSTEM_CONFIG.prepared_queue_check_interval);
-            await utility.sleep(500); //고정값으로 테스트 해보자
+            await utility.sleep(check_interval);
+            // await utility.sleep(500); //고정값으로 테스트 해보자
         }
         
         this.current_question = game_data.prepared_question_queue.shift(); //하나 꺼내오자
