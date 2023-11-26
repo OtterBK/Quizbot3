@@ -2,3 +2,4 @@ node_modules
 quizdata
 /private_config.json
 bgm_bak
+/config/private_config.json
