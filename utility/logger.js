@@ -5,7 +5,7 @@
 * 로깅용 모듈
 */
 
-const { SYSTEM_CONFIG } = require('./system_setting.js'); 
+const { SYSTEM_CONFIG } = require('../config/system_setting.js'); 
 const winston = require('winston');
 const winstonDaily = require('winston-daily-rotate-file'); // 날짜별로 로그 저장
 const { combine, timestamp, printf, label } = winston.format;

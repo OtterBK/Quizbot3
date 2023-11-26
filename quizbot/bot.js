@@ -8,17 +8,17 @@ const ytdl = require('discord-ytdl-core');
 const { KoreanbotsClient } = require('koreanbots');
 
 //로컬 modules
-const PRIVATE_CONFIG = require('./private_config.json');
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
+const PRIVATE_CONFIG = require('../config/private_config.json');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
 
 const command_register = require('./commands.js');
 const quizbot_ui = require('./quizbot-ui.js');
 const quiz_system = require('./quiz_system.js');
 const option_system = require("./quiz_option.js");
-const utility = require('./utility.js');
-const logger = require('./logger.js')('Main');
-const db_manager = require('./db_manager.js');
-const ipc_manager = require('./ipc_manager.js');
+const utility = require('../utility/utility.js');
+const logger = require('../utility/logger.js')('Main');
+const db_manager = require('./managers/db_manager.js');
+const ipc_manager = require('./managers/ipc_manager.js');
 
 /** global 변수 **/
 

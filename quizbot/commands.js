@@ -2,7 +2,7 @@
 
 const { REST, Routes } = require('discord.js');
 const {SlashCommandBuilder} = require("@discordjs/builders");
-const logger = require('./logger.js')('Commands');
+const logger = require('../utility/logger.js')('Commands');
 
 //명령어 목록
 const commands = [

@@ -6,9 +6,9 @@ const { reject } = require('lodash');
 const pg = require('pg');
 
 //로컬 modules
-const PRIVATE_CONFIG = require('./private_config.json');
-const { SYSTEM_CONFIG } = require('./system_setting.js');
-const logger = require('./logger.js')('DBManager');
+const PRIVATE_CONFIG = require('../../config/private_config.json');
+const { SYSTEM_CONFIG } = require('../../config/system_setting.js');
+const logger = require('../../utility/logger.js')('DBManager');
 
 const pool = new pg.Pool({
   host: PRIVATE_CONFIG.DB.HOST,

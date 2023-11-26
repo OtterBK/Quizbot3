@@ -14,13 +14,13 @@
 const { ClusterManager, HeartbeatManager } = require('discord-hybrid-sharding');
 
 //로컬 모듈
-const PRIVATE_CONFIG = require('./private_config.json');
-const logger = require('./logger.js')('ShardManager');
-const { SYSTEM_CONFIG } = require('./system_setting.js');
-const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
+const PRIVATE_CONFIG = require('./config/private_config.json');
+const logger = require('./utility/logger.js')('ShardManager');
+const { SYSTEM_CONFIG } = require('./config/system_setting.js');
+const { IPC_MESSAGE_TYPE } = require('./quizbot/managers/ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
 
-const manager = new ClusterManager(`${__dirname}/bot.js`, {
+const manager = new ClusterManager(`${__dirname}/quizbot/bot.js`, {
     totalShards: 1, // or 'auto'
     shardsPerClusters: 2,
     totalClusters: 1,

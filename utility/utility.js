@@ -5,9 +5,9 @@ const { createAudioResource, StreamType } = require('@discordjs/voice');
 const mm = require('music-metadata');
 
 //로컬 modules
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE } = require('../config/system_setting.js');
 const { orderBy } = require('lodash');
-const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
+const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
 const logger = require('./logger.js')('Utility');
 
 //미리 로드해둘 것들

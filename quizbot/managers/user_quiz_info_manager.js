@@ -3,7 +3,7 @@
 
 //로컬 modules
 const db_manager = require('./db_manager.js');
-const logger = require('./logger.js')('UserQuizInfoManager');
+const logger = require('../../utility/logger.js')('UserQuizInfoManager');
 
 //만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
 const QuizInfoColumn = 

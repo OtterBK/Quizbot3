@@ -15,13 +15,13 @@ const { SeekStream } = require('play-dl');
 //#endregion
 
 //#region 로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('./system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
 const option_system = require("./quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
-const text_contents = require('./text_contents.json')[SYSTEM_CONFIG.language]; 
-const utility = require('./utility.js');
-const logger = require('./logger.js')('QuizSystem');
-const db_manager = require('./db_manager.js');
+const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
+const utility = require('../utility/utility.js');
+const logger = require('../utility/logger.js')('QuizSystem');
+const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
 
 //#endregion
