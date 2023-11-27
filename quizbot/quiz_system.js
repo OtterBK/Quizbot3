@@ -264,6 +264,7 @@ class QuizPlayUI
             if(err.code === RESTJSONErrorCodes.MissingPermissions) //권한 부족해서 종료된거면 알려주자
             {
                 quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.`});
+		logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}`);
             }
 	
             return;
