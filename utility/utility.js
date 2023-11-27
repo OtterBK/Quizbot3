@@ -368,7 +368,7 @@ exports.isValidURL = (url) =>
 {
   try
   {
-    if(url.startsWith("http://") == false && url.startsWith("https://") == false)
+    if(url.endsWith(".webp") == true || (url.startsWith("http://") == false && url.startsWith("https://") == false)) //webp는 사용 불가
     {
       return false;
     }
