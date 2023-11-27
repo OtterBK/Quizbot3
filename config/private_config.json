@@ -1,0 +1,14 @@
+{
+    "BOT": {
+        "TOKEN" : "Discord Bot Token",
+        "CLIENT_ID" : "Discord Bot Client ID",
+        "KOREANBOT_TOKEN" : "Optional, KOREANBOT_TOKEN"
+    },
+    "DB": {
+        "HOST" : "DB HOST",
+        "USER" : "DB USER ID",
+        "PASSWORD" : "DB USER PW",
+        "DATABASE" : "Database NAME",
+        "PORT" : "DB Port"
+    }
+}

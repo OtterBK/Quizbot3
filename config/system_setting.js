@@ -11,10 +11,13 @@ exports.SYSTEM_CONFIG = {
     fade_out_duration: 5000, //fade out 시간(ms)
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
+    max_question_audio_play_time: 60, //문제용 오디오 최대 허용 길이(s)
+    max_answer_audio_play_time: 12, //정답용 오디오 최대 허용 길이(s)
+
     max_check_prepared_queue: 150, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 100, //prepared queue 체크 간격
 
-    ui_holder_aging_manager_criteria: 600, //얼마나 오래된 holder를 삭제할 지(s)
+    ui_holder_aging_manager_criteria: 3600, //얼마나 오래된 holder를 삭제할 지(s)
     ui_holder_aging_manager_interval: 600, //체크 주기(s)
 
     guilds_count_manager_interval: 10, //참여 중인 guild 수 체크 주기(s)
@@ -29,13 +32,14 @@ exports.SYSTEM_CONFIG = {
 
     explicit_close_audio_stream: true, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
 
-    bgm_path: `${__dirname}/resources/bgm`, //BGM 파일 위치
-    dev_quiz_path: `${__dirname}/resources/quizdata`, //Dev퀴즈 파일 위치
-    log_path: `${__dirname}/log`, //LOG 저장할 위치
-    notices_path: `${__dirname}/resources/notices`, //공지사항 파일 위치
-    patch_notes_path: `${__dirname}/resources/patch_notes`, //패치노트 파일 위치
-    current_notice_path: `${__dirname}/resources/current_notice.txt`, //실시간 공지
-    version_info_path: `${__dirname}/resources/version_info.txt`, //실시간 버전
+    bgm_path: `${__dirname}/../resources/bgm`, //BGM 파일 위치
+    dev_quiz_path: `${__dirname}/../resources/quizdata`, //Dev퀴즈 파일 위치
+    log_path: `${__dirname}/../log`, //LOG 저장할 위치
+    notices_path: `${__dirname}/../resources/notices`, //공지사항 파일 위치
+    patch_notes_path: `${__dirname}/../resources/patch_notes`, //패치노트 파일 위치
+    current_notice_path: `${__dirname}/../resources/current_notice.txt`, //실시간 공지
+    version_info_path: `${__dirname}/../resources/version_info.txt`, //실시간 버전
+	banned_user_path: `${__dirname}/../resources/banned_user.txt`, //퀴즈만들기 밴
 
     hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
@@ -48,6 +52,8 @@ exports.SYSTEM_CONFIG = {
     ffmpeg_kill_timeout: 70000, //ffmpeg에서 에러 발생 시나, start 안했을 시 안꺼지는 버그 있음. 최대 timeout 설정해서 시간 지나면 강종
     ffmpeg_aging_manager_criteria: 300, //5분 지나도 안꺼지면 ffmpeg는 강종
     ffmpeg_aging_manager_interval: 300, //체크 주기(s)
+
+    custom_audio_ytdl_max_length: 1200, //문제용 오디오으로 사용가능한 오디오 최대 길이(s)
 }
 
 exports.CUSTOM_EVENT_TYPE = {
@@ -74,7 +80,8 @@ exports.QUIZ_TYPE = {
 }
 
 exports.EXPLAIN_TYPE = {
-    ShortAnswerType: "short_answer",
+    SHORT_ANSWER_TYPE: "short_answer",
+    CUSTOM_ANSWER_TYPE: "custom_answer",
 }
 
 exports.BGM_TYPE = {

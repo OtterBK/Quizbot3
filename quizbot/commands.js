@@ -2,7 +2,7 @@
 
 const { REST, Routes } = require('discord.js');
 const {SlashCommandBuilder} = require("@discordjs/builders");
-const logger = require('./logger.js')('Commands');
+const logger = require('../utility/logger.js')('Commands');
 
 //명령어 목록
 const commands = [
@@ -16,16 +16,15 @@ const commands = [
     //     .setRequired(true)
     //     .addChannelTypes(ChannelType.GuildVoice)
     // ),
+
+    new SlashCommandBuilder()
+    .setName('퀴즈만들기')
+    .setDescription('직접 퀴즈를 만들 수 있는 퀴즈툴을 요청합니다.'),
+
     new SlashCommandBuilder()
     .setName('quiz')
-    .setDescription('퀴즈봇의 메인 메뉴를 표시합니다.'),
-    // .addChannelOption(option => 
-    //     option
-    //     .setName("보이스채널")
-    //     .setDescription("봇을 부를 채널")
-    //     .setRequired(true)
-    //     .addChannelTypes(ChannelType.GuildVoice)
-    // ),
+    .setDescription('Quizbot\'s commands'),
+
     new SlashCommandBuilder()
     .setName('답')
     .setDescription('현재 제시된 퀴즈의 정답을 제출합니다.')
