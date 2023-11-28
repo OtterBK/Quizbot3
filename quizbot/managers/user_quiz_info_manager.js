@@ -54,6 +54,7 @@ const QuestionInfoColumn =
   "answer_audio_end",
   "answer_audio_play_time",
   "answer_audio_range_row",
+  "hint_image_url",
 ];
 
 let question_info_key_fields = '';

@@ -1521,7 +1521,7 @@ const modal_question_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_image_url')
-        .setLabel('문제와 함께 표시할 이미지입니다.')
+        .setLabel('문제와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(250)
@@ -1549,12 +1549,24 @@ const modal_question_additional_info = new ModalBuilder()
   new ActionRowBuilder()
     .addComponents(
       new TextInputBuilder()
-        .setCustomId('txt_input_question_hint')
+        .setCustomId('txt_input_hint')
         .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(250)
         .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! (생략 가능)')
+    )
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_hint_image_url')
+        .setLabel('힌트와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(250)
+        .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
 .addComponents(
@@ -1602,7 +1614,7 @@ const modal_question_answering_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_answering_image_url')
-        .setLabel('정답 공개 시 함께 표시할 이미지입니다.')
+        .setLabel('정답 공개 시 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(250)
@@ -2228,7 +2240,8 @@ class UserQuestionInfoUI extends QuizbotUI
       const modal_current_question_additional_info = cloneDeep(modal_question_additional_info);
 
       modal_current_question_additional_info.components[0].components[0].setValue(question_info.data.hint ?? ''); 
-      modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.use_answer_timer === true ? '사용' : ''); 
+      modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.hint_image_url ?? ''); 
+      modal_current_question_additional_info.components[2].components[0].setValue(question_info.data.use_answer_timer === true ? '사용' : ''); 
 
       interaction.showModal(modal_current_question_additional_info);
       return;
@@ -2325,31 +2338,45 @@ class UserQuestionInfoUI extends QuizbotUI
     const question_info = question_list[question_index];
     this.current_question_info = question_info;
 
-    const is_valid_question_audio_url = ytdl.validateURL(question_info.data.question_audio_url);
-    const is_valid_question_image_url = utility.isValidURL(question_info.data.question_image_url);
-    const is_valid_answer_audio_url = ytdl.validateURL(question_info.data.answer_audio_url);
-    const is_valid_answer_image_url = utility.isValidURL(question_info.data.answer_image_url);
+    //url valid check, 값 없으면 true로
+    const is_valid_question_audio_url = ((question_info.data.question_audio_url ?? '').length == 0) || ytdl.validateURL(question_info.data.question_audio_url);
+    const is_valid_question_image_url = ((question_info.data.question_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.question_image_url);
 
+    const is_valid_hint_image_url = ((question_info.data.hint_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.hint_image_url);
+    
+    const is_valid_answer_audio_url = ((question_info.data.answer_audio_url ?? '').length == 0) || ytdl.validateURL(question_info.data.answer_audio_url);
+    const is_valid_answer_image_url = ((question_info.data.answer_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.answer_image_url);
+
+    //convert range row to string
+    const question_audio_range_string = this.convertAudioRangeToString(question_info.data.audio_start, question_info.data.audio_end, 'question');
+    const answer_audio_range_string = this.convertAudioRangeToString(question_info.data.answer_audio_start, question_info.data.answer_audio_end, 'answer');
+
+    /** display */
     this.embed.title = `**[ 📁 ${question_index+1}번째 문제** ]`;
-    this.embed.thumbnail.url = is_valid_question_image_url ? question_info.data.question_image_url : '',
+    this.embed.image.url = is_valid_question_image_url ? question_info.data.question_image_url : '',
+    this.embed.thumbnail.url = is_valid_answer_image_url ? question_info.data.answer_image_url : '',
     this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
 
     let description = '';
     description += "------ 기본 정보 ------\n\n";
     description += `🔸 정답: **[${question_info.data.answers}]**\n\n`;
     description += `🔸 문제 제출시 음악:\n**[${question_info.data.question_audio_url ?? ''}]**\n`;
-    if(is_valid_question_audio_url == false && (question_info.data.question_audio_url ?? '').length != 0)
+    if(is_valid_question_audio_url == false)
     {
-      description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
+      description += '```⚠ __해당 오디오 URL은 사용이 불가능합니다.__```';
     }
     description += "\n\n";
 
-    description += `🔸 음악 재생 구간: **${this.convertAudioRangeToString(question_info.data.audio_start, question_info.data.audio_end, 'question')}**\n\n`;
+    description += `🔸 음악 재생 구간: **${question_audio_range_string}**\n\n`;
 
     description += `🔸 문제 제출시 이미지:\n**[${question_info.data.question_image_url ?? ''}]**\n`;
-    if(is_valid_question_image_url == false && (question_info.data.question_image_url ?? '').length != 0)
+    if(is_valid_question_image_url == false)
     {
-      description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
+      description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
+    }
+    else
+    {
+      description += `__만약 이미지 로딩이 안된다면 다른 URL을 사용하세요.__`;
     }
     description += "\n\n";
 
@@ -2357,24 +2384,31 @@ class UserQuestionInfoUI extends QuizbotUI
 
 
     description += "------ 추가 정보 ------\n\n";
-    description += `🔸 힌트: **[${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]**\n`;
+    description += `🔸 힌트: **[${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]**\n\n`;
+    description += `🔸 힌트용 이미지:\n**[${question_info.data.hint_image_url ?? ''}]**\n`;
+    if(is_valid_hint_image_url == false)
+    {
+      description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
+    }
+    description += "\n\n";
+
     description += `🔸 정답 여유 시간 여부: **[${(question_info.data.use_answer_timer == true ? '예' : '아니요')}]**\n`;
     description += "\n";
 
     description += "------ 정답 이벤트 정보 ------\n\n";
     description += `🔸 정답용 음악:\n**[${question_info.data.answer_audio_url ?? ''}]**\n`;
-    if(is_valid_answer_audio_url == false && (question_info.data.answer_audio_url ?? '').length != 0)
+    if(is_valid_answer_audio_url == false)
     {
-      description += `⚠ __해당 오디오 URL은 사용이 불가능합니다.__`
+      description += '```⚠ __해당 오디오 URL은 사용이 불가능합니다.__```';
     }
     description += "\n\n";
 
-    description += `🔸 정답용 음악 재생 구간: **${this.convertAudioRangeToString(question_info.data.answer_audio_start, question_info.data.answer_audio_end, 'answer')}**\n\n`;
+    description += `🔸 정답용 음악 재생 구간: **${answer_audio_range_string}**\n\n`;
 
     description += `🔸 정답용 이미지:\n**[${question_info.data.answer_image_url ?? ''}]**\n`;
-    if(is_valid_answer_image_url == false && (question_info.data.answer_image_url ?? '').length != 0)
+    if(is_valid_answer_image_url == false)
     {
-      description += `⚠ __해당 이미지 URL은 사용이 불가능합니다.__`
+      description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
     }
     description += "\n\n";
     
@@ -2400,7 +2434,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
       if(audio_end == undefined)
       {
-        audio_range_string += '끝까지]';
+        audio_range_string += '음악 끝까지]';
       }
       else
       {
@@ -2448,12 +2482,14 @@ class UserQuestionInfoUI extends QuizbotUI
 
   applyQuestionAdditionalInfo(user_question_info, modal_interaction)
   {
-    const input_question_hint = modal_interaction.fields.getTextInputValue('txt_input_question_hint');
+    const input_hint = modal_interaction.fields.getTextInputValue('txt_input_hint');
+    const input_hint_image_url = modal_interaction.fields.getTextInputValue('txt_input_hint_image_url');
     const input_use_answer_timer = modal_interaction.fields.getTextInputValue('txt_input_use_answer_timer');
 
     user_question_info.data.quiz_id = this.quiz_info.quiz_id;
 
-    user_question_info.data.hint = input_question_hint ?? "";
+    user_question_info.data.hint = input_hint ?? "";
+    user_question_info.data.hint_image_url = input_hint_image_url ?? "";
     user_question_info.data.use_answer_timer = (input_use_answer_timer.length == 0 ? false : true);
   }
 
@@ -2481,22 +2517,6 @@ class UserQuestionInfoUI extends QuizbotUI
 
   parseAudioRangePoints(audio_range_row)
   {
-    if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
-    {
-      return [undefined, undefined, undefined];
-    }
-
-    audio_range_row = audio_range_row.trim();
-    if(audio_range_row.endsWith('~')) //25 ~ 이런식으로 쳤으면 ~ 제거
-    {
-      audio_range_row = audio_range_row.slice(0, audio_range_row.length - 1);
-    }
-
-    if(audio_range_row.length == 0) //정제 후에도 생략 시,
-    {
-      return [undefined, undefined, undefined];
-    }
-
     if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
     {
       return [undefined, undefined, undefined];
