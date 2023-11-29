@@ -2172,7 +2172,10 @@ class UserQuestionInfoUI extends QuizbotUI
       color: 0x05f1f1,
       title: `**${question_index+1}번째 문제**`,
       description: '데이터를 불러오는 중...\n잠시만 기다려주세요.',
-      thumbnail: { //문제 이미지 표시
+      image: { //문제 이미지 표시
+        url: '',
+      },
+      thumbnail: { //정답 이미지 표시
         url: '',
       },
       footer: { //문제 번호 표시
