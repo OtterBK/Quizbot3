@@ -21,6 +21,7 @@ const QuizInfoColumn =
     "played_count",
     "is_private",
     "played_count_of_week",
+    "tags_value",
 ];
 
 let quiz_info_key_fields = '';

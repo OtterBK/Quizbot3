@@ -16,7 +16,7 @@ const ytdl = require('discord-ytdl-core');
 //#endregion
 
 //#region 로컬 modules
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE, QUIZ_TYPE } = require('../config/system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE, QUIZ_TYPE, QUIZ_TAG } = require('../config/system_setting.js');
 const option_system = require("./quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
@@ -1400,6 +1400,33 @@ const quiz_info_control_comp = new ActionRowBuilder()
   .setStyle(ButtonStyle.Secondary),
 )
 
+//퀴즈 선택 UI에서 태그 선택용
+const quiz_search_tags_select_menu =  new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder().
+  setCustomId('quiz_search_tags_select_menu').
+  setPlaceholder('검색할 퀴즈 태그 선택하기').
+  setMaxValues(1)
+)
+for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
+{
+  const tag_option = { label: `${tag_name}`, value: `${tag_value}` };
+  quiz_search_tags_select_menu.components[0].addOptions(tag_option);
+}
+
+//퀴즈 제작 UI에서 태그 지정용
+const quiz_tags_select_menu =  new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder().
+  setCustomId('quiz_tags_select_menu').
+  setPlaceholder('검색용 퀴즈 태그 선택하기 (여러 개 선택 가능)').
+  setMaxValues(Object.keys(QUIZ_TAG).length)
+)
+for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
+{
+  const tag_option = { label: `${tag_name}`, value: `${tag_value}` };
+  quiz_tags_select_menu.components[0].addOptions(tag_option);
+}
 
 const question_select_menu_comp =  new ActionRowBuilder()
 .addComponents(
@@ -1933,7 +1960,9 @@ class UserQuizInfoUI extends QuizbotUI {
     description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     
-    description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n";
+    description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n\n";
+
+    description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n";
 
     if(quiz_info.data.is_private)
     {
@@ -1953,7 +1982,7 @@ class UserQuizInfoUI extends QuizbotUI {
     {
       this.embed.title += quiz_info.data.is_private ? ` **[비공개🔒]**` : ` **[공개]**`
 
-      this.components = [quiz_edit_comp]; //퀴즈 수정 가능한 comp
+      this.components = [quiz_edit_comp, quiz_tags_select_menu]; //퀴즈 수정 가능한 comp
 
       let temp_question_select_menu_comp = undefined;
       let temp_question_select_menu = undefined;
@@ -2039,6 +2068,12 @@ class UserQuizInfoUI extends QuizbotUI {
       return new UserQuestionInfoUI(this.quiz_info, select_index); //선택한 문제의 ui 전달
     }
 
+    if(interaction.customId == 'quiz_tags_select_menu') //태그 선택하기 메뉴 눌렀을 때
+    {
+      this.editTagsInfo(interaction);
+      return this;
+    }
+
     if(interaction.customId == 'request_modal_question_add') //문제 추가 눌렀을 떄
     {
       interaction.showModal(modal_question_info);
@@ -2063,6 +2098,9 @@ class UserQuizInfoUI extends QuizbotUI {
     if(interaction.customId == 'quiz_toggle_public') //퀴즈 공개/비공개 버튼
     {
       quiz_info.data.is_private = !quiz_info.data.is_private;
+
+      logger.info(`Edited Quiz Public/Private...value:${quiz_info.data.is_private} quiz_id: ${quiz_info.quiz_id}`);
+
       quiz_info.saveDataToDB();
 
       this.refreshUI();
@@ -2127,7 +2165,27 @@ class UserQuizInfoUI extends QuizbotUI {
     this.refreshUI();
 
     modal_interaction.reply({ content: ">>> 퀴즈 정보를 수정하였습니다.", ephemeral: true });
+    logger.info(`Edited Quiz info... quiz_id: ${quiz_info.quiz_id}`);
     // modal_interaction.deferUpdate();
+  }
+
+  editTagsInfo(select_interaction)
+  {
+    const quiz_info = this.quiz_info;
+
+    let tags_value = 0;
+    for(const tag_value of select_interaction.values)
+    {
+      tags_value += parseInt(tag_value);
+    }
+    quiz_info.data.tags_value = tags_value;
+
+    // quiz_info.data.modified_time = new Date(); //일부러 뺐다 필요하면 넣어도된다.
+
+    quiz_info.saveDataToDB();
+    this.refreshUI();
+
+    logger.info(`Edited Quiz Tag... quiz_id: ${quiz_info.quiz_id}`);
   }
 
   //TODO 컬럼미스
@@ -2640,8 +2698,12 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
   {
     super();
 
+    this.all_user_quiz_contents = undefined;
+    this.selected_tags_value = 0;
+
     this.selected_sort_by_value = 'modified_time';
     this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
+    this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함ㄴ
 
     this.embed = {
       color: 0x05f1f1,
@@ -2651,6 +2713,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     };
 
     this.components.push(this.sort_by_select_menu);
+    this.components.push(this.search_tag_select_menu);
   }
 
   onReady() //ui 등록 됐을 때
@@ -2664,7 +2727,17 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
     {
-      this.reorderQuizInfoList(interaction); //재정렬 ㄱㄱ
+      this.reorderQuizInfoList(interaction.values[0]); //재정렬 ㄱㄱ
+      this.displayContents(this.cur_page);
+      return this;
+    }
+
+    if(interaction.customId == 'quiz_search_tags_select_menu')
+    {
+      const selected_tags_value = interaction.values[0];
+      this.filterByTags(selected_tags_value);
+
+      this.cur_page = 0;
       this.displayContents(this.cur_page);
       return this;
     }
@@ -2699,16 +2772,16 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n🔸) ${user_quiz_info.data.simple_description}`;
     }
 
-    this.cur_contents = user_quiz_list ?? [];
+    this.all_user_quiz_contents = user_quiz_list ?? [];
+    this.cur_contents = this.all_user_quiz_contents;
     this.main_description = text_contents.user_select_category.description;
 
     this.displayContents(0);
     this.update();
   }
 
-  reorderQuizInfoList(interaction)
+  reorderQuizInfoList(selected_sort_by_value)
   {
-    const selected_sort_by_value = interaction.values[0];
     if(this.selected_sort_by_value == selected_sort_by_value) return; //바뀐게 없다면 return
     
     this.selected_sort_by_value = selected_sort_by_value;
@@ -2718,6 +2791,32 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     this.cur_contents.sort((a, b) => b.data[this.selected_sort_by_value] - a.data[this.selected_sort_by_value]); //내림차순
 
     this.displayContents(this.current_question_index);
+  }
+
+  filterByTags(selected_tags_value) //태그로
+  {
+    if(this.selected_tags_value == selected_tags_value) //같으면 패스
+    {
+      return;
+    }
+
+    this.selected_tags_value = selected_tags_value;
+
+    this.selectDefaultOptionByValue(this.search_tag_select_menu.components[0], selected_tags_value);
+
+    let filtered_contents = [];
+    for(const quiz_info of this.all_user_quiz_contents)
+    {
+      const quiz_tags_value = quiz_info.data.tags_value;
+      if((quiz_tags_value & selected_tags_value) != selected_tags_value) //비트 마스킹
+      {
+        continue;
+      }
+
+      filtered_contents.push(quiz_info);
+    }
+
+    this.cur_contents = filtered_contents;
   }
 
 }
