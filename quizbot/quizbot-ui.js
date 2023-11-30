@@ -61,11 +61,18 @@ const select_btn_component = new ActionRowBuilder()
 
 const page_select_menu = new StringSelectMenuBuilder().
 setCustomId('page_jump').
-setPlaceholder('페이지 이동');
+setPlaceholder('페이지 이동')
 
 const page_select_row = new ActionRowBuilder()
 .addComponents(
-  
+  new StringSelectMenuBuilder().
+    setCustomId('page_jump_temp').
+    setPlaceholder('페이지 이동')
+    .addOptions(
+      new StringSelectMenuOptionBuilder()
+      .setLabel('페이지 정보를 계산하는 중...')
+      .setValue('page_select_menu_temp'),
+    )
 )
 
 const control_btn_component = new ActionRowBuilder()
@@ -651,7 +658,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
 
     this.control_btn_component = cloneDeep(control_btn_component);
     this.page_jump_component = cloneDeep(page_select_row);
-    this.components = [select_btn_component, this.control_btn_component ]; //이게 기본 component임
+    this.components = [select_btn_component, this.control_btn_component, this.page_jump_component ]; //이게 기본 component임
 
     this.cur_contents = undefined;
     this.cur_page = 0;
@@ -676,7 +683,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
       this.cur_page = selected_page_num;
       this.displayContents(this.cur_page);
 
-      const page_select_menu = this.page_jump_component.components[0];
+      // const page_select_menu = this.page_jump_component.components[0];
       // this.selectDefaultOptionByValue(page_select_menu, selected_page_num);
       return true;
     }
@@ -706,30 +713,35 @@ class QuizBotControlComponentUI extends QuizbotUI {
   {
     //selectmenu component의 options는 readonly 라서 다시 만들어야함
 
-    if(max_page <= 1)
+    // if(max_page <= 1) //23.11.30 아 그냥 뺴지마, 신경쓸게 많음;;
+    // {
+    //   // this.components = [select_btn_component, this.control_btn_component]; //페이지가 1개면 페이지 이동 menu 뺌
+    //   const index_to_remove = this.components.indexOf(this.page_jump_component);
+    //   if(index_to_remove != -1)
+    //   {
+    //     this.components.splice(index_to_remove, 1); 
+    //   }
+    //   return;
+    // }
+
+    // this.components = [select_btn_component, this.control_btn_component, this.page_jump_component ]; //기본 component로 다시 지정
+    // this.components.splice(2, 0, this.page_jump_component); //페이지 선택 메뉴 필요하면 삽입
+
+    if(max_page <= 0) 
     {
-      // this.components = [select_btn_component, this.control_btn_component]; //페이지가 1개면 페이지 이동 menu 뺌
-      const index_to_remove = this.components.indexOf(this.page_jump_component);
-      if(index_to_remove != -1)
-      {
-        this.components.splice(index_to_remove, 1); 
-      }
       return;
     }
 
-    // this.components = [select_btn_component, this.control_btn_component, this.page_jump_component ]; //기본 component로 다시 지정
-    this.components.splice(2, 0, this.page_jump_component); //페이지 선택 메뉴 필요하면 삽입
-
     const new_select_menu = cloneDeep(page_select_menu);
 
-    for(let i = 0; i < max_page; ++i)
+    for(let i = 0; i < max_page && i < 25; ++i) //최대 25까지밖에 안됨
     {
       const page_option = { label: `${i+1}페이지`, description: ` `, value: `page_${i}` };
       new_select_menu.addOptions(page_option);
     }
 
     this.page_jump_component.components[0] = new_select_menu;
-    this.components[2] = this.page_jump_component;
+    // this.components[2] = this.page_jump_component;
   }
 
   displayContents(page_num)
@@ -1405,8 +1417,7 @@ const quiz_search_tags_select_menu =  new ActionRowBuilder()
 .addComponents(
   new StringSelectMenuBuilder().
   setCustomId('quiz_search_tags_select_menu').
-  setPlaceholder('검색할 퀴즈 태그 선택하기').
-  setMaxValues(1)
+  setPlaceholder('검색할 퀴즈 태그 선택하기')
 )
 for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
 {
@@ -2703,7 +2714,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.selected_sort_by_value = 'modified_time';
     this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
-    this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함ㄴ
+    this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함
 
     this.embed = {
       color: 0x05f1f1,
