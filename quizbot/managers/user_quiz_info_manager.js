@@ -21,6 +21,7 @@ const QuizInfoColumn =
     "played_count",
     "is_private",
     "played_count_of_week",
+    "tags_value",
 ];
 
 let quiz_info_key_fields = '';
@@ -54,6 +55,7 @@ const QuestionInfoColumn =
   "answer_audio_end",
   "answer_audio_play_time",
   "answer_audio_range_row",
+  "hint_image_url",
 ];
 
 let question_info_key_fields = '';

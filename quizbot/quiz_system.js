@@ -1368,12 +1368,28 @@ class InitializeCustomQuiz extends Initialize
 
             const question_data = question_row.data;
 
+
+            /** 문제용 이벤트 */
             //정답 값 처리
             const answer_string = question_data['answers'];
             const answers_row = answer_string.split(","); //custom quiz는 ,로 끊는다
             const answers = this.makeAnswers(answers_row);
             question['answers'] = answers;
 
+            //퀴즈용 오디오 url 처리
+            //prepare 단계에서함
+
+            //퀴즈용 음악 구간 처리
+            //prepare 단계에서함
+
+            //퀴즈용 이미지 url 처리
+            question['image_resource'] = question_data['question_image_url'];
+
+            //퀴즈용 텍스트 처리
+            question['question_text'] = question_data['question_text'];
+
+
+            /** 추가 정보 이벤트 */
             //힌트 값 처리
             const hint = question_data['hint'];
             if((hint == undefined || hint === '') && answers.length > 0)
@@ -1385,6 +1401,27 @@ class InitializeCustomQuiz extends Initialize
                 question['hint'] = question_data['hint']; //지정된 값 있으면 그대로
             }
 
+            //힌트 이미지 처리
+            question['hint_image_url'] = (question_data['hint_image_url'] ?? '').length == 0 ? undefined : question_data['hint_image_url'];
+
+            //타임 오버 됐을 때 10초의 여유 시간 줄지 여부
+            question['use_answer_timer'] = question_data['use_answer_timer'];
+
+
+            /** 정답 공개 이벤트 */
+            //정답용 오디오
+            // prepare 단계에서함
+
+            //정답용 음악 구간
+            // prepare 단계에서함
+
+            //정답 공개용 이미지 url
+            question['answer_image_resource'] = question_data['answer_image_url'];
+
+            //정답 공개용 텍스트
+            question['author'] = [ question_data['answer_text'] ];
+
+            /**완성했으면 넣자 */
             question_list.push(question);
 
         });
@@ -1452,15 +1489,21 @@ class Explain extends QuizLifecycle
             quiz_ui.embed.description += explain;
             utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.PLING);
             quiz_ui.update();
-            
-            await new Promise((resolve, reject) =>
-            {
-                setTimeout(() => {
-                    //그냥 sleep용
-                    resolve();
-                },SYSTEM_CONFIG.explain_wait);
-            });
+
+            await utility.sleep(SYSTEM_CONFIG.explain_wait);
         }
+
+        //k, h 관련 알림
+        const option_data = this.quiz_session.option_data;
+        if(option_data.quiz.use_message_intent == OPTION_TYPE.ENABLED) //메시지 입력 감시 옵션 on일 때만
+        {
+            const channel = quiz_ui.channel;
+            channel.send('```' + `${text_contents.quiz_explain.how_to_request_hint_and_skip}` + '```');
+            utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.PLING);
+
+            await utility.sleep(SYSTEM_CONFIG.explain_wait);
+        }
+
     }
 }
 
@@ -1825,9 +1868,9 @@ class Prepare extends QuizLifecycle
         }
 
         /**
-         * question_image_url, 문제용 오디오 url
+         * question_image_url, 문제용 이미지 url
          */
-        target_question['image_resource'] = target_question_data['question_image_url'];
+        //Initial 할 때 이미 처리됨 target_question_data['question_image_url'];
 
         /**
          * question_answers. 문제 정답
@@ -1835,20 +1878,24 @@ class Prepare extends QuizLifecycle
         //Initial 할 때 이미 처리됨 target_question_data['answers'];
 
         /**
-         * question_hint, 문제 힌트
+         * question_text, 문제용 텍스트
+         */
+        //Initial 할 때 이미 처리됨 target_question_data['question_text'];
+
+        /**
+         * hint, 문제 힌트
          */
         //Initial 할 때 이미 처리됨 target_question_data['hint'];
 
         /**
-         * question_text, 문제용 텍스트
+         * hint_image_url, 문제 힌트용 이미지
          */
-        target_question['question_text'] = target_question_data['question_text'];
-        //question_text 도 그대로
+        //Initial 할 때 이미 처리됨 target_question_data['hint_image_url'];
 
         /**
          * use_answer_timer, 타임 오버 됐을 때 10초의 여유 시간 줄지 여부
          */
-        target_question['use_answer_timer'] = target_question_data['use_answer_timer'];
+        //Initial 할 때 이미 처리됨 target_question_data['use_answer_timer'];
 
         /**
          * answer_audio_url, 정답 공개용 오디오 url
@@ -1870,16 +1917,15 @@ class Prepare extends QuizLifecycle
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
         }
         
-
         /**
          * answer_image_url, 정답 공개용 이미지 url
          */
-        target_question['answer_image_resource'] = target_question_data['answer_image_url'];
+        //Initial 할 때 이미 처리됨 target_question_data[''answer_image_url'];
 
         /**
          * answer_text, 정답 공개용 텍스트
          */
-        target_question['author'] = [ target_question_data['answer_text'] ];
+        //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
     }
 
 
@@ -1894,7 +1940,7 @@ class Prepare extends QuizLifecycle
 
         const option_data = this.quiz_session.option_data;
 
-        const max_play_time_sec = (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->10s
+        const max_play_time_sec = (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->12s
 
         let audio_resource; //최종 audio_resource
         let audio_length_ms; //최종 audio_length
@@ -1921,7 +1967,7 @@ class Prepare extends QuizLifecycle
             return [undefined, undefined];
         }
 
-        //최종 재생 길이 구하기
+        //최종 재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
         let audio_length_sec = (audio_play_time_row ?? 0) <= 0 ? Math.floor(option_data.quiz.audio_play_time / 1000) : audio_play_time_row; //얼만큼 재생할지
 
         if(audio_start_row == undefined || audio_start_row >= audio_duration_sec) //시작 요청 값 없거나, 시작 요청 구간이 오디오 범위 넘어서면
@@ -1931,7 +1977,7 @@ class Prepare extends QuizLifecycle
         }
         else
         {
-            if(audio_end_row == undefined || audio_end_row > audio_duration_sec) //끝 요청 값 없거나, 오디오 길이 초기화면 자동으로 최대치
+            if(audio_end_row == undefined || audio_end_row > audio_duration_sec) //끝 요청 값 없거나, 오디오 길이 초과화면 자동으로 최대치
             {
                 audio_end_row = audio_duration_sec;
             }
@@ -1994,7 +2040,7 @@ class Prepare extends QuizLifecycle
 
             //2초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
             //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 2}`], 
+            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 5}`], 
             seek: audio_start_point, 
         });
 
@@ -2077,6 +2123,9 @@ class Question extends QuizLifeCycleWithUtility
 
         this.is_select_question = false; //객관식 퀴즈 여부
         this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
+
+        this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
+        this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
     }
 
     async enter()
@@ -2106,6 +2155,9 @@ class Question extends QuizLifeCycleWithUtility
 
         this.is_select_question = false; //객관식 퀴즈 여부
         this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
+
+        this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
+        this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
 
         if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
         {
@@ -2239,21 +2291,39 @@ class Question extends QuizLifeCycleWithUtility
     //힌트 표시
     async showHint(question)
     {
-        if(question['hint_used'] == true || question['hint'] == undefined)
+        if(question['hint_used'] == true || (question['hint'] == undefined && question['hint_image_url'] == undefined))
         {
             return;    
         }
         question['hint_used'] = true;
 
+        let quiz_ui = this.quiz_session.quiz_ui;
+        quiz_ui.setButtonStatus(0, false); //힌트 버튼 비활성화
+        quiz_ui.update();
+
         const hint = question['hint'];
         const channel = this.quiz_session.channel;
         let hint_message = text_contents.quiz_play_ui.show_hint;
         hint_message = hint_message.replace("${hint}", hint);
-        channel.send({content: hint_message});
 
-        let quiz_ui = this.quiz_session.quiz_ui;
-        quiz_ui.setButtonStatus(0, false); //스킵 버튼 비활성화
-        quiz_ui.update();
+        if(question['hint_image_url'] != undefined)
+        {
+            const hint_image_url = question['hint_image_url'];
+            const hint_embed = {
+                color: 0x05f1f1,
+                title: `${text_contents.quiz_play_ui.hint_title}`,
+                description: `${hint_message}`,
+                image: {
+                    url: utility.isValidURL(hint_image_url) ? hint_image_url : '',
+                }
+              };
+
+            channel.send({embeds: [hint_embed]});
+        }
+        else
+        {
+            channel.send({content: hint_message});
+        }
     }
 
     //스킵
@@ -2265,13 +2335,13 @@ class Question extends QuizLifeCycleWithUtility
         }
         question['skip_used'] = true;
 
-        const channel = this.quiz_session.channel;
-        let skip_message = text_contents.quiz_play_ui.skip;
-        channel.send({content: skip_message});
-        
         let quiz_ui = this.quiz_session.quiz_ui;
         quiz_ui.setButtonStatus(1, false); //스킵 버튼 비활성화
         quiz_ui.update();
+
+        const channel = this.quiz_session.channel;
+        let skip_message = text_contents.quiz_play_ui.skip;
+        channel.send({content: skip_message});
         
         await this.stopTimeoverTimer(); //그리고 다음으로 진행 가능하게 타임오버 타이머를 중지해줌
     }
@@ -2404,14 +2474,16 @@ class Question extends QuizLifeCycleWithUtility
     async checkAutoHint(audio_play_time) 
     {
         const option_data = this.quiz_session.option_data;
-        if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.AUTO) //자동 힌트 사용 중이라면
+        if(option_data.quiz.hint_type != OPTION_TYPE.HINT_TYPE.AUTO) //자동 힌트 사용 중이 아니라면
         {
-            const hint_timer_wait = audio_play_time / 2; //절반 지나면 힌트 표시할거임
-            const hint_timer = setTimeout(() => {
-                this.showHint(this.current_question); //현재 퀴즈 hint 표시
-            }, hint_timer_wait);
-            this.hint_timer = hint_timer;
+            return;
         }   
+
+        const hint_timer_wait = audio_play_time / 2; //절반 지나면 힌트 표시할거임
+        const hint_timer = setTimeout(() => {
+            this.showHint(this.current_question); //현재 퀴즈 hint 표시
+        }, hint_timer_wait);
+        this.hint_timer = hint_timer;
     }
 
     //정답 대기 타이머 생성 및 지연 시작
@@ -2539,6 +2611,17 @@ class Question extends QuizLifeCycleWithUtility
             // .catch(err => {
             //     logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
             // });
+            return;
+        }
+
+        if(submit_answer === 'ㅎ')
+        {
+            this.requestHint(message.author);
+        }
+
+        if(submit_answer === 'ㅅ')
+        {
+            this.requestSkip(message.author);
         }
     }
 
@@ -2578,13 +2661,6 @@ class Question extends QuizLifeCycleWithUtility
 
     async handleButtonCommand(interaction)
     {
-        const option_data = this.quiz_session.option_data;
-        const current_question = this.current_question;
-        if(current_question == undefined) 
-        {
-            return;
-        }
-
         if(this.timeover_timer == undefined)
         {
             return; //타임 오버 타이머 시작도 안했는데 누른거면 패스한다.
@@ -2592,95 +2668,13 @@ class Question extends QuizLifeCycleWithUtility
 
         if(interaction.customId === 'hint') 
         {
-            if(current_question['hint_used'] == true || current_question['hint'] == undefined) //2중 체크
-            {
-                return;
-            }
-
-            if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
-            {
-                if(interaction.member == this.quiz_session.owner)
-                {
-                    this.showHint(current_question);
-                    return;
-                }
-                const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_hint}` +'```'
-                interaction.channel.send({content: reject_message});
-            }
-            else if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.VOTE)
-            {
-                const voice_channel = this.quiz_session.voice_channel;
-                const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 
-
-                let current_hint_vote_count = 0;
-                if(current_question['hint_vote_count'] == undefined)
-                {
-                    current_hint_vote_count = 1;
-                }
-                else 
-                {
-                    current_hint_vote_count = current_question['hint_vote_count'] + 1;
-                }
-                current_question['hint_vote_count'] = current_hint_vote_count;
-
-                let hint_vote_message = text_contents.quiz_play_ui.hint_vote;
-                hint_vote_message = hint_vote_message.replace("${who_voted}", interaction.member.displayName);
-                hint_vote_message = hint_vote_message.replace("${current_vote_count}", current_hint_vote_count);
-                hint_vote_message = hint_vote_message.replace("${vote_criteria}", vote_criteria);
-                interaction.channel.send({content: hint_vote_message});
-                if(current_hint_vote_count >= vote_criteria)
-                {
-                    this.showHint(current_question);
-                }
-
-            }
+            this.requestHint(interaction.member);
             return;
         }
 
         if(interaction.customId === 'skip') 
         {
-            if(current_question['skip_used'] == true) //2중 체크
-            {
-                return;
-            }
-
-            if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.OWNER) //주최자만 skip 사용 가능하면
-            {
-                if(interaction.member == this.quiz_session.owner)
-                {
-                    this.skip(this.current_question);
-                    return;
-                }
-                const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_skip}` +'```'
-                interaction.channel.send({content: reject_message});
-            }
-            else if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.VOTE)
-            {
-                const voice_channel = this.quiz_session.voice_channel;
-                const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 
-
-                let current_skip_vote_count = 0;
-                if(current_question['skip_vote_count'] == undefined)
-                {
-                    current_skip_vote_count = 1;
-                }
-                else
-                {
-                    current_skip_vote_count = current_question['skip_vote_count'] + 1;
-                }
-                current_question['skip_vote_count'] = current_skip_vote_count;
-
-                let skip_vote_message = text_contents.quiz_play_ui.skip_vote;
-                skip_vote_message = skip_vote_message.replace("${who_voted}", interaction.member.displayName);
-                skip_vote_message = skip_vote_message.replace("${current_vote_count}", current_skip_vote_count);
-                skip_vote_message = skip_vote_message.replace("${vote_criteria}", vote_criteria);
-                interaction.channel.send({content: skip_vote_message});
-
-                if(current_skip_vote_count >= vote_criteria)
-                {
-                    this.skip(current_question);
-                }
-            }
+            this.requestSkip(interaction.member);
             return;
         }
 
@@ -2694,6 +2688,106 @@ class Question extends QuizLifeCycleWithUtility
                 this.selected_answer_map = new Map();
             }
             this.selected_answer_map.set(member, selected_value);
+        }
+    }
+
+    requestHint(member)
+    {
+        const option_data = this.quiz_session.option_data;
+        const current_question = this.current_question;
+        if(current_question == undefined) 
+        {
+            return;
+        }
+
+        //2중 체크의 필요성이 있나?
+        // if(current_question['hint_used'] == true 
+        //     || (current_question['hint'] == undefined && current_question['hint_image_url'] == undefined)) //2중 체크
+        // {
+        //     return;
+        // }
+        const member_id = member.id;
+        if(this.hint_voted_user_list.includes(member_id))
+        {
+            return;
+        }
+
+        this.hint_voted_user_list.push(member_id);
+
+        if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
+        {
+            if(member_id == this.quiz_session.owner.id)
+            {
+                this.showHint(current_question);
+                return;
+            }
+            const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_hint}` +'```'
+            this.quiz_session.channel.send({content: reject_message});
+        }
+        else if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.VOTE)
+        {
+            const voice_channel = this.quiz_session.voice_channel;
+            const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 
+
+            current_question['hint_vote_count'] = current_question['hint_vote_count'] == undefined ? 1 : current_question['hint_vote_count'] + 1;
+
+            let hint_vote_message = text_contents.quiz_play_ui.hint_vote;
+            hint_vote_message = hint_vote_message.replace("${who_voted}", member.displayName);
+            hint_vote_message = hint_vote_message.replace("${current_vote_count}", current_question['hint_vote_count'] );
+            hint_vote_message = hint_vote_message.replace("${vote_criteria}", vote_criteria);
+            this.quiz_session.channel.send({content: hint_vote_message});
+            if(current_question['hint_vote_count']  >= vote_criteria)
+            {
+                this.showHint(current_question);
+            }
+
+        }
+    }
+
+    requestSkip(member)
+    {
+        const option_data = this.quiz_session.option_data;
+        const current_question = this.current_question;
+        if(current_question == undefined) 
+        {
+            return;
+        }
+
+        const member_id = member.id;
+        if(this.skip_voted_user_list.includes(member_id))
+        {
+            return;
+        }
+
+        this.skip_voted_user_list.push(member_id);
+
+        if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.OWNER) //주최자만 skip 사용 가능하면
+        {
+            if(member_id == this.quiz_session.owner.id)
+            {
+                this.skip(this.current_question);
+                return;
+            }
+            const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_skip}` +'```'
+            this.quiz_session.channel.send({content: reject_message});
+        }
+        else if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.VOTE)
+        {
+            const voice_channel = this.quiz_session.voice_channel;
+            const vote_criteria = parseInt((voice_channel.members.size - 2) / 2) + 1; 
+
+            current_question['skip_vote_count'] = current_question['skip_vote_count'] == undefined ? 1 : current_question['skip_vote_count'] + 1;
+
+            let skip_vote_message = text_contents.quiz_play_ui.skip_vote;
+            skip_vote_message = skip_vote_message.replace("${who_voted}", member.displayName);
+            skip_vote_message = skip_vote_message.replace("${current_vote_count}", current_question['skip_vote_count']);
+            skip_vote_message = skip_vote_message.replace("${vote_criteria}", vote_criteria);
+            this.quiz_session.channel.send({content: skip_vote_message});
+
+            if(current_question['skip_vote_count'] >= vote_criteria)
+            {
+                this.skip(current_question);
+            }
         }
     }
 }
