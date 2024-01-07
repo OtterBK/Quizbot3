@@ -59,6 +59,54 @@ const select_btn_component = new ActionRowBuilder()
     .setStyle(ButtonStyle.Primary),
 )
 
+//24.01.07 부터는 9개씩 보여준다. 대신 페이지 이동 뺐음
+const select_btn_component2 = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+    .setCustomId('6')
+    // .setLabel('1️⃣')
+    .setLabel('6')
+    .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+    .setCustomId('7')
+    // .setLabel('2️⃣')
+    .setLabel('7')
+    .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+    .setCustomId('8')
+    // .setLabel('3️⃣')
+    .setLabel('8')
+    .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+    .setCustomId('9')
+    // .setLabel('4️⃣')
+    .setLabel('9')
+    .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+    .setCustomId('request_modal_page_jump')
+    // .setLabel('5️⃣')
+    .setLabel('점프')
+    .setStyle(ButtonStyle.Secondary),
+)
+
+//퀴즈 만들기
+const modal_page_jump = new ModalBuilder()
+.setCustomId('modal_page_jump')
+.setTitle('페이지 이동')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_page_jump')
+        .setLabel('몇 페이지로 이동할까요?')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(1)
+        .setMaxLength(4)
+        .setRequired(true)
+        .setPlaceholder('예시) 1')
+    )
+)
+
 const page_select_menu = new StringSelectMenuBuilder().
 setCustomId('page_jump').
 setPlaceholder('페이지 이동')
@@ -548,7 +596,7 @@ class QuizbotUI {
   {
     this.embed = {};
     // this.components = [cloneDeep(select_btn_component), cloneDeep(control_btn_component)]; //내가 clonedeep을 왜 해줬었지?
-    this.components = [ select_btn_component ]; //이게 기본 component임
+    this.components = [ select_btn_component, select_btn_component2 ]; //이게 기본 component임
     this.holder = undefined; 
   }
 
@@ -658,33 +706,72 @@ class QuizBotControlComponentUI extends QuizbotUI {
 
     this.control_btn_component = cloneDeep(control_btn_component);
     this.page_jump_component = cloneDeep(page_select_row);
-    this.components = [select_btn_component, this.control_btn_component, this.page_jump_component ]; //이게 기본 component임
+    this.components = [select_btn_component, select_btn_component2, this.control_btn_component ]; //이게 기본 component임
 
     this.cur_contents = undefined;
     this.cur_page = 0;
     this.total_page = 0;
-    this.count_per_page = 5; //페이지별 표시할 컨텐츠 수
+    this.count_per_page = 9; //페이지별 표시할 컨텐츠 수
     this.main_description = undefined; //displayContent에 같이 표시할 메인 description
   }
 
   checkPageMove(interaction) //더미용 이벤트 콜백
   {
     /** false => 페이지 이동 관련 아님, undefined => 페이지 이동 관련이긴하나 페이지가 바뀌진 않음, true => 페이지가 바뀜 */
-    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return false;
+    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return false;
 
-    if(interaction.customId == 'page_jump') //페이지 점프 시,
-    {
-      const selected_value = interaction.values[0];
-      const selected_page_num = parseInt(selected_value.replace('page_', ""));
-      if(this.cur_page == selected_page_num) return undefined; //페이지 바뀐게 없다면 return;
+    //페이지이동 select menu 눌렀을 때임
+    // if(interaction.customId == 'page_jump') //페이지 점프 시,
+    // {
+    //   const selected_value = interaction.values[0];
+    //   const selected_page_num = parseInt(selected_value.replace('page_', ""));
+    //   if(this.cur_page == selected_page_num) return undefined; //페이지 바뀐게 없다면 return;
 
-      if(selected_page_num < 0 || selected_page_num > this.total_page - 1) return undefined; //이상한 범위면 return
+    //   if(selected_page_num < 0 || selected_page_num > this.total_page - 1) return undefined; //이상한 범위면 return
       
-      this.cur_page = selected_page_num;
+    //   this.cur_page = selected_page_num;
+    //   this.displayContents(this.cur_page);
+
+    //   const page_select_menu = this.page_jump_component.components[0];
+    //   // this.selectDefaultOptionByValue(page_select_menu, selected_page_num);
+    //   return true;
+    // }
+
+    //점프 버튼 눌렀을 때임
+    if(interaction.customId == 'request_modal_page_jump')
+    {
+      interaction.showModal(modal_page_jump); //페이지 점프 입력 모달 전달
+      return undefined;
+    }
+
+    //페이지 점프 제공했을 때임
+    if(interaction.customId == 'modal_page_jump')
+    {
+      const input_page_value = interaction.fields.getTextInputValue('txt_input_page_jump');
+
+      const selected_page_num = parseInt(input_page_value.trim());
+      if(isNaN(selected_page_num)) //입력 값 잘못된거 처리
+      {
+        interaction.reply({content: `>>> ${input_page_value} 값은 잘못됐습니다.`, ephemeral: true});
+        return undefined;
+      }
+
+      if(selected_page_num <= 0 || selected_page_num > this.total_page) 
+      {
+        interaction.reply({content: `>>> ${input_page_value} 페이지는 없네요...`, ephemeral: true});
+        return undefined; //이상한 범위면 return
+      }
+
+      interaction.deferUpdate();
+
+      if(this.cur_page == selected_page_num) 
+      {
+        return undefined; //페이지 바뀐게 없다면 return;
+      }
+      
+      this.cur_page = selected_page_num - 1;
       this.displayContents(this.cur_page);
 
-      // const page_select_menu = this.page_jump_component.components[0];
-      // this.selectDefaultOptionByValue(page_select_menu, selected_page_num);
       return true;
     }
 
@@ -709,6 +796,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
     return false;
   }
 
+  //Deprecated
   setPageSelectMenuMax(max_page)
   {
     //selectmenu component의 options는 readonly 라서 다시 만들어야함
@@ -755,7 +843,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
     if(this.total_page == 0 || this.total_page != total_page) //total page 변경 사항 있을 시
     {
       this.total_page = total_page; //나중에 쓸거라 저장
-      this.setPageSelectMenuMax(this.total_page);
+      // this.setPageSelectMenuMax(this.total_page);
     }
 
     let page_contents = [];
@@ -953,14 +1041,14 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
 
     const is_page_move = this.checkPageMove(interaction);
     if(is_page_move == undefined) return;
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -1294,7 +1382,7 @@ class NotesSelectUI extends QuizBotControlComponentUI
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
 
     const is_page_move = this.checkPageMove(interaction);
     if(is_page_move == undefined) return;
@@ -1317,7 +1405,7 @@ class NotesSelectUI extends QuizBotControlComponentUI
     }
 
     const select_num = parseInt(interaction.customId);
-    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -1794,7 +1882,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -2108,6 +2196,13 @@ class UserQuizInfoUI extends QuizbotUI {
 
     if(interaction.customId == 'quiz_toggle_public') //퀴즈 공개/비공개 버튼
     {
+      //비공개에서 공개로 전환할 경우
+      if(quiz_info.data.is_private == true && (quiz_info.data.tags_value == undefined || quiz_info.data.tags_value == 0))
+      {
+        interaction.user.send({ content: ">>> 태그를 1개 이상 선택해주세요...ㅜㅜ 😥", ephemeral: true });
+        return;
+      }
+
       quiz_info.data.is_private = !quiz_info.data.is_private;
 
       logger.info(`Edited Quiz Public/Private...value:${quiz_info.data.is_private} quiz_id: ${quiz_info.quiz_id}`);
@@ -2734,7 +2829,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
 
     if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
     {
@@ -2758,7 +2853,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(select_num == NaN || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함

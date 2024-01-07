@@ -254,7 +254,7 @@ class QuizPlayUI
         if(err.code === RESTJSONErrorCodes.UnknownChannel || err.code === RESTJSONErrorCodes.MissingPermissions)
         {
             const guild_id = this.channel.guild.id;
-            const quiz_session = exports.getQuizSession(guild.id);
+            const quiz_session = exports.getQuizSession(guild_id);
             logger.info(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
             if(quiz_session != undefined)
             {
