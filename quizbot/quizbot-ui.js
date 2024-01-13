@@ -59,34 +59,29 @@ const select_btn_component = new ActionRowBuilder()
     .setStyle(ButtonStyle.Primary),
 )
 
-//24.01.07 부터는 9개씩 보여준다. 대신 페이지 이동 뺐음
+//24.01.08 부터는 10개씩 보여준다. 대신 페이지 이동 뺐음
 const select_btn_component2 = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
     .setCustomId('6')
-    // .setLabel('1️⃣')
     .setLabel('6')
     .setStyle(ButtonStyle.Primary),
   new ButtonBuilder()
     .setCustomId('7')
-    // .setLabel('2️⃣')
     .setLabel('7')
     .setStyle(ButtonStyle.Primary),
   new ButtonBuilder()
     .setCustomId('8')
-    // .setLabel('3️⃣')
     .setLabel('8')
     .setStyle(ButtonStyle.Primary),
   new ButtonBuilder()
     .setCustomId('9')
-    // .setLabel('4️⃣')
     .setLabel('9')
     .setStyle(ButtonStyle.Primary),
-  new ButtonBuilder()
-    .setCustomId('request_modal_page_jump')
-    // .setLabel('5️⃣')
-    .setLabel('점프')
-    .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+    .setCustomId('10')
+    .setLabel('10')
+    .setStyle(ButtonStyle.Primary),
 )
 
 //퀴즈 만들기
@@ -131,7 +126,11 @@ const control_btn_component = new ActionRowBuilder()
   .setStyle(ButtonStyle.Secondary),
   new ButtonBuilder()
     .setCustomId('back')
-    .setLabel('뒤로가기')
+    .setLabel('뒤로')
+    .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('request_modal_page_jump')
+    .setLabel('점프')
     .setStyle(ButtonStyle.Secondary),
   new ButtonBuilder()
     .setCustomId('next')
@@ -265,7 +264,7 @@ const sort_by_select_menu = new ActionRowBuilder()
     .setValue('played_count_of_week'),
 
     new StringSelectMenuOptionBuilder()
-    .setLabel('최신 생성순')
+    .setLabel('최신 퀴즈순')
     .setDescription('최근 생성된 퀴즈부터 표시합니다.')
     .setValue('birthtime'),
 
@@ -273,6 +272,11 @@ const sort_by_select_menu = new ActionRowBuilder()
     .setLabel('전체 인기순')
     .setDescription('가장 많이 플레이된 퀴즈부터 표시합니다.')
     .setValue('played_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('오래된 퀴즈순')
+    .setDescription('가장 오래전에 생성된 퀴즈부터 표시합니다.')
+    .setValue('birthtime_reverse'),
   )
 );
 
@@ -711,7 +715,7 @@ class QuizBotControlComponentUI extends QuizbotUI {
     this.cur_contents = undefined;
     this.cur_page = 0;
     this.total_page = 0;
-    this.count_per_page = 9; //페이지별 표시할 컨텐츠 수
+    this.count_per_page = 10; //페이지별 표시할 컨텐츠 수
     this.main_description = undefined; //displayContent에 같이 표시할 메인 description
   }
 
@@ -1048,7 +1052,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -1405,7 +1409,7 @@ class NotesSelectUI extends QuizBotControlComponentUI
     }
 
     const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -1584,7 +1588,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_description')
         .setLabel('퀴즈에 대해 자유롭게 소개해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setRequired(false)
         .setPlaceholder('예시) 2023년 인기를 얻었던 팝송 맞추기 퀴즈입니다!\n모건 월렌, 콤즈 등 유명한 노래가 포함되어 있습니다')
     )
@@ -1596,7 +1600,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_thumbnail')
         .setLabel('퀴즈의 썸네일 이미지 URL을 입력해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setRequired(false)
         .setPlaceholder('예시) https://buly.kr/D3b6HK6')
     )
@@ -1626,7 +1630,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 재생할 음악입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM 사용)')
     )
 )
@@ -1650,7 +1654,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1662,7 +1666,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
@@ -1679,7 +1683,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! (생략 가능)')
     )
 )
@@ -1691,7 +1695,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('힌트와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1720,7 +1724,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 재생할 오디오입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('유튜브 URL 입력 (생략 가능)')
     )
 )
@@ -1743,7 +1747,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1755,7 +1759,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 정답과 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
-        .setMaxLength(250)
+        .setMaxLength(500)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
@@ -1882,7 +1886,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -2853,7 +2857,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     if(is_page_move == true) return this;
 
     const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 9) return; //1~9번 사이 눌렀을 경우만
+    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
@@ -2894,7 +2898,14 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.selectDefaultOptionByValue(this.sort_by_select_menu.components[0], selected_sort_by_value);
 
-    this.cur_contents.sort((a, b) => b.data[this.selected_sort_by_value] - a.data[this.selected_sort_by_value]); //내림차순
+    if(this.selected_sort_by_value.endsWith("_reverse")) //거꾸로 정렬이면
+    {
+      this.cur_contents.sort((a, b) => a.data[this.selected_sort_by_value] - b.data[this.selected_sort_by_value]); //오름차순(오래된 퀴즈순)
+    }
+    else
+    {
+      this.cur_contents.sort((a, b) => b.data[this.selected_sort_by_value] - a.data[this.selected_sort_by_value]); //내림차순(최근 퀴즈순)
+    }
 
     this.displayContents(this.current_question_index);
   }
