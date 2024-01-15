@@ -19,7 +19,7 @@ create user quizbot password '1234' superuser;
 \du
 
 #DB생성
-create database quizbot3 owner quizbot
+create database quizbot3 owner quizbot;
 \l
 \q
 
