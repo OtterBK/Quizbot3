@@ -23,6 +23,10 @@ const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('QuizSystem');
 const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
+const { error } = require('console');
+const ytdl_agent = ytdl.createAgent(
+    JSON.parse(fs.readFileSync('/home/ubuntu/quizbot3/config/youtube_cookies.json')),
+);
 
 //#endregion
 
@@ -1594,6 +1598,7 @@ class Prepare extends QuizLifecycle
                 return;
             }
             logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
+            target_question['question_text'] += "\n\nAUDIO_ERROR: " + err.message; //에러나면 UI에도 표시해주자
         }
 
         this.prepared_question = target_question;
@@ -1858,11 +1863,16 @@ class Prepare extends QuizLifecycle
             const question_audio_start = target_question_data['audio_start'];
             const question_audio_end = target_question_data['audio_end'];
 
-            const [question_audio_resource, question_audio_play_time_ms] = 
+            const [question_audio_resource, question_audio_play_time_ms, error_message] = 
                 await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question');
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
+
+            if(error_message != undefined)
+            {
+                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+            }
         }
 
         /**
@@ -1908,11 +1918,16 @@ class Prepare extends QuizLifecycle
             const answer_audio_start = target_question_data['answer_audio_start'];
             const answer_audio_end = target_question_data['answer_audio_end'];
     
-            const [answer_audio_resource, answer_audio_play_time_ms] = 
+            const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
                 await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer');
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+
+            if(error_message != undefined)
+            {
+                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+            }
         }
         
         /**
@@ -1930,10 +1945,13 @@ class Prepare extends QuizLifecycle
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
     async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question') 
     {
+        let error_message;
+
         if(ytdl.validateURL(audio_url_row) == false)
         {
             logger.warn(`${audio_url_row} is not validateURL`);
-            return [undefined, undefined];
+            error_message = `${audio_url_row} is not validateURL`;
+            return [undefined, undefined, error_message];
         }
 
         const option_data = this.quiz_session.option_data;
@@ -1944,12 +1962,13 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(audio_url_row);
+        const youtube_info = await ytdl.getInfo(audio_url_row, {agent: ytdl_agent});
         let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
         if(audio_formats.length == 0) 
         {
             logger.error(`cannot found audio format from ${youtube_info}`);
-            return [undefined, undefined];
+            error_message = `cannot found audio format from ${youtube_info}`;
+            return [undefined, undefined, error_message];
         }
 
         const audio_format = audio_formats[audio_formats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
@@ -1962,7 +1981,8 @@ class Prepare extends QuizLifecycle
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
             logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            return [undefined, undefined];
+            error_message = `${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`;
+            return [undefined, undefined, error_message];
         }
 
         //최종 재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
@@ -2032,6 +2052,7 @@ class Prepare extends QuizLifecycle
         
         logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
         let audio_stream = ytdl(audio_url_row, { 
+            agent: ytdl_agent,
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
@@ -2083,7 +2104,7 @@ class Prepare extends QuizLifecycle
             // resource.volume.setVolume(0);
         }
         
-        return [audio_resource, audio_length_ms];
+        return [audio_resource, audio_length_ms, undefined];
     }
 }
 
