@@ -6,6 +6,7 @@ const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
 const { KoreanbotsClient } = require('koreanbots');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 //로컬 modules
 const PRIVATE_CONFIG = require('../config/private_config.json');
@@ -127,6 +128,13 @@ const start_quiz_handler = async (interaction) => {
   }
 };
 
+const create_quiz_tool_btn_component = new ActionRowBuilder()
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('btn_create_quiz_tool')
+  .setLabel('퀴즈만들기')
+  .setStyle(ButtonStyle.Success),
+);
 const create_quiz_handler = async (interaction) => {
   //나중에 시간마다 조회하는 방식으로 변경할 것
   if(fs.existsSync(SYSTEM_CONFIG.banned_user_path)) //퀴즈만들기 ban 시스템
@@ -149,7 +157,7 @@ const create_quiz_handler = async (interaction) => {
   if(interaction.guild != undefined && interaction.guild !== null) //샤딩돼 있어서 길드에서 요청할경우 ui_holder_map 주소가 달라 못찾음
   {
     interaction.reply({content: '>>> 퀴즈 제작에 참여해주셔서 감사합니다!\n퀴즈봇이 메시지를 보낼거에요. 확인해보세요!', ephemeral: true});
-    interaction.member.send({content: '>>> **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력해주세요!', ephemeral: true});
+    interaction.member.send({content: '>>> **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력하시거나 버튼을 클릭하세요!', components: [ create_quiz_tool_btn_component ], ephemeral: true});
     return;
   }
   
@@ -173,7 +181,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
     return;
   }
 
-  if(main_command === '퀴즈만들기') 
+  if(main_command === '퀴즈만들기' || interaction.customId == 'btn_create_quiz_tool') 
   {
     await create_quiz_handler(interaction);
     return;
