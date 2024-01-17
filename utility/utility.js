@@ -3,6 +3,7 @@ const fs = require('fs');
 const { EmbedBuilder } = require('discord.js');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
 const mm = require('music-metadata');
+const os = require('os');
 
 //로컬 modules
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE, QUIZ_TAG } = require('../config/system_setting.js');
@@ -396,3 +397,20 @@ exports.convertTagsValueToString = (tags_value) =>
 
   return tag_string;
 }
+
+exports.getIPv6Address = () => {
+  const networkInterfaces = os.networkInterfaces();
+  const ipv6Addresses = [];
+
+  for (const interfaceKey in networkInterfaces) {
+    const interfaces = networkInterfaces[interfaceKey];
+    for (let i = 0; i < interfaces.length; i++) {
+      const address = interfaces[i];
+      if (address.family === 'IPv6' && !address.internal) {
+        ipv6Addresses.push(address.address);
+      }
+    }
+  }
+
+  return ipv6Addresses;
+};

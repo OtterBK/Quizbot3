@@ -24,9 +24,6 @@ const logger = require('../utility/logger.js')('QuizSystem');
 const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
 const { error } = require('console');
-const ytdl_agent = ytdl.createAgent(
-    JSON.parse(fs.readFileSync('/home/ubuntu/quizbot3/config/youtube_cookies.json')),
-);
 
 //#endregion
 
@@ -65,6 +62,7 @@ exports.initialize = (client) =>
         return false;
     }
     bot_client = client;
+
     return true;
 }
 
@@ -385,6 +383,8 @@ class QuizSession
 
         this.force_stop = false; //강제종료 여부
 
+        this.ytdl_agent = undefined; //ytdl용 agent
+
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
         //Initialize ->
@@ -451,6 +451,9 @@ class QuizSession
         this.option_data = undefined; //옵션
 
         this.scoreboard = undefined; //scoreboard 
+
+        this.ipv6 = undefined; 
+        this.ytdl_agent = undefined; 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -1431,6 +1434,32 @@ class InitializeCustomQuiz extends Initialize
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+        {
+            try
+            {
+                const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
+                if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
+                {
+                    logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
+                    return false;
+                }
+        
+                const cookie_ytdl_agent = ytdl.createAgent(
+                    JSON.parse(fs.readFileSync(ytdl_cookie_path)),
+                ); //cookie 기반 ytdl agent
+
+                this.quiz_session.ytdl_agent = cookie_ytdl_agent;
+    
+                logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
+            }
+            catch(err)
+            {
+                logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
+            }
+        }
+    
     }
 }
 
@@ -1847,6 +1876,7 @@ class Prepare extends QuizLifecycle
     {
         const option_data = this.quiz_session.option_data;
         const game_data = this.quiz_session.game_data;
+        const ytdl_agent = this.quiz_session.ytdl_agent;
 
         const target_question_data = target_question.data;
 
@@ -1864,7 +1894,7 @@ class Prepare extends QuizLifecycle
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question');
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', ytdl_options);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
@@ -1919,7 +1949,7 @@ class Prepare extends QuizLifecycle
             const answer_audio_end = target_question_data['answer_audio_end'];
     
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer');
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', ytdl_agent);
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
@@ -1943,7 +1973,7 @@ class Prepare extends QuizLifecycle
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question') 
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ytdl_agent=undefined) 
     {
         let error_message;
 
@@ -1962,7 +1992,10 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(audio_url_row, {agent: ytdl_agent});
+        const youtube_info = await ytdl.getInfo(audio_url_row, {
+            agent: ytdl_agent,
+            IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
+        });
         let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
         if(audio_formats.length == 0) 
         {
