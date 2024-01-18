@@ -11,7 +11,7 @@ const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
 const ffmpeg = require('fluent-ffmpeg');
 const stream = require('stream');
-const { SeekStream } = require('play-dl');
+// const { SeekStream } = require('play-dl');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -23,6 +23,8 @@ const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('QuizSystem');
 const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
+const { error } = require('console');
+const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
 
 //#endregion
 
@@ -61,6 +63,7 @@ exports.initialize = (client) =>
         return false;
     }
     bot_client = client;
+
     return true;
 }
 
@@ -254,7 +257,7 @@ class QuizPlayUI
         if(err.code === RESTJSONErrorCodes.UnknownChannel || err.code === RESTJSONErrorCodes.MissingPermissions)
         {
             const guild_id = this.channel.guild.id;
-            const quiz_session = exports.getQuizSession(guild.id);
+            const quiz_session = exports.getQuizSession(guild_id);
             logger.info(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
             if(quiz_session != undefined)
             {
@@ -381,6 +384,8 @@ class QuizSession
 
         this.force_stop = false; //강제종료 여부
 
+        this.ytdl_agent = undefined; //ytdl용 agent
+
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
         //Initialize ->
@@ -429,24 +434,27 @@ class QuizSession
             // cycle.free();
         }
 
-        this.guild = undefined;
-        this.owner = undefined;
-        this.channel = undefined;
-        this.quiz_info = undefined;
-        this.voice_channel = undefined;
+        this.guild = null;
+        this.owner = null;
+        this.channel = null;
+        this.quiz_info = null;
+        this.voice_channel = null;
 
-        this.quiz_ui = undefined; //직접 새로 UI만들자
+        this.quiz_ui = null; //직접 새로 UI만들자
 
-        this.voice_connection = undefined;
-        this.audio_player = undefined;
+        this.voice_connection = null;
+        this.audio_player = null;
 
-        this.lifecycle_map = {};
+        this.lifecycle_map = null;
 
-        this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
-        this.game_data = undefined; //얘는 자주 바뀐다.
-        this.option_data = undefined; //옵션
+        this.quiz_data = null; //얘는 처음 initialize 후 바뀌지 않는다.
+        this.game_data = null; //얘는 자주 바뀐다.
+        this.option_data = null; //옵션
 
-        this.scoreboard = undefined; //scoreboard 
+        this.scoreboard = null; //scoreboard 
+
+        this.ipv6 = null; 
+        this.ytdl_agent = null; 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -577,7 +585,7 @@ class QuizLifecycle
 
     free()
     {
-        this.quiz_session = undefined;
+        this.quiz_session = null;
     }
 
     do()
@@ -935,21 +943,19 @@ class Initialize extends QuizLifecycle
             }
         });
 		
-		/*
-		보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185
-		const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-		  const newUdp = Reflect.get(newNetworkState, 'udp');
-		  clearInterval(newUdp?.keepAliveInterval);
-		};
+	//보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
+	const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+	  const newUdp = Reflect.get(newNetworkState, 'udp');
+	  clearInterval(newUdp?.keepAliveInterval);
+	};
 
-		voice_connection.on('stateChange', (oldState, newState) => {
-		  const oldNetworking = Reflect.get(oldState, 'networking');
-		  const newNetworking = Reflect.get(newState, 'networking');
+	voice_connection.on('stateChange', (oldState, newState) => {
+	  const oldNetworking = Reflect.get(oldState, 'networking');
+	  const newNetworking = Reflect.get(newState, 'networking');
 
-		  oldNetworking?.off('stateChange', networkStateChangeHandler);
-		  newNetworking?.on('stateChange', networkStateChangeHandler);
-		});
-		*/
+	  oldNetworking?.off('stateChange', networkStateChangeHandler);
+	  newNetworking?.on('stateChange', networkStateChangeHandler);
+	});
 
         const audio_player = createAudioPlayer({
             behaviors: {
@@ -1429,6 +1435,32 @@ class InitializeCustomQuiz extends Initialize
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+        {
+            try
+            {
+                const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
+                if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
+                {
+                    logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
+                    return false;
+                }
+        
+                const cookie_ytdl_agent = ytdl.createAgent(
+                    JSON.parse(fs.readFileSync(ytdl_cookie_path)),
+                ); //cookie 기반 ytdl agent
+
+                this.quiz_session.ytdl_agent = cookie_ytdl_agent;
+    
+                logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
+            }
+            catch(err)
+            {
+                logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
+            }
+        }
+    
     }
 }
 
@@ -1596,6 +1628,7 @@ class Prepare extends QuizLifecycle
                 return;
             }
             logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
+            target_question['question_text'] += "\n\nAUDIO_ERROR: " + err.message; //에러나면 UI에도 표시해주자
         }
 
         this.prepared_question = target_question;
@@ -1783,7 +1816,7 @@ class Prepare extends QuizLifecycle
         {
             const seek_stream = new SeekStream(
                 question,
-                (audio_duration_sec + 5), //duration, 5는 패딩
+                (audio_length_sec + 10), //duration, 10는 패딩
                 0, //header length 안넘겨도됨
                 size_in_bytes,
                 bitrate, //TODO BITRATE 정확한 값으로 넘기기
@@ -1844,6 +1877,7 @@ class Prepare extends QuizLifecycle
     {
         const option_data = this.quiz_session.option_data;
         const game_data = this.quiz_session.game_data;
+        const ytdl_agent = this.quiz_session.ytdl_agent;
 
         const target_question_data = target_question.data;
 
@@ -1860,11 +1894,16 @@ class Prepare extends QuizLifecycle
             const question_audio_start = target_question_data['audio_start'];
             const question_audio_end = target_question_data['audio_end'];
 
-            const [question_audio_resource, question_audio_play_time_ms] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question');
+            const [question_audio_resource, question_audio_play_time_ms, error_message] = 
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', ytdl_options);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
+
+            if(error_message != undefined)
+            {
+                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+            }
         }
 
         /**
@@ -1910,11 +1949,16 @@ class Prepare extends QuizLifecycle
             const answer_audio_start = target_question_data['answer_audio_start'];
             const answer_audio_end = target_question_data['answer_audio_end'];
     
-            const [answer_audio_resource, answer_audio_play_time_ms] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer');
+            const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', ytdl_agent);
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+
+            if(error_message != undefined)
+            {
+                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+            }
         }
         
         /**
@@ -1930,12 +1974,15 @@ class Prepare extends QuizLifecycle
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question') 
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ytdl_agent=undefined) 
     {
+        let error_message;
+
         if(ytdl.validateURL(audio_url_row) == false)
         {
             logger.warn(`${audio_url_row} is not validateURL`);
-            return [undefined, undefined];
+            error_message = `${audio_url_row} is not validateURL`;
+            return [undefined, undefined, error_message];
         }
 
         const option_data = this.quiz_session.option_data;
@@ -1946,15 +1993,23 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(audio_url_row);
-        let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
-        if(audio_formats.length == 0) 
+        const youtube_info = await ytdl.getInfo(audio_url_row, {
+            agent: ytdl_agent,
+            IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
+        });
+        
+        const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
+            filter: 'audioonly', 
+            quality: 'lowestaudio' 
+        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308
+
+        if(audio_format == undefined) 
         {
             logger.error(`cannot found audio format from ${youtube_info}`);
-            return [undefined, undefined];
+            error_message = `cannot found audio format from ${youtube_info}`;
+            return [undefined, undefined, error_message];
         }
 
-        const audio_format = audio_formats[audio_formats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
         const audio_duration_ms = audio_format.approxDurationMs;
         const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
         const audio_size = audio_format.contentLength;
@@ -1964,7 +2019,8 @@ class Prepare extends QuizLifecycle
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
             logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            return [undefined, undefined];
+            error_message = `${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`;
+            return [undefined, undefined, error_message];
         }
 
         //최종 재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
@@ -2034,13 +2090,14 @@ class Prepare extends QuizLifecycle
         
         logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
         let audio_stream = ytdl(audio_url_row, { 
+            agent: ytdl_agent,
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
 
-            //2초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
+            //10초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
             //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 5}`], 
+            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 10}`], 
             seek: audio_start_point, 
         });
 
@@ -2085,7 +2142,7 @@ class Prepare extends QuizLifecycle
             // resource.volume.setVolume(0);
         }
         
-        return [audio_resource, audio_length_ms];
+        return [audio_resource, audio_length_ms, undefined];
     }
 }
 
