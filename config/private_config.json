@@ -1,0 +1,14 @@
+{
+    "BOT": {
+        "TOKEN" : "INPUT_BOT_TOKEN",
+        "CLIENT_ID" : "INPUT_BOT_CLIENT_ID",
+        "KOREANBOT_TOKEN" : "INPUT_KOREAN_BOT_TOKEN"
+    },
+    "DB": {
+        "HOST" : "localhsot",
+        "USER" : "quizbot",
+        "PASSWORD" : "changepasswd",
+        "DATABASE" : "quizbot3",
+        "PORT" : "5432"
+    }
+}
