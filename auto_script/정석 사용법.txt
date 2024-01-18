@@ -1,0 +1,2 @@
+mkdir Quizbot3
+sudo sh auto_script/setup_quizbot3.sh --cron --node=18 --dump=/home/ubuntu/auto_script/db_backup/backup_20240118_222832.sql --install-path=/home/ubuntu/Quizbot3/
