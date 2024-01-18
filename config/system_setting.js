@@ -55,8 +55,8 @@ exports.SYSTEM_CONFIG = {
 
     custom_audio_ytdl_max_length: 1200, //문제용 오디오으로 사용가능한 오디오 최대 길이(s)
 
-    ytdl_ipv6_USE: true, //IPv4 대신 IPv6 사용 여부
-    ytdl_ipv6_block_agent_use: true, //IPv6 Block 기반 YTDL Agent, 사용 시, cookie는 비활성화됨
+    ytdl_ipv6_USE: false, //IPv4 대신 IPv6 사용 여부
+    ytdl_ipv6_block_agent_use: false, //IPv6 Block 기반 YTDL Agent, 사용 시, cookie는 비활성화됨
     ytdl_ipv6_block_range: '2600:1900:41a0:36cb::/64', //IPv6 Block Range
     ytdl_cookie_agent_use: false, //Cookie YTDL Agent
     ytdl_cookie_path: `${__dirname}/../resources/youtube_cookies.json`, //Cookie 기반 YTDL Agent의 Cookie 경로
