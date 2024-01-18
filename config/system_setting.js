@@ -30,7 +30,8 @@ exports.SYSTEM_CONFIG = {
     explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
-    explicit_close_audio_stream: true, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
+    explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
+    //ffmpeg는 drop_ffmpeg.sh 로 스케줄 돌리고 utlity/SeekStream에서 알아서 잘 닫도록 해뒀으니 false로 해야함
 
     bgm_path: `${__dirname}/../resources/bgm`, //BGM 파일 위치
     dev_quiz_path: `${__dirname}/../resources/quizdata`, //Dev퀴즈 파일 위치
