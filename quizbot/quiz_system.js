@@ -11,7 +11,7 @@ const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
 const ffmpeg = require('fluent-ffmpeg');
 const stream = require('stream');
-const { SeekStream } = require('play-dl');
+// const { SeekStream } = require('play-dl');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -24,6 +24,7 @@ const logger = require('../utility/logger.js')('QuizSystem');
 const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
 const { error } = require('console');
+const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
 
 //#endregion
 
@@ -433,27 +434,27 @@ class QuizSession
             // cycle.free();
         }
 
-        this.guild = undefined;
-        this.owner = undefined;
-        this.channel = undefined;
-        this.quiz_info = undefined;
-        this.voice_channel = undefined;
+        this.guild = null;
+        this.owner = null;
+        this.channel = null;
+        this.quiz_info = null;
+        this.voice_channel = null;
 
-        this.quiz_ui = undefined; //직접 새로 UI만들자
+        this.quiz_ui = null; //직접 새로 UI만들자
 
-        this.voice_connection = undefined;
-        this.audio_player = undefined;
+        this.voice_connection = null;
+        this.audio_player = null;
 
-        this.lifecycle_map = {};
+        this.lifecycle_map = null;
 
-        this.quiz_data = undefined; //얘는 처음 initialize 후 바뀌지 않는다.
-        this.game_data = undefined; //얘는 자주 바뀐다.
-        this.option_data = undefined; //옵션
+        this.quiz_data = null; //얘는 처음 initialize 후 바뀌지 않는다.
+        this.game_data = null; //얘는 자주 바뀐다.
+        this.option_data = null; //옵션
 
-        this.scoreboard = undefined; //scoreboard 
+        this.scoreboard = null; //scoreboard 
 
-        this.ipv6 = undefined; 
-        this.ytdl_agent = undefined; 
+        this.ipv6 = null; 
+        this.ytdl_agent = null; 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -584,7 +585,7 @@ class QuizLifecycle
 
     free()
     {
-        this.quiz_session = undefined;
+        this.quiz_session = null;
     }
 
     do()
@@ -1815,7 +1816,7 @@ class Prepare extends QuizLifecycle
         {
             const seek_stream = new SeekStream(
                 question,
-                (audio_duration_sec + 10), //duration, 10는 패딩
+                (audio_length_sec + 10), //duration, 10는 패딩
                 0, //header length 안넘겨도됨
                 size_in_bytes,
                 bitrate, //TODO BITRATE 정확한 값으로 넘기기
@@ -1996,15 +1997,19 @@ class Prepare extends QuizLifecycle
             agent: ytdl_agent,
             IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
         });
-        let audio_formats = ytdl.filterFormats(youtube_info.formats, 'audioonly');
-        if(audio_formats.length == 0) 
+        
+        const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
+            filter: 'audioonly', 
+            quality: 'lowestaudio' 
+        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308
+
+        if(audio_format == undefined) 
         {
             logger.error(`cannot found audio format from ${youtube_info}`);
             error_message = `cannot found audio format from ${youtube_info}`;
             return [undefined, undefined, error_message];
         }
 
-        const audio_format = audio_formats[audio_formats.length - 1]; //맨 뒤에 있는게 가장 low 퀄리티, 반대로 맨 앞이면 high 퀄리티
         const audio_duration_ms = audio_format.approxDurationMs;
         const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
         const audio_size = audio_format.contentLength;
