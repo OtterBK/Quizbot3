@@ -1436,6 +1436,10 @@ class InitializeCustomQuiz extends Initialize
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
 
+        let cookie = undefined;
+        let local_address = undefined;
+        let auto_select_family = false;
+
         if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
         {
             try
@@ -1446,12 +1450,8 @@ class InitializeCustomQuiz extends Initialize
                     logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
                     return false;
                 }
-        
-                const cookie_ytdl_agent = ytdl.createAgent(
-                    JSON.parse(fs.readFileSync(ytdl_cookie_path)),
-                ); //cookie 기반 ytdl agent
 
-                this.quiz_session.ytdl_agent = cookie_ytdl_agent;
+                cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
     
                 logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
             }
@@ -1460,7 +1460,31 @@ class InitializeCustomQuiz extends Initialize
                 logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
             }
         }
-    
+
+        if(SYSTEM_CONFIG.ytdl_ipv6_USE)
+        {
+            const ipv6 = utility.getIPv6Address()[0];
+            if(ipv6 == undefined)
+            {
+                logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ipv4, guild_id:${this.quiz_session.guild_id}`);
+            }
+            else
+            {
+                logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${this.quiz_session.guild_id}`);
+                local_address = ipv6;
+                auto_select_family = true;
+            }
+        }
+
+        const ytdl_agent = ytdl.createAgent(
+            cookie,
+            {
+                autoSelectFamily: auto_select_family,
+                localAddress: local_address
+            }
+        ); //cookie 기반 ytdl agent
+
+        this.quiz_session.ytdl_agent = ytdl_agent;
     }
 }
 
@@ -1895,7 +1919,7 @@ class Prepare extends QuizLifecycle
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', ytdl_options);
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', ytdl_agent);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;

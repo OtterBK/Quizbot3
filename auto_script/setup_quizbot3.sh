@@ -77,10 +77,13 @@ print_emphasized() {
 }
 
 print_emphasized "Updating package list..."
-sudo apt update
+sudo apt update -y
+
+print_emphasized "Installing Net tools..."
+sudo apt install net-tools -y 
 
 print_emphasized "Installing PostgreSQL 14..."
-sudo apt install postgresql-14
+sudo apt install postgresql-14 -y
 
 print_emphasized "Creating user 'quizbot' with password 'changepasswd'..."
 sudo -u postgres psql -c "CREATE USER quizbot WITH PASSWORD 'changepasswd';"
@@ -114,8 +117,8 @@ if [ -n "$BACKUP_FILE" ]; then
 	rm "/tmp/$(basename "$BACKUP_FILE")"
 fi
 
-print_emphasized "Modifying pg_hba.conf to use md5 for all local peers..."
-sudo sed -i "s/local.*all.*peer/local all all md5/" /etc/postgresql/14/main/pg_hba.conf
+#print_emphasized "Modifying pg_hba.conf to use md5 for all local peers..."
+#sudo sed -i "s/local.*all.*peer/local all all md5/" /etc/postgresql/14/main/pg_hba.conf
 
 # Install Quizbot3
 print_emphasized "Installing Git"
@@ -132,13 +135,13 @@ print_emphasized "Quizbot3 has been Installed!!!!!!!!!!!!!!!!!!!!"
 # Setting Cron Scheduler
 if [ "$REGISTER_CRON" = true ]; then
 	print_emphasized "Installing Cron..."
-        sudo timedatectl set-timezone Asia/Seoul
+    sudo timedatectl set-timezone Asia/Seoul
 	sudo apt install cron -y
 	sudo service cron start
 
 	print_emphasized "Executing Register cron script"
- 	(crontab -l 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | crontab -
-  
+	SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
+    (crontab -l 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | crontab -
 	(crontab -l 2>/dev/null; echo "0 * * * * sudo sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | crontab -
 	(crontab -l 2>/dev/null; echo "0 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | crontab -
 	(crontab -l 2>/dev/null; echo "1 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_start.sh") | crontab -
