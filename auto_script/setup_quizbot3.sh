@@ -2,7 +2,7 @@
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 [--help] [--install-path=path] [--cron] [--dump=backup_file.sql] [--node=node_version(16,17,18)]"
+    echo "Usage: $0 [--help] [--install-path=path] [--cron] [--dump=backup_file.sql] [--node=node_version(16,17,18)] [--swap=8]"
     exit 1
 }
 
@@ -11,6 +11,7 @@ INSTALL_PATH=""
 NODE_VERSION="16"
 BACKUP_FILE=""
 REGISTER_CRON=false
+SWAP_MEM=""
 
 # Process parameters
 while [ "$#" -gt 0 ]; do
@@ -31,6 +32,10 @@ while [ "$#" -gt 0 ]; do
 			BACKUP_FILE="${1#*=}"
             shift 1
             ;;
+		--swap=*)
+		    SWAP_MEM="${1#*=}"
+		    shift 1
+		    ;;
         --help)
             usage
             ;;
@@ -59,6 +64,11 @@ echo "Register cron set to: $REGISTER_CRON"
 # Check if --node option is provided
 if [ -n "$NODE_VERSION" ]; then
     echo "Node version set to: $NODE_VERSION"
+fi
+
+# Check if --swap option is provided
+if [ -n "$SWAP_MEM" ]; then
+    echo "Swap Memory set to: $SWAP_MEM"
 fi
 
 # Check if --dump option is provided
@@ -150,5 +160,32 @@ if [ "$REGISTER_CRON" = true ]; then
 	(crontab -l 2>/dev/null; echo "0 8 * * * sudo sh $SCRIPT_PATH/db_script/backup_script.sh") | crontab -
  	(crontab -l 2>/dev/null; echo "0 */3 * * * sudo sync && echo 3 > /proc/sys/vm/drop_caches") | crontab -
 fi
+
+# Setting Swap Memory
+if [ -n "$SWAP_MEM" ]; then
+    print_emphasized "Setting Swap Memory to: $SWAP_MEM"
+
+    SWAPFILE="/swapfile"
+    SWAPSIZE=$SWAP_MEM
+
+    # Check if swapfile already exists
+    if [ -e "$SWAPFILE" ]; then
+    	 echo "Swapfile already exists. Exiting."
+    else
+
+    	# Create a swapfile
+    	sudo fallocate -l $SWAPSIZE $SWAPFILE
+	sudo chmod 600 $SWAPFILE
+    	sudo mkswap $SWAPFILE
+    	sudo swapon $SWAPFILE
+
+    	# Add the swapfile entry to /etc/fstab to make it persistent across reboots
+    	echo "$SWAPFILE none swap sw 0 0" | sudo tee -a /etc/fstab
+
+    	# Display the swap information
+    	echo "Swapfile created and activated:"
+    	sudo swapon --show
+    fi
+fi    
 
 print_emphasized "Quizbot3 Auto Setup Finised! :)"
