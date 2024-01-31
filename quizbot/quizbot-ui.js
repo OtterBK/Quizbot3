@@ -1911,13 +1911,13 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
 
+    this.cur_contents = [];
     if(user_quiz_list.length == 0)
     {
       this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
       return;
     }
 
-    this.cur_contents = [];
     for(const quiz_info of user_quiz_list)
     {
       quiz_info.name = quiz_info.data.quiz_title;
