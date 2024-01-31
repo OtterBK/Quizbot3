@@ -162,6 +162,59 @@ function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 �
   return ffmpeg_aging_manager;
 }
 
+function createYtdlAgent(quiz_session=undefined)
+{
+    let cookie = undefined;
+    let local_address = undefined;
+    let auto_select_family = false;
+
+    if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+    {
+        try
+        {
+            const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
+            if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
+            {
+                logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
+                return false;
+            }
+
+            cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
+
+            logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}`);
+        }
+        catch(err)
+        {
+            logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}, err: ${err.stack ?? err.message}`);
+        }
+    }
+
+    if(SYSTEM_CONFIG.ytdl_ipv6_USE)
+    {
+        const ipv6 = utility.getIPv6Address()[0];
+        if(ipv6 == undefined)
+        {
+            logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
+        }
+        else
+        {
+            logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
+            local_address = ipv6;
+            auto_select_family = true;
+        }
+    }
+
+    const ytdl_agent = ytdl.createAgent(
+        cookie,
+        {
+            autoSelectFamily: auto_select_family,
+            localAddress: local_address
+        }
+    ); //cookie 기반 ytdl agent
+
+    return ytdl_agent;
+}
+
 //#region 퀴즈 플레이에 사용될 UI
 class QuizPlayUI
 {
@@ -453,7 +506,6 @@ class QuizSession
 
         this.scoreboard = null; //scoreboard 
 
-        this.ipv6 = null; 
         this.ytdl_agent = null; 
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
@@ -527,7 +579,7 @@ class QuizSession
 
     getCycle(cycle_type)
     {
-        if(this.lifecycle_map.hasOwnProperty(cycle_type) == false)
+        if(this.lifecycle_map?.hasOwnProperty(cycle_type) == false)
         {
             return undefined;
         }
@@ -1436,55 +1488,7 @@ class InitializeCustomQuiz extends Initialize
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
 
-        let cookie = undefined;
-        let local_address = undefined;
-        let auto_select_family = false;
-
-        if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
-        {
-            try
-            {
-                const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
-                if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
-                {
-                    logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
-                    return false;
-                }
-
-                cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
-    
-                logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
-            }
-            catch(err)
-            {
-                logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
-            }
-        }
-
-        if(SYSTEM_CONFIG.ytdl_ipv6_USE)
-        {
-            const ipv6 = utility.getIPv6Address()[0];
-            if(ipv6 == undefined)
-            {
-                logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ipv4, guild_id:${this.quiz_session.guild_id}`);
-            }
-            else
-            {
-                logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${this.quiz_session.guild_id}`);
-                local_address = ipv6;
-                auto_select_family = true;
-            }
-        }
-
-        const ytdl_agent = ytdl.createAgent(
-            cookie,
-            {
-                autoSelectFamily: auto_select_family,
-                localAddress: local_address
-            }
-        ); //cookie 기반 ytdl agent
-
-        this.quiz_session.ytdl_agent = ytdl_agent;
+        this.quiz_session.ytdl_agent = createYtdlAgent(this.quiz_session);
     }
 }
 
@@ -1653,6 +1657,18 @@ class Prepare extends QuizLifecycle
             }
             logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
             target_question['question_text'] += "\n\nAUDIO_ERROR: " + err.message; //에러나면 UI에도 표시해주자
+
+            if(err.message.includes("bind") && this.quiz_session.ytdl_agent != undefined && this.SYSTEM_CONFIG.ytdl_ipv6_USE) //ip bind error면
+            {
+                const current_ip = this.quiz_session.ytdl_agent.localAddress;
+                const new_ip = utility.getIPv6Address()[0];
+
+                if(current_ip != new_ip) //다시 한번 만들어본다.
+                {
+                    logger.info(`Detected IPv6 Address has been changed! recreating ytdl agent...[${current_ip} -> ${new_ip}]`);
+                    this.quiz_session.ytdl_agent = createYtdlAgent(this.quiz_session);
+                }
+            }
         }
 
         this.prepared_question = target_question;
@@ -2017,11 +2033,31 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(audio_url_row, {
-            agent: ytdl_agent,
-            IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
-        });
-        
+        let youtube_info = undefined;
+        let try_count = 0;
+
+        while(youtube_info == undefined && try_count < SYSTEM_CONFIG.ytdl_max_try)
+        {
+            ++try_count;
+
+            try
+            {
+                youtube_info = await ytdl.getInfo(audio_url_row, {
+                    agent: ytdl_agent,
+                    IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
+                });
+            }
+            catch(err)
+            {
+                logger.error(`Failed ytdl.getInfo... current_try: ${try_count}, err_message: ${err.message}`);
+                if(try_count == SYSTEM_CONFIG.ytdl_max_try)
+                {
+                    logger.error(`Tried max count for ytdl.getInfo... throwing this error`);
+                    throw err;
+                }
+            }
+        }
+
         const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
             filter: 'audioonly', 
             quality: 'lowestaudio' 
@@ -2043,7 +2079,7 @@ class Prepare extends QuizLifecycle
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
             logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            error_message = `${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`;
+            error_message = `${audio_url_row}'s duration[${audio_duration_sec}s] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}s`;
             return [undefined, undefined, error_message];
         }
 

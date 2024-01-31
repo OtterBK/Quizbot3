@@ -20,7 +20,7 @@ for pid in $pids; do
 	# Check if the elapsed time is at least 300 seconds (5 minutes)
 	if [ $elapsed_seconds -ge 300 ]; then
 	# Kill the process
-		kill $pid
+		kill -9 $pid
 			echo "Killed process $pid with start time $start_time and elapsed time $elapsed_seconds seconds."
 			fi
 		done

@@ -5,7 +5,7 @@ const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js')
 const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
-const { KoreanbotsClient } = require('koreanbots');
+const { Koreanbots } = require('koreanbots');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 //로컬 modules
@@ -23,7 +23,7 @@ const ipc_manager = require('./managers/ipc_manager.js');
 
 /** global 변수 **/
 
-const client = new KoreanbotsClient(
+const client = new Client(
   { 
     shards: getInfo().SHARD_LIST, // An array of shards that will get spawned
     shardCount: getInfo().TOTAL_SHARDS, // Total number of shards,
@@ -33,25 +33,27 @@ const client = new KoreanbotsClient(
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
     ],
-    koreanbots: {
+  })
+client.cluster = new ClusterClient(client); // initialize the Client, so we access the .broadcastEval()
+
+let koreanbots = undefined;
+if(PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN != undefined && PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN != "")
+{
+  try
+  {
+    koreanbots = new Koreanbots({
       api: {
         token: PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN,
-      }
-    },
-  });
-// const client = new Client(
-//   { 
-//     shards: getInfo().SHARD_LIST, // An array of shards that will get spawned
-//     shardCount: getInfo().TOTAL_SHARDS, // Total number of shards,
-//     intents: [
-//       GatewayIntentBits.Guilds,
-//       GatewayIntentBits.GuildVoiceStates,
-//       GatewayIntentBits.GuildMessages,
-//       GatewayIntentBits.MessageContent,
-//     ],
-//   });
-  
-client.cluster = new ClusterClient(client); // initialize the Client, so we access the .broadcastEval()
+      },
+      clientID: PRIVATE_CONFIG.BOT.CLIENT_ID
+    });
+  }
+  catch(err)
+  {
+    logger.error(err.stack); 
+    koreanbots = undefined;
+  }
+}
 
 /**  이벤트 등록  **/
 //봇 최초 실행 이벤트
@@ -99,6 +101,37 @@ client.on('ready', () => {
 
   ///////////
   logger.info(`Started Quizbot! tag name: ${client.user.tag}!`);
+
+  if(koreanbots != undefined && client.cluster.id == 0) //0번 클러스터에서만
+  {
+    const update = () => 
+    {
+      const servers_count = ipc_manager.sync_objects.get('guild_count');
+      if(servers_count == undefined || servers_count == 0)
+      {
+        servers_count = client.guilds.cache.size;
+      }
+
+      if(servers_count >= 10000) //10000 이상이면 업뎃 못하고 문의해달라고 한다...귀찮으니 걍 9700정도만
+      {
+        const min = 9700;
+        const max = 9950;
+
+        // Generate a random decimal number between 0 and 1
+        const randomDecimal = Math.random();
+
+        // Scale and shift the random decimal to fit the desired range
+        servers_count = Math.floor(randomDecimal * (max - min + 1) + min);
+      }
+
+      logger.info(`Updating Korean bot server count: ${servers_count}`);
+      koreanbots.mybot.update({ servers: servers_count, shards: getInfo().TOTAL_SHARDS }) 
+      .then(res => logger.info("서버 수를 정상적으로 업데이트하였습니다!\n반환된 정보:" + JSON.stringify(res)))
+      .catch(err =>  logger.error(`${err.stack ?? err.message}`));
+    }
+
+    setInterval(() => update(), 600000) // 10분마다 서버 수를 업데이트합니다.
+  }
 
 });
 
