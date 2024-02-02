@@ -3,7 +3,7 @@
 exports.SYSTEM_CONFIG = {
     language: 'kor', //사용 언어
 
-    develop_mode: false, //개발자 모드 활성화, console 로깅 등
+    develop_mode: true, //개발자 모드 활성화, console 로깅 등
 
     use_inline_volume: false, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
     fade_interval: 500, //fade in,out 시 사용할 interval(ms), 값이 낮을수록 부드러운 fade 효과를 얻을 수 있으나 리소스를 많이 잡아먹음
@@ -55,11 +55,7 @@ exports.SYSTEM_CONFIG = {
 
     custom_audio_ytdl_max_length: 1200, //문제용 오디오으로 사용가능한 오디오 최대 길이(s)
 
-    ytdl_ipv6_USE: true, //IPv4 대신 IPv6 사용 여부
-    ytdl_ipv6_block_agent_use: false, //IPv6 Block 기반 YTDL Agent, 사용 시, cookie는 비활성화됨
-    ytdl_ipv6_block_range: '2600:1900:41a0:36cb::/64', //IPv6 Block Range
-    ytdl_cookie_agent_use: false, //Cookie YTDL Agent
-    ytdl_cookie_path: `${__dirname}/../resources/youtube_cookies.json`, //Cookie 기반 YTDL Agent의 Cookie 경로
+    ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
 }
 
 exports.CUSTOM_EVENT_TYPE = {
