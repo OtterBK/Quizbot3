@@ -414,3 +414,20 @@ exports.getIPv6Address = () => {
 
   return ipv6Addresses;
 };
+
+exports.getIPv4Address = () => {
+  const networkInterfaces = os.networkInterfaces();
+  const ipv4Addresses = [];
+
+  for (const interfaceKey in networkInterfaces) {
+    const interfaces = networkInterfaces[interfaceKey];
+    for (let i = 0; i < interfaces.length; i++) {
+      const address = interfaces[i];
+      if (address.family === 'IPv4' && !address.internal) {
+        ipv4Addresses.push(address.address);
+      }
+    }
+  }
+
+  return ipv4Addresses;
+};
