@@ -2125,7 +2125,7 @@ class Prepare extends QuizLifecycle
 
                     if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
                     {
-                        logger.error(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
+                        logger.info(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
                     }
 
                     break; //성공했다면
