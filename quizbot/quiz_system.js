@@ -326,7 +326,7 @@ class QuizPlayUI
         {
             const guild_id = this.channel.guild.id;
             const quiz_session = exports.getQuizSession(guild_id);
-            logger.info(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
+            logger.error(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
             if(quiz_session != undefined)
             {
                 quiz_session.forceStop();
@@ -334,8 +334,8 @@ class QuizPlayUI
 		
             if(err.code === RESTJSONErrorCodes.MissingPermissions || err.code === RESTJSONErrorCodes.MissingAccess) //권한 부족해서 종료된거면 알려주자
             {
-                quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}`});
-		logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}, err.code: ${err.code}`);
+                quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}`});
+		        logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}, err.code: ${err.code}`);
             }
 	
             return;
@@ -2125,7 +2125,7 @@ class Prepare extends QuizLifecycle
 
                     if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
                     {
-                        logger.info(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
+                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
                     }
 
                     break; //성공했다면
@@ -2133,7 +2133,7 @@ class Prepare extends QuizLifecycle
             }
             catch(err)
             {
-                logger.error(`Failed ytdl.getInfo... Using ipv${family}...${ip} err_message: ${err.message}, url: ${audio_url_row}`);
+                logger.warn(`Failed ytdl.getInfo... Using ipv${family}...${ip} err_message: ${err.message}, url: ${audio_url_row}`);
 
                 if(i == try_info_list.length - 1) //마지막 시도였다면
                 {
@@ -2164,7 +2164,7 @@ class Prepare extends QuizLifecycle
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
             logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            error_message = `${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`;
+            error_message = `${audio_url_row}'s 오디오 길이(${audio_duration_sec}초)가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}를 초과합니다.`;
             return [undefined, undefined, error_message];
         }
 
@@ -2402,6 +2402,16 @@ class Question extends QuizLifeCycleWithUtility
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
                 logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                this.quiz_session.channel.send({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
+
+                const memoryUsage = process.memoryUsage();
+                logger.error('Memory Usage:', {
+                    'Heap Used': `${memoryUsage.heapUsed / 1024 / 1024} MB`,
+                    'Heap Total': `${memoryUsage.heapTotal / 1024 / 1024} MB`,
+                    'RSS': `${memoryUsage.rss / 1024 / 1024} MB`,
+                    'External': `${memoryUsage.external / 1024 / 1024} MB`,
+                });
+
                 return false;
             }
 
