@@ -132,10 +132,13 @@ print_emphasized "Quizbot3 has been Installed!!!!!!!!!!!!!!!!!!!!"
 # Setting Cron Scheduler
 if [ "$REGISTER_CRON" = true ]; then
 	print_emphasized "Installing Cron..."
-	sudo apt install cron
+        sudo timedatectl set-timezone Asia/Seoul
+	sudo apt install cron -y
 	sudo service cron start
 
 	print_emphasized "Executing Register cron script"
+ 	(crontab -l 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | crontab -
+  
 	(crontab -l 2>/dev/null; echo "0 * * * * sudo sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | crontab -
 	(crontab -l 2>/dev/null; echo "0 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | crontab -
 	(crontab -l 2>/dev/null; echo "1 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_start.sh") | crontab -
