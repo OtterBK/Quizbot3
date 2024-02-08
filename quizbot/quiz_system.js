@@ -28,7 +28,7 @@ const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
 
 //#endregion
 
-//#region Cycle 타입 정의
+//#region 상수 타입 정의
 const CYCLE_TYPE = 
 {
     UNDEFINED: 'UNDEFINED',
@@ -43,6 +43,8 @@ const CYCLE_TYPE =
     FINISH: 'FINISH', //세션 정상 종료. 삭제 대기 중
     FORCEFINISH: 'FORCEFINISH', //세션 강제 종료. 삭제 대기 중
 }
+
+const AUDIO_BUFFER_SIZE = 1024 * 1024 * 10; //10mb
 //#endregion
 
 //#region global 변수 정의
@@ -172,7 +174,7 @@ function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 �
  * 
  * 24.02.02 정말 @distube/ytdl-core만을 사용해야하는지 의문이 든다.
  * 유일한 문제점은 해당 모듈이 HTTP 통신 모듈로 undici를 사용하는데, 이 경우 localAddress 옵션이 잘 먹지 않고 bind -22 에러가 난다는 문제다...
- * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다...
+ * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다... -> 24.02.08 해당 모듈 문제는 아니었다...nodejs 18로 바꾼게 문제일 수 있으니 16으로 롤백해보기로한다.(ytdl-core 자체의 문제일 수 있다.)
  * 정말 필요한지 한번 다시 고려해보기로 하고 ytdl-core로 롤백하기로 결정하였다.
 */
 
@@ -903,25 +905,27 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
     //페이드 아웃 자동 시작
     async autoFadeOut(audio_player, resource, audio_play_time)
     {
-        if(SYSTEM_CONFIG.use_inline_volume)
+        if(SYSTEM_CONFIG.use_inline_volume == false)
         {
-            const fade_in_duration = SYSTEM_CONFIG.fade_in_duration;
-            const fade_out_duration = SYSTEM_CONFIG.fade_out_duration;
-            let fade_out_start_offset = audio_play_time - fade_out_duration - 1000; //해당 지점부터 fade_out 시작, 부드럽게 1초 정도 간격두자
-            if(fade_out_start_offset < fade_in_duration)
-            {
-                fade_out_start_offset = fade_in_duration;
-            }
-
-            //일정시간 후에 fadeout 시작
-            const fade_out_timer = setTimeout(() => {
-                this.already_start_fade_out = true;
-                if(resource == undefined || resource.volume == undefined) return;
-                utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
-            }, fade_out_start_offset);
-
-            this.fade_out_timer = fade_out_timer;
+            return;
         }
+
+        const fade_in_duration = SYSTEM_CONFIG.fade_in_duration;
+        const fade_out_duration = SYSTEM_CONFIG.fade_out_duration;
+        let fade_out_start_offset = audio_play_time - fade_out_duration - 1000; //해당 지점부터 fade_out 시작, 부드럽게 1초 정도 간격두자
+        if(fade_out_start_offset < fade_in_duration)
+        {
+            fade_out_start_offset = fade_in_duration;
+        }
+
+        //일정시간 후에 fadeout 시작
+        const fade_out_timer = setTimeout(() => {
+            this.already_start_fade_out = true;
+            if(resource == undefined || resource.volume == undefined) return;
+            utility.fade_audio_play(audio_player, resource, resource.volume.volume, 0, fade_out_duration);
+        }, fade_out_start_offset);
+
+        this.fade_out_timer = fade_out_timer;
     }
 }
 //#endregion
@@ -1014,16 +1018,16 @@ class Initialize extends QuizLifecycle
 		
         //보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
         const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-        const newUdp = Reflect.get(newNetworkState, 'udp');
-        clearInterval(newUdp?.keepAliveInterval);
+            const newUdp = Reflect.get(newNetworkState, 'udp');
+            clearInterval(newUdp?.keepAliveInterval);
         };
 
         voice_connection.on('stateChange', (oldState, newState) => {
-        const oldNetworking = Reflect.get(oldState, 'networking');
-        const newNetworking = Reflect.get(newState, 'networking');
+            const oldNetworking = Reflect.get(oldState, 'networking');
+            const newNetworking = Reflect.get(newState, 'networking');
 
-        oldNetworking?.off('stateChange', networkStateChangeHandler);
-        newNetworking?.on('stateChange', networkStateChangeHandler);
+            oldNetworking?.off('stateChange', networkStateChangeHandler);
+            newNetworking?.on('stateChange', networkStateChangeHandler);
         });
 
         const audio_player = createAudioPlayer({
@@ -2125,7 +2129,7 @@ class Prepare extends QuizLifecycle
 
                     if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
                     {
-                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
+                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${available_family}...${available_address}`);
                     }
 
                     break; //성공했다면
@@ -2244,6 +2248,10 @@ class Prepare extends QuizLifecycle
             //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
             encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 10}`], 
             seek: audio_start_point, 
+
+            dlChunkSize: 0, //disabling chunking is recommended in discord bot
+            bitrate: 128, //max bitrate for discord bot, (부스트 없는 서버 기준),
+            highWaterMark: AUDIO_BUFFER_SIZE //오디오 버퍼 사이즈(이게 connReset의 원인일까...?)
         };
 
         if(available_address != undefined && available_family != undefined) //잘 되는 ip 정보가 있다면
