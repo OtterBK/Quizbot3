@@ -18,9 +18,9 @@ const QuizInfoColumn =
     "winner_nickname",
     "birthtime",
     "modified_time",
-    "played_count",
+    // "played_count", 퀴즈 수정했을 때 이건 덮어쓰기 되면 안됨
     "is_private",
-    "played_count_of_week",
+    // "played_count_of_week",
     "tags_value",
 ];
 
