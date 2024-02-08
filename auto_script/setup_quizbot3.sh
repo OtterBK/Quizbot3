@@ -8,7 +8,7 @@ usage() {
 
 # Variables
 INSTALL_PATH=""
-NODE_VERSION="18"
+NODE_VERSION="16"
 BACKUP_FILE=""
 REGISTER_CRON=false
 
@@ -136,12 +136,13 @@ if [ "$REGISTER_CRON" = true ]; then
 	sudo service cron start
 
 	print_emphasized "Executing Register cron script"
-	(crontab -l 2>/dev/null; echo "0 * * * * $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | crontab -
-	(crontab -l 2>/dev/null; echo "0 9,21 * * * $SCRIPT_PATH/server_script/quizbot_stop.sh") | crontab -
-	(crontab -l 2>/dev/null; echo "1 9,21 * * * $SCRIPT_PATH/server_script/quizbot_start.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "0 * * * * sudo sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "0 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "1 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_start.sh") | crontab -
 
-	(crontab -l 2>/dev/null; echo "0 0 * * 1 $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | crontab -
-	(crontab -l 2>/dev/null; echo "0 8 * * * $SCRIPT_PATH/db_script/backup_script.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "0 0 * * 1 sudo sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "0 8 * * * sudo sh $SCRIPT_PATH/db_script/backup_script.sh") | crontab -
+ 	(crontab -l 2>/dev/null; echo "0 */3 * * * sudo sync && echo 3 > /proc/sys/vm/drop_caches") | crontab -
 fi
 
 print_emphasized "Quizbot3 Auto Setup Finised! :)"
