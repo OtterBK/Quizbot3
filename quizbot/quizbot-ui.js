@@ -1588,7 +1588,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_description')
         .setLabel('퀴즈에 대해 자유롭게 소개해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setRequired(false)
         .setPlaceholder('예시) 2023년 인기를 얻었던 팝송 맞추기 퀴즈입니다!\n모건 월렌, 콤즈 등 유명한 노래가 포함되어 있습니다')
     )
@@ -1600,7 +1600,7 @@ const modal_quiz_info = new ModalBuilder()
         .setCustomId('txt_input_quiz_thumbnail')
         .setLabel('퀴즈의 썸네일 이미지 URL을 입력해주세요.')
         .setStyle(TextInputStyle.Paragraph)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setRequired(false)
         .setPlaceholder('예시) https://buly.kr/D3b6HK6')
     )
@@ -1630,7 +1630,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 재생할 음악입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('유튜브 URL 입력 (생략 시, 10초 타이머 BGM 사용)')
     )
 )
@@ -1643,7 +1643,7 @@ const modal_question_info = new ModalBuilder()
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(40)
-        .setPlaceholder('예시) 40~80 또는 40 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~80 또는 40 또는 ~80 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1654,7 +1654,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1666,7 +1666,7 @@ const modal_question_info = new ModalBuilder()
         .setLabel('문제와 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
@@ -1683,7 +1683,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('문제의 힌트를 직접 지정할 수 있습니다.')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('예시) 한 때 유행했던 추억의 레이싱 게임! (생략 가능)')
     )
 )
@@ -1695,7 +1695,7 @@ const modal_question_additional_info = new ModalBuilder()
         .setLabel('힌트와 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1724,7 +1724,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 재생할 오디오입니다. [20분 이하의 영상만 가능]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('유튜브 URL 입력 (생략 가능)')
     )
 )
@@ -1736,7 +1736,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel(`정답용 음악 재생 구간을 지정할 수 있습니다. [최대 ${SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생됨]`)
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 40~50 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~50 또는 40 또는 ~50 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1747,7 +1747,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 함께 표시할 이미지입니다. [.Webp 사용 불가]')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('이미지 URL 입력 (생략 가능)')
     )
 )
@@ -1759,7 +1759,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel('정답 공개 시 정답과 함께 표시할 텍스트입니다.')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
-        .setMaxLength(500)
+        .setMaxLength(250)
         .setPlaceholder('자유롭게 텍스트 입력 (생략 가능)')
     )
 )
@@ -1911,13 +1911,13 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
 
+    this.cur_contents = [];
     if(user_quiz_list.length == 0)
     {
       this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
       return;
     }
 
-    this.cur_contents = [];
     for(const quiz_info of user_quiz_list)
     {
       quiz_info.name = quiz_info.data.quiz_title;
@@ -2042,7 +2042,7 @@ class UserQuizInfoUI extends QuizbotUI {
       color: 0x05f1f1,
       title: `**${quiz_info.data.quiz_title}**`,
       description: '',
-      thumbnail: { //퀴즈 섬네일 표시
+      image: { //퀴즈 섬네일 표시
         url: utility.isValidURL(quiz_info.data.thumbnail) ? quiz_info.data.thumbnail : '',
       },
       footer: { //퀴즈 제작자 표시
@@ -2063,7 +2063,7 @@ class UserQuizInfoUI extends QuizbotUI {
     description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     
-    description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n\n";
+    description += "플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회\n\n";
 
     description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n";
 
