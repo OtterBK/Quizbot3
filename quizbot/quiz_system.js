@@ -162,6 +162,74 @@ function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 �
   return ffmpeg_aging_manager;
 }
 
+/** @distube/ytdl-core 에만 있는 agent 기능, 다만 이 ytdl-core는 HTTP 통신 모듈로 기존 ytdl-core와는 다른걸 사용한다.(쿠키 지원을 위해서 인듯. 이름은 기억 안남) 
+ * 여기까지는 괜찮다...다만 requestOptions로 ipv6 주소를 localAddress에 넣고 family 값도 6으로 넘겨야 잘 인식하는데
+ * 기존 ytdl-core은 이렇게하면 잘 되는데 @distube/ytdl-core는 family 값 지정 기능이 없다...
+ * 따라서 유일하게 지원하는 autoSelectFamily를 true로 넘겨야하는데, 이 기능은 nodejs 18부터 지원한다...! 흑흑
+ * 우선 어거지로 16 -> 18로 업데이트했는데 큰 문제는 없이 동작한다.
+ * 만약 EINVAL(errno -22)에러가 뜨면 IPv6 주소를 IPv4로 파싱하려고 하다 문제가 생긴거니, family 값을 잘 명시해줘야하며
+ * 만약 -99에러가 뜨면 정말 해당 ip로 외부 통신이 불가능한것이라 발생한다.(localAddress에 IP주소 잘 넣었는지 확인필요)
+ * 
+ * 24.02.02 정말 @distube/ytdl-core만을 사용해야하는지 의문이 든다.
+ * 유일한 문제점은 해당 모듈이 HTTP 통신 모듈로 undici를 사용하는데, 이 경우 localAddress 옵션이 잘 먹지 않고 bind -22 에러가 난다는 문제다...
+ * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다...
+ * 정말 필요한지 한번 다시 고려해보기로 하고 ytdl-core로 롤백하기로 결정하였다.
+*/
+
+//Deprecated
+// function createYtdlAgent(quiz_session=undefined)
+// {
+//     let cookie = undefined;
+//     let local_address = undefined;
+//     let auto_select_family = false;
+
+//     if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+//     {
+//         try
+//         {
+//             const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
+//             if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
+//             {
+//                 logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
+//                 return false;
+//             }
+
+//             cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
+
+//             logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}`);
+//         }
+//         catch(err)
+//         {
+//             logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}, err: ${err.stack ?? err.message}`);
+//         }
+//     }
+
+//     if(SYSTEM_CONFIG.ytdl_ipv6_USE)
+//     {
+//         const ipv6 = utility.getIPv6Address()[0];
+//         if(ipv6 == undefined)
+//         {
+//             logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
+//         }
+//         else
+//         {
+//             logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
+//             local_address = ipv6;
+//             auto_select_family = true;
+//         }
+//     }
+
+//     const ytdl_agent = ytdl.createAgent(
+//         cookie,
+//         {
+//             autoSelectFamily: auto_select_family,
+//             localAddress: local_address
+//         }
+//     ); //cookie 기반 ytdl agent
+
+//     return ytdl_agent;
+// }
+
 //#region 퀴즈 플레이에 사용될 UI
 class QuizPlayUI
 {
@@ -254,20 +322,20 @@ class QuizPlayUI
         this.ui_instance = ui_instance;
     })
     .catch(err => {
-        if(err.code === RESTJSONErrorCodes.UnknownChannel || err.code === RESTJSONErrorCodes.MissingPermissions)
+        if(err.code === RESTJSONErrorCodes.UnknownChannel || err.code === RESTJSONErrorCodes.MissingPermissions || err.code === RESTJSONErrorCodes.MissingAccess)
         {
             const guild_id = this.channel.guild.id;
             const quiz_session = exports.getQuizSession(guild_id);
-            logger.info(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
+            logger.error(`Unknown channel for ${this.channel.id}, guild_id: ${guild_id}`);
             if(quiz_session != undefined)
             {
                 quiz_session.forceStop();
             }
 		
-            if(err.code === RESTJSONErrorCodes.MissingPermissions) //권한 부족해서 종료된거면 알려주자
+            if(err.code === RESTJSONErrorCodes.MissingPermissions || err.code === RESTJSONErrorCodes.MissingAccess) //권한 부족해서 종료된거면 알려주자
             {
-                quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다. 봇을 추방하고 관리자가 다시 초대하도록 해보세요.`});
-		logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}`);
+                quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}`});
+		        logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}, err.code: ${err.code}`);
             }
 	
             return;
@@ -384,7 +452,8 @@ class QuizSession
 
         this.force_stop = false; //강제종료 여부
 
-        this.ytdl_agent = undefined; //ytdl용 agent
+        this.ipv4 = undefined; 
+        this.ipv6 = undefined; 
 
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
@@ -453,8 +522,8 @@ class QuizSession
 
         this.scoreboard = null; //scoreboard 
 
-        this.ipv6 = null; 
-        this.ytdl_agent = null; 
+        this.ipv4 = null;
+        this.ipv6 = null;
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -527,7 +596,7 @@ class QuizSession
 
     getCycle(cycle_type)
     {
-        if(this.lifecycle_map.hasOwnProperty(cycle_type) == false)
+        if(this.lifecycle_map?.hasOwnProperty(cycle_type) == false)
         {
             return undefined;
         }
@@ -943,19 +1012,19 @@ class Initialize extends QuizLifecycle
             }
         });
 		
-	//보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
-	const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-	  const newUdp = Reflect.get(newNetworkState, 'udp');
-	  clearInterval(newUdp?.keepAliveInterval);
-	};
+        //보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
+        const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+        const newUdp = Reflect.get(newNetworkState, 'udp');
+        clearInterval(newUdp?.keepAliveInterval);
+        };
 
-	voice_connection.on('stateChange', (oldState, newState) => {
-	  const oldNetworking = Reflect.get(oldState, 'networking');
-	  const newNetworking = Reflect.get(newState, 'networking');
+        voice_connection.on('stateChange', (oldState, newState) => {
+        const oldNetworking = Reflect.get(oldState, 'networking');
+        const newNetworking = Reflect.get(newState, 'networking');
 
-	  oldNetworking?.off('stateChange', networkStateChangeHandler);
-	  newNetworking?.on('stateChange', networkStateChangeHandler);
-	});
+        oldNetworking?.off('stateChange', networkStateChangeHandler);
+        newNetworking?.on('stateChange', networkStateChangeHandler);
+        });
 
         const audio_player = createAudioPlayer({
             behaviors: {
@@ -1346,6 +1415,7 @@ class InitializeCustomQuiz extends Initialize
     {
         logger.info(`Start custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}`);
 
+        const quiz_session = this.quiz_session;
         const quiz_info = this.quiz_session.quiz_info;
         const quiz_data = this.quiz_session.quiz_data;
         //실제 퀴즈들 로드
@@ -1436,31 +1506,32 @@ class InitializeCustomQuiz extends Initialize
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
 
-        if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+        //Set Ipv4 info
+        const ipv4 = utility.getIPv4Address()[0];
+        if(ipv4 == undefined)
         {
-            try
-            {
-                const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
-                if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
-                {
-                    logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
-                    return false;
-                }
-        
-                const cookie_ytdl_agent = ytdl.createAgent(
-                    JSON.parse(fs.readFileSync(ytdl_cookie_path)),
-                ); //cookie 기반 ytdl agent
+            logger.info(`This session has no ipv4!, use default... wtf, guild_id:${quiz_session?.guild_id}`);
+        }
+        else
+        {
+            logger.info(`This session's selected ipv4 is ${ipv4} guild_id:${quiz_session?.guild_id}`);
+            quiz_session.ipv4 = ipv4;
+        }
 
-                this.quiz_session.ytdl_agent = cookie_ytdl_agent;
-    
-                logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
-            }
-            catch(err)
+        //Set Ipv6 info
+        if(SYSTEM_CONFIG.ytdl_ipv6_USE)
+        {
+            const ipv6 = utility.getIPv6Address()[0];
+            if(ipv6 == undefined)
             {
-                logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
+                logger.info(`This session is using ipv6, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
+            }
+            else
+            {
+                logger.info(`This session is using ipv6, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
+                quiz_session.ipv6 = ipv6;
             }
         }
-    
     }
 }
 
@@ -1627,8 +1698,20 @@ class Prepare extends QuizLifecycle
                 this.skip_prepare = true;
                 return;
             }
-            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
+            logger.error(`Failed prepare enter step quiz, guild_id:${this.quiz_session?.guild_id}, target_question: ${target_question?.question ?? target_question.question_audio_url}, question_id: ${target_question?.question_id ?? "no id"} err: ${err.stack ?? err.message}`);
             target_question['question_text'] += "\n\nAUDIO_ERROR: " + err.message; //에러나면 UI에도 표시해주자
+
+            if(err.message.includes("bind") && this.quiz_session.ipv6 != undefined && SYSTEM_CONFIG.ytdl_ipv6_USE) //ip bind error면
+            {
+                const current_ip = this.quiz_session.ipv6;
+                const new_ip = utility.getIPv6Address()[0];
+
+                if(current_ip != new_ip) //다시 한번 찾아본다.
+                {
+                    logger.info(`Detected IPv6 Address has been changed! recreating ytdl agent...[${current_ip} -> ${new_ip}]`);
+                    this.quiz_session.ipv6 = new_ip;
+                }
+            }
         }
 
         this.prepared_question = target_question;
@@ -1877,7 +1960,8 @@ class Prepare extends QuizLifecycle
     {
         const option_data = this.quiz_session.option_data;
         const game_data = this.quiz_session.game_data;
-        const ytdl_agent = this.quiz_session.ytdl_agent;
+        const ipv4 = this.quiz_session.ipv4;
+        const ipv6 = this.quiz_session.ipv6;
 
         const target_question_data = target_question.data;
 
@@ -1895,7 +1979,7 @@ class Prepare extends QuizLifecycle
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', ytdl_options);
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
@@ -1950,7 +2034,7 @@ class Prepare extends QuizLifecycle
             const answer_audio_end = target_question_data['answer_audio_end'];
     
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', ytdl_agent);
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
@@ -1974,7 +2058,7 @@ class Prepare extends QuizLifecycle
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ytdl_agent=undefined) 
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
     {
         let error_message;
 
@@ -1993,15 +2077,76 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const youtube_info = await ytdl.getInfo(audio_url_row, {
-            agent: ytdl_agent,
-            IPv6Block: SYSTEM_CONFIG.ytdl_ipv6_block_agent_use ? SYSTEM_CONFIG.ytdl_ipv6_block_range : undefined
-        });
-        
+        const [ipv4, ipv6] = ip_info;
+
+        const try_info_list = [];
+        if(ipv6 != undefined) //처음엔 ipv6로 시도
+        {
+            try_info_list.push([ipv6, 6]);
+        }
+
+        if(ipv4 != undefined) //그 다음엔 ipv4로 시도
+        {
+            try_info_list.push([ipv4, 4]);
+        }
+
+        try_info_list.push([undefined, undefined]); //다 안되면 마지막엔 그냥 해보기
+        logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
+
+        let youtube_info = undefined;
+        let available_address;
+        let available_family;
+
+        for(let i = 0; i < try_info_list.length; ++i)
+        {
+            const [ip, family] = try_info_list[i];
+
+            try
+            {
+                if(ip == undefined || family == undefined)
+                {
+                    youtube_info = await ytdl.getInfo(audio_url_row);
+                }
+                else
+                {
+                    youtube_info = await ytdl.getInfo(audio_url_row, {
+                        requestOptions:
+                        {
+                            localAddress: ip,
+                            family: family
+                        }
+                    });
+                }
+
+                if(youtube_info != undefined)
+                {
+                    available_address = ip,
+                    available_family = family;
+
+                    if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
+                    {
+                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${family}...${ip}`);
+                    }
+
+                    break; //성공했다면
+                }
+            }
+            catch(err)
+            {
+                logger.warn(`Failed ytdl.getInfo... Using ipv${family}...${ip} err_message: ${err.message}, url: ${audio_url_row}`);
+
+                if(i == try_info_list.length - 1) //마지막 시도였다면
+                {
+                    logger.error(`Failed ytdl.getInfo... for all scenario throwing...`);
+                    throw err;
+                }
+            }  
+        }
+
         const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
             filter: 'audioonly', 
             quality: 'lowestaudio' 
-        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308
+        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308 -> 24.02.02 해결책은 아니었다.
 
         if(audio_format == undefined) 
         {
@@ -2019,7 +2164,7 @@ class Prepare extends QuizLifecycle
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
             logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            error_message = `${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`;
+            error_message = `${audio_url_row}'s 오디오 길이(${audio_duration_sec}초)가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}를 초과합니다.`;
             return [undefined, undefined, error_message];
         }
 
@@ -2089,8 +2234,8 @@ class Prepare extends QuizLifecycle
         // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); 
         
         logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
-        let audio_stream = ytdl(audio_url_row, { 
-            agent: ytdl_agent,
+
+        const download_option = {
             format: audio_format ,
             opusEncoded: true,
             // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
@@ -2099,7 +2244,19 @@ class Prepare extends QuizLifecycle
             //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
             encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 10}`], 
             seek: audio_start_point, 
-        });
+        };
+
+        if(available_address != undefined && available_family != undefined) //잘 되는 ip 정보가 있다면
+        {
+            download_option['requestOptions'] = {
+                localAddress: available_address,
+                family: available_family
+            };
+
+            logger.debug(`found available address info!!! ${available_family}, ${available_address}`);
+        };
+
+        let audio_stream = ytdl(audio_url_row, download_option);
 
          /** 
         23.11.08 확인 결과 
@@ -2245,6 +2402,16 @@ class Question extends QuizLifeCycleWithUtility
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
                 logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
+                this.quiz_session.channel.send({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
+
+                const memoryUsage = process.memoryUsage();
+                logger.error('Memory Usage:', {
+                    'Heap Used': `${memoryUsage.heapUsed / 1024 / 1024} MB`,
+                    'Heap Total': `${memoryUsage.heapTotal / 1024 / 1024} MB`,
+                    'RSS': `${memoryUsage.rss / 1024 / 1024} MB`,
+                    'External': `${memoryUsage.external / 1024 / 1024} MB`,
+                });
+
                 return false;
             }
 

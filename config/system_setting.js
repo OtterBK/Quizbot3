@@ -3,7 +3,7 @@
 exports.SYSTEM_CONFIG = {
     language: 'kor', //사용 언어
 
-    develop_mode: false, //개발자 모드 활성화, console 로깅 등
+    develop_mode: true, //개발자 모드 활성화, console 로깅 등
 
     use_inline_volume: false, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
     fade_interval: 500, //fade in,out 시 사용할 interval(ms), 값이 낮을수록 부드러운 fade 효과를 얻을 수 있으나 리소스를 많이 잡아먹음
@@ -30,7 +30,8 @@ exports.SYSTEM_CONFIG = {
     explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
     ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
-    explicit_close_audio_stream: true, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
+    explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
+    //ffmpeg는 drop_ffmpeg.sh 로 스케줄 돌리고 utlity/SeekStream에서 알아서 잘 닫도록 해뒀으니 false로 해야함
 
     bgm_path: `${__dirname}/../resources/bgm`, //BGM 파일 위치
     dev_quiz_path: `${__dirname}/../resources/quizdata`, //Dev퀴즈 파일 위치
@@ -54,11 +55,7 @@ exports.SYSTEM_CONFIG = {
 
     custom_audio_ytdl_max_length: 1200, //문제용 오디오으로 사용가능한 오디오 최대 길이(s)
 
-    ytdl_ipv6_USE: false, //IPv4 대신 IPv6 사용 여부
-    ytdl_ipv6_block_agent_use: false, //IPv6 Block 기반 YTDL Agent, 사용 시, cookie는 비활성화됨
-    ytdl_ipv6_block_range: '2600:1900:41a0:36cb::/64', //IPv6 Block Range
-    ytdl_cookie_agent_use: false, //Cookie YTDL Agent
-    ytdl_cookie_path: `${__dirname}/../resources/youtube_cookies.json`, //Cookie 기반 YTDL Agent의 Cookie 경로
+    ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
 }
 
 exports.CUSTOM_EVENT_TYPE = {

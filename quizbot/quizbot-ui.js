@@ -1643,7 +1643,7 @@ const modal_question_info = new ModalBuilder()
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(40)
-        .setPlaceholder('예시) 40~80 또는 40 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~80 또는 40 또는 ~80 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1736,7 +1736,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel(`정답용 음악 재생 구간을 지정할 수 있습니다. [최대 ${SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생됨]`)
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 40~50 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~50 또는 40 또는 ~50 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1911,13 +1911,13 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
 
+    this.cur_contents = [];
     if(user_quiz_list.length == 0)
     {
       this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
       return;
     }
 
-    this.cur_contents = [];
     for(const quiz_info of user_quiz_list)
     {
       quiz_info.name = quiz_info.data.quiz_title;
@@ -2042,7 +2042,7 @@ class UserQuizInfoUI extends QuizbotUI {
       color: 0x05f1f1,
       title: `**${quiz_info.data.quiz_title}**`,
       description: '',
-      thumbnail: { //퀴즈 섬네일 표시
+      image: { //퀴즈 섬네일 표시
         url: utility.isValidURL(quiz_info.data.thumbnail) ? quiz_info.data.thumbnail : '',
       },
       footer: { //퀴즈 제작자 표시
