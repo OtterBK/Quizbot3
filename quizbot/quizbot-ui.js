@@ -2063,7 +2063,7 @@ class UserQuizInfoUI extends QuizbotUI {
     description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     
-    description += "플레이된 횟수: " + quiz_info.data.played_count + "회\n\n";
+    description += "플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회\n\n";
 
     description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n";
 
