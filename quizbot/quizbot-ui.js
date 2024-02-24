@@ -2810,6 +2810,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.all_user_quiz_contents = undefined;
     this.selected_tags_value = 0;
+    this.selected_keyword_value = undefined;
 
     this.selected_sort_by_value = 'modified_time';
     this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
@@ -2845,7 +2846,18 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     if(interaction.customId == 'quiz_search_tags_select_menu')
     {
       const selected_tags_value = interaction.values[0];
-      this.filterByTags(selected_tags_value);
+      this.filterByTag(selected_tags_value);
+
+      this.cur_page = 0;
+      this.displayContents(this.cur_page);
+      return this;
+    }
+
+    if(interaction.customId == 'modal_keyword_search') //키워드 검색을 먼저 본다.
+    {
+      const input_keyword_value = interaction.fields.getTextInputValue('txt_input_keyword');
+
+      this.filterByKeyword(input_keyword_value);
 
       this.cur_page = 0;
       this.displayContents(this.cur_page);
@@ -2911,7 +2923,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     this.displayContents(this.current_question_index);
   }
 
-  filterByTags(selected_tags_value) //태그로
+  filterByTag(selected_tags_value) //태그로
   {
     if(this.selected_tags_value == selected_tags_value) //같으면 패스
     {
@@ -2932,6 +2944,36 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       }
 
       filtered_contents.push(quiz_info);
+    }
+
+    this.cur_contents = filtered_contents;
+  }
+
+
+  filterByKeyword(selected_keyword_value) //검색어로
+  {
+    if(this.selected_keyword_value == selected_keyword_value) //같으면 패스
+    {
+      return;
+    }
+
+    if(selected_keyword_value == undefined || selected_keyword_value == "") //아무것도 입력 안 입력했다면 전체로 설정하고 패스
+    {
+      this.cur_contents = this.all_user_quiz_contents;
+    }
+
+    this.selected_keyword_value = selected_keyword_value;
+
+    let filtered_contents = [];
+    for(const quiz_info of this.all_user_quiz_contents)
+    {
+      if(quiz_info.data.quiz_title.includes(selected_keyword_value)
+        || quiz_info.data.simple_description.includes(selected_keyword_value)
+        || quiz_info.data.description.includes(selected_keyword_value)) 
+      {
+        filtered_contents.push(quiz_info);
+        continue;
+      }
     }
 
     this.cur_contents = filtered_contents;

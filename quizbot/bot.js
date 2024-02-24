@@ -106,7 +106,7 @@ client.on('ready', () => {
   {
     const update = () => 
     {
-      const servers_count = ipc_manager.sync_objects.get('guild_count');
+      let servers_count = ipc_manager.sync_objects.get('guild_count');
       if(servers_count == undefined || servers_count == 0)
       {
         servers_count = client.guilds.cache.size;
@@ -114,8 +114,8 @@ client.on('ready', () => {
 
       if(servers_count >= 10000) //10000 이상이면 업뎃 못하고 문의해달라고 한다...귀찮으니 걍 9700정도만
       {
-        const min = 9700;
-        const max = 9950;
+        const min = 9900;
+        const max = 9990;
 
         // Generate a random decimal number between 0 and 1
         const randomDecimal = Math.random();
@@ -181,7 +181,7 @@ const create_quiz_handler = async (interaction) => {
     {
       if(banned_id.trim() == user_id)
       {
-        interaction.reply({content: `you cannot create quiz, reason: banned`});
+        interaction.reply({content: `something wrong`});
         return;
       }
     }
