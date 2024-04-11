@@ -1949,7 +1949,8 @@ class UserQuizListUI extends QuizBotControlComponentUI
   async loadUserQuiz()
   {
     let creator_id = this.creator_id;
-    if(PRIVATE_CONFIG.ADMIN_ID == creator_id) //어드민일 경우
+
+    if(PRIVATE_CONFIG?.ADMIN_ID != undefined && PRIVATE_CONFIG.ADMIN_ID == creator_id) //어드민일 경우
     {
       logger.warn(`Matched to Admin ID ${creator_id}, Loading User Quiz List as Undefined`);
       creator_id = undefined; //전체 조회
@@ -2065,12 +2066,8 @@ class UserQuizListUI extends QuizBotControlComponentUI
       }
     }
 
-    let info_string = `
-      🔸 유저분들이 ${user.displayName} 님의 퀴즈를 ${total_played_count}회 플레이했어요!\n
-      🔸 이번 주에 가장 플레이된 퀴즈는 ${best_quiz_of_week.data.quiz_title ?? "UNKNOWN NAME"}이네요!\n
-      🔸 모든 퀴즈 중 가장 많이 플레이된 퀴즈는 ${best_quiz.data.quiz_title ?? "UNKNOWN NAME"}입니다!\n
-      🔸 퀴즈 제작에 참여해주셔서 정말 감사드립니다.🙂
-    `;
+    let info_string = 
+	 `🔸 유저분들이 ${user.displayName} 님의 퀴즈를 [${total_played_count}]회 플레이했어요!\n🔸 이번 주에 가장 플레이된 퀴즈는 [${best_quiz_of_week.data.quiz_title ?? "UNKNOWN NAME"}]이네요!\n🔸 모든 퀴즈 중 가장 많이 플레이된 퀴즈는 [${best_quiz.data.quiz_title ?? "UNKNOWN NAME"}]입니다!\n🔸 퀴즈 제작에 참여해주셔서 정말 감사드립니다.🙂`;
     user.send({content: '```' + info_string + '```', ephemeral: true});
   }
 }
