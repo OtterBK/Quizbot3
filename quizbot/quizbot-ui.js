@@ -1975,7 +1975,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
   showEditor(user, user_quiz_info)
   {
-    if(user.id != user_quiz_info.data.creator_id)
+    if(user.id != user_quiz_info.data.creator_id && user.id != PRIVATE_CONFIG?.ADMIN_ID) //어드민이면 다 수정 할 수 있음
     {
       user.send({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
       return;
