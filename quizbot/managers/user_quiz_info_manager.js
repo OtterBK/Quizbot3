@@ -294,8 +294,10 @@ const addQuizLike = async (quiz_id, guild_id, user_id) =>
 
   db_manager.updateQuizLikeCount(quiz_id)
   .then((like_count) => {
+    logger.info(`Custom quiz's like updated to ${like_count}. quiz_id: ${quiz_id}`);
     if(like_count >= 10) //10개 이상이면 인증된 퀴즈
     {
+      logger.info(`Custom quiz has been auto certified. quiz_id: ${quiz_id}`);
       db_manager.certifyQuiz(quiz_id);
     }
   });

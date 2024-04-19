@@ -1,6 +1,6 @@
 const { addQuizLike, checkQuizLike } = require('./user_quiz_info_manager.js');
 const {  CUSTOM_EVENT_TYPE } = require('../../config/system_setting.js');
-const { intersection } = require('lodash');
+const logger = require('../../utility/logger.js')('FeedbackManager');
 
 //@Deprecated
 const feedback_quiz_info_map = {}; //dynamic quiz feedback을 위해 사용
@@ -32,6 +32,7 @@ exports.addLikeAuto(guild, user, quiz_id, quiz_title, creator_name, channel)
     if(result == true)
     {
       channel.send({content: `>>>❤ **${user.displayName}**님이 **[${quiz_title}/${creator_name}]** 퀴즈를 추천하였습니다!`});
+      logger.info(`Custom quiz got liked by ${guild.name}[${guild.id}]/${user.displayname}[${user.id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
     }
     else
     {
