@@ -225,3 +225,48 @@ exports.deleteQuestionInfo = async (question_id) => {
   return sendQuery(query_string, [question_id]);
 
 }
+
+exports.insertLikeInfo = async (key_fields, value_fields) => {
+
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `insert into tb_like_info (${key_fields}) values (${placeholders}) 
+  returning question_id`;
+
+  return sendQuery(query_string, value_fields);
+}
+
+exports.selectLikeInfo = async (value_fields) => {
+
+  const query_string = 
+  `select user_id from tb_like_info 
+  where quiz_id = $1 and guild_id = $2`;
+
+  return sendQuery(query_string, value_fields);
+
+}
+
+exports.updateQuizLikeCount = async (quiz_id) => {
+
+  const query_string = 
+  `UPDATE tb_quiz_info set like_count = (select count(guild_id) from tb_like_info where tb_like_info.quiz_id = $1)
+    where quiz_id = $1
+    returning like_count;`;
+
+  return sendQuery(query_string, [quiz_id]);
+
+}
+
+exports.certifyQuiz = async (quiz_id) => {
+
+  const query_string = 
+  `UPDATE tb_quiz_info set certified = true
+    where quiz_id = $1;`;
+
+  return sendQuery(query_string, [quiz_id]);
+
+}

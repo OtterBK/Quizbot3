@@ -22,6 +22,8 @@ const QuizInfoColumn =
     "is_private",
     "played_count_of_week",
     "tags_value",
+    "certified",
+    "like_count",
 ];
 
 let quiz_info_key_fields = '';
@@ -69,6 +71,23 @@ QuestionInfoColumn.forEach((field) =>
 });
 
 
+//만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
+const LikeInfoColumn = 
+[
+  "quiz_id",
+  "guild_id",
+  "user_id",
+];
+
+let like_info_key_fields = '';
+LikeInfoColumn.forEach((field) =>
+{
+    if(like_info_key_fields != '')
+    {
+        like_info_key_fields += ', ';
+    }
+    like_info_key_fields += `${field}`;
+});
 
 class UserQuizInfo //유저 제작 퀴즈 정보
 {
@@ -163,6 +182,12 @@ class UserQuizInfo //유저 제작 퀴즈 정보
   {
     db_manager.updateQuizInfoModifiedTime(this.quiz_id);
   }
+
+  //@Deprecated
+  async addLike(guild_id, user_id)
+  {
+    return await addQuizLike(this.quiz_id, guild_id);
+  }
 }
 
 class UserQuestionInfo //유저 제작 문제 정보
@@ -253,4 +278,46 @@ const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로
     return user_quiz_list;
 }
 
-module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn };
+const addQuizLike = async (quiz_id, guild_id, user_id) =>
+{
+  if(quiz_id == undefined || guild_id == undefined || user_id == undefined)
+  {
+    return false;
+  }
+
+  const result = await db_manager.insertLikeInfo(like_info_key_fields, [quiz_id, guild_id, user_id]);
+
+  if(result == undefined || result.rows?.length == 0) //maybe already exists
+  {
+    return false;
+  }
+
+  db_manager.updateQuizLikeCount(quiz_id)
+  .then((like_count) => {
+    if(like_count >= 10) //10개 이상이면 인증된 퀴즈
+    {
+      db_manager.certifyQuiz(quiz_id);
+    }
+  });
+
+  return true;
+}
+
+const checkQuizLike = async (quiz_id, guild_id, user_id) =>
+{
+  if(quiz_id == undefined || guild_id == undefined)
+  {
+    return false;
+  }
+
+  const result = await db_manager.selectLikeInfo([quiz_id, guild_id]);
+
+  if(result == undefined || result.rows?.length == 0) //not exists
+  {
+    return false;
+  }
+
+  return true; //exists
+}
+
+module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, addQuizLike, checkQuizLike };

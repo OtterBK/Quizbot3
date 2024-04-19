@@ -26,6 +26,7 @@ const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('QuizUI');
 const { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB } = require('./managers/user_quiz_info_manager.js');
 const { sync_objects } = require('./managers/ipc_manager.js');
+const feedback_manager = require('./managers/feedback_manager.js');
 //#endregion
 
 //#region 사전 정의 UI들
@@ -296,14 +297,19 @@ const sort_by_select_menu = new ActionRowBuilder()
     .setValue('played_count_of_week'),
 
     new StringSelectMenuOptionBuilder()
-    .setLabel('최신 퀴즈순')
-    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
-    .setValue('birthtime'),
-
-    new StringSelectMenuOptionBuilder()
     .setLabel('전체 인기순')
     .setDescription('가장 많이 플레이된 퀴즈부터 표시합니다.')
     .setValue('played_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('전체 추천순')
+    .setDescription('가장 많이 추천 받은 퀴즈부터 표시합니다.')
+    .setValue('like_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('최신 퀴즈순')
+    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
+    .setValue('birthtime'),
 
     new StringSelectMenuOptionBuilder()
     .setLabel('오래된 퀴즈순')
@@ -1121,6 +1127,8 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
       quiz_info['quiz_path'] = content['content_path'];//dev quiz는 quiz_path 필요
       quiz_info['quiz_type'] = content['quiz_type'];
       quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.BY_DEVELOPER;
+
+      quiz_info['quiz_id'] = undefined; //dev quiz는 quiz_id가 없다
 
       return new QuizInfoUI(quiz_info);
     }
@@ -2156,8 +2164,11 @@ class UserQuizInfoUI extends QuizbotUI {
     description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
     
     description += "플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회\n\n";
+    description += "추천한 서버수: " + (quiz_info.data.like_count ?? 0) + "개\n\n";
 
-    description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n";
+    description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n\n";
+
+    description += `인증여부: **${(quiz_info.data.certified ? "✔" : "❌")}**\n`;
 
     if(quiz_info.data.is_private)
     {
@@ -2171,7 +2182,7 @@ class UserQuizInfoUI extends QuizbotUI {
     if(this.readonly)
     {
       description += '⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n';
-      this.components = [quiz_info_comp]; //게임 시작 가능한 comp
+      this.components = [quiz_info_comp, feedback_manager.quiz_feedback_comp]; //게임 시작 가능한 comp, 퀴즈 feedback comp
     }
     else
     {
@@ -2412,6 +2423,8 @@ class UserQuizInfoUI extends QuizbotUI {
     quiz_info['quiz_path'] = undefined;//dev quiz는 quiz_path 필요
     quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
     quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
+
+    quiz_info['quiz_id'] = quiz_info.data.quiz_id;
   }
 
 
