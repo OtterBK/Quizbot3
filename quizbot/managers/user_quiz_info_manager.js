@@ -4,6 +4,7 @@
 //로컬 modules
 const db_manager = require('./db_manager.js');
 const logger = require('../../utility/logger.js')('UserQuizInfoManager');
+const feedback_manager = require('./feedback_manager.js')
 
 //만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
 const QuizInfoColumn = 
@@ -72,23 +73,6 @@ QuestionInfoColumn.forEach((field) =>
 
 
 //만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
-const LikeInfoColumn = 
-[
-  "quiz_id",
-  "guild_id",
-  "user_id",
-];
-
-let like_info_key_fields = '';
-LikeInfoColumn.forEach((field) =>
-{
-    if(like_info_key_fields != '')
-    {
-        like_info_key_fields += ', ';
-    }
-    like_info_key_fields += `${field}`;
-});
-
 class UserQuizInfo //유저 제작 퀴즈 정보
 {
   constructor()
@@ -186,7 +170,7 @@ class UserQuizInfo //유저 제작 퀴즈 정보
   //@Deprecated
   async addLike(guild_id, user_id)
   {
-    return await addQuizLike(this.quiz_id, guild_id);
+    return await feedback_manager.addQuizLike(this.quiz_id, guild_id);
   }
 }
 
@@ -278,48 +262,4 @@ const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로
     return user_quiz_list;
 }
 
-const addQuizLike = async (quiz_id, guild_id, user_id) =>
-{
-  if(quiz_id == undefined || guild_id == undefined || user_id == undefined)
-  {
-    return false;
-  }
-
-  const result = await db_manager.insertLikeInfo(like_info_key_fields, [quiz_id, guild_id, user_id]);
-
-  if(result == undefined || result.rows?.length == 0) //maybe already exists
-  {
-    return false;
-  }
-
-  db_manager.updateQuizLikeCount(quiz_id)
-  .then((like_count) => {
-    logger.info(`Custom quiz's like updated to ${like_count}. quiz_id: ${quiz_id}`);
-    if(like_count >= 10) //10개 이상이면 인증된 퀴즈
-    {
-      logger.info(`Custom quiz has been auto certified. quiz_id: ${quiz_id}`);
-      db_manager.certifyQuiz(quiz_id);
-    }
-  });
-
-  return true;
-}
-
-const checkQuizLike = async (quiz_id, guild_id, user_id) =>
-{
-  if(quiz_id == undefined || guild_id == undefined)
-  {
-    return false;
-  }
-
-  const result = await db_manager.selectLikeInfo([quiz_id, guild_id]);
-
-  if(result == undefined || result.rows?.length == 0) //not exists
-  {
-    return false;
-  }
-
-  return true; //exists
-}
-
-module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, addQuizLike, checkQuizLike };
+module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn };

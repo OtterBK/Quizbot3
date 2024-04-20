@@ -2160,15 +2160,14 @@ class UserQuizInfoUI extends QuizbotUI {
 
     description += `📖 퀴즈 설명:\n${quiz_info.data.description}\n\n\n\n`;
 
-    description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
-    description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
+    description += "`만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
+    description += "`업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
     
-    description += "플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회\n\n";
-    description += "추천한 서버수: " + (quiz_info.data.like_count ?? 0) + "개\n\n";
+    description += "`플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회`\n";
+    description += "`추천한 서버수: " + (quiz_info.data.like_count ?? 0) + "개`\n";
+    description += "`인증여부: " + (quiz_info.data.certified ? "✔" : "❌") + "`\n\n";
 
-    description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n\n";
-
-    description += `인증여부: **${(quiz_info.data.certified ? "✔" : "❌")}**\n`;
+    description += "`퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "`\n\n";
 
     if(quiz_info.data.is_private)
     {
@@ -2181,7 +2180,7 @@ class UserQuizInfoUI extends QuizbotUI {
     
     if(this.readonly)
     {
-      description += '⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n';
+      description += '`⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n`';
       this.components = [quiz_info_comp, feedback_manager.quiz_feedback_comp]; //게임 시작 가능한 comp, 퀴즈 feedback comp
     }
     else
@@ -2255,6 +2254,12 @@ class UserQuizInfoUI extends QuizbotUI {
     if(interaction.customId == 'settings') //설정 버튼 눌렀을 때
     {
       return new ServerSettingUI(interaction.guild.id);
+    }
+
+    if(interaction.customId == 'like') //추천하기 버튼 눌렀을 때
+    {
+      feedback_manager.addQuizLikeAuto(interaction.guild, interaction.member, quiz_info.quiz_id, quiz_info.data.quiz_title, quiz_info.data.creator_name, interaction.channel);
+      return;
     }
   }
 
@@ -2424,7 +2429,7 @@ class UserQuizInfoUI extends QuizbotUI {
     quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
     quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
 
-    quiz_info['quiz_id'] = quiz_info.data.quiz_id;
+    quiz_info['quiz_id'] = quiz_info.quiz_id;
   }
 
 

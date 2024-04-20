@@ -234,8 +234,7 @@ exports.insertLikeInfo = async (key_fields, value_fields) => {
     placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
   }
   const query_string = 
-  `insert into tb_like_info (${key_fields}) values (${placeholders}) 
-  returning question_id`;
+  `insert into tb_like_info (${key_fields}) values (${placeholders})`;
 
   return sendQuery(query_string, value_fields);
 }

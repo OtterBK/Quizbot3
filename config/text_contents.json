@@ -154,7 +154,7 @@
         "quiz_info_ui":
         {
             "description": 
-                " \n🏷 퀴즈 유형: **${quiz_type_name}**\n📦 문제 개수: **${quiz_size}개**\n\n\n📖 퀴즈 설명:\n${quiz_description}\n \n \n⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n \n",
+                " \n🏷 퀴즈 유형: **${quiz_type_name}**\n📦 문제 개수: **${quiz_size}개**\n\n\n📖 퀴즈 설명:\n${quiz_description}\n \n \n`⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.`\n \n",
             "failed_start":
                 "```❗ 퀴즈를 시작할 수 없습니다.\n(${reason})```"
         },

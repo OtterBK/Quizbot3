@@ -790,12 +790,12 @@ class QuizLifecycle
                 return;
             }
 
-            if(event_object.isButton() && event_object.customId == 'like') //추천하기 버튼 눌렀을 때
+            if(event_object.isButton() && this.quiz_session.already_liked == false && event_object.customId == 'like') //추천하기 버튼 눌렀을 때
             {
                 const interaction = event_object;
-                const quiz_info = this.quiz_info;
+                const quiz_info = this.quiz_session.quiz_info;
 
-                feedback_manager.addLikeAuto(interaction.guild, intersection.member, quiz_info.quiz_id, quiz_info.title, quiz_info.author, interaction.channel);
+                feedback_manager.addQuizLikeAuto(interaction.guild, interaction.member, quiz_info.quiz_id, quiz_info.title, quiz_info.author, interaction.channel);
                 this.quiz_session.already_liked = true;
 
                 return;
@@ -3468,7 +3468,6 @@ class QuestionCustom extends Question
 
     async act()
     {
-        const quiz_info = this.quiz_session.quiz_info;
         let quiz_data = this.quiz_session.quiz_data;
         let game_data = this.quiz_session.game_data;
         const option_data = this.quiz_session.option_data;
@@ -3491,7 +3490,15 @@ class QuestionCustom extends Question
         if(this.quiz_session.already_liked == false && question_num == Math.floor(quiz_size / 2)) //절반 정도 했을 때
         {
             const channel = this.quiz_session.channel;
-            channel.send({content: ">>> 이 퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!", components: [ feedback_manager.quiz_feedback_comp ]});
+            channel.send({
+                embeds: 
+                [{ 
+                    color: 0x05f1f1, 
+                    title: `**${quiz_data['title']}**`,
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!"
+                }], 
+                components: [ feedback_manager.quiz_feedback_comp ]
+            });
         }
 
         //이미지 표시
@@ -3892,7 +3899,15 @@ class Ending extends QuizLifeCycleWithUtility
 
         if(this.quiz_session.already_liked == false)
         {
-            channel.send({content: ">>> 이 퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!", components: [ feedback_manager.quiz_feedback_comp ]});
+            const channel = this.quiz_session.channel;
+            channel.send({
+            embeds: 
+            [{ 
+                color: 0x05f1f1, 
+                title: `**${quiz_data['title']}**`,
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!"
+            }], 
+            components: [ feedback_manager.quiz_feedback_comp ]});
         }
 
         quiz_ui.embed.color = 0xFED049,
