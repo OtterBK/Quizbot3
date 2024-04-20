@@ -1,0 +1,383 @@
+quiz_answer: 장날 &# 장날이다 &# 가는 날이 장날이다
+가늘 날이
+desc: 어떤 일을 하려고 하는데 뜻하지 않은 일을 공교롭게 당함을 비유적으로 이르는 말
+
+quiz_answer: 채찍질 &# 가는 말에 채찍질
+가는 말에
+desc: 부지런하고 성실한 사람에게 더 잘하라는 뜻
+
+quiz_answer: 오는 말이 곱다 &# 가는 말이 고와야 오는 말이 곱다
+가는 말이 고와야
+desc: 자기가 먼저 남에게 잘 대해 주어야 남도 자기에게 잘 대해 준다는 뜻
+
+quiz_answer: 콩 나듯 한다 &# 가뭄에 콩 나듯 한다
+가뭄에 
+desc: 수가 너무 적다는 뜻
+
+quiz_answer: 안 간다 &# 간에 기별도 안 간다
+간에 기별도
+desc: 먹은 것이 너무 적어 먹으나 마나 하다
+
+quiz_answer: 쓸개에 붙었다 한다 &# 간에 붙었다 쓸개에 붙었다 한다
+간에 붙었다
+desc: 지조 없이 아무에게나 형편에 따라 아부한다는 뜻
+
+quiz_answer: 자전거 타는 격 &# 갓 쓰고 자전거 타는 격
+갓 쓰고 
+desc: 상황에 전혀 어울리지 않거나 차림새가 다른 경우의 뜻
+
+quiz_answer: 불구경 &# 불구경하듯 한다 &# 갓 쓰고 자전거 타는 격
+강 건너 
+desc: 남의 일인 듯 무관심한 태고
+
+quiz_answer: 쓰면 준다 &# 강물도 쓰면 준다
+강물도 
+desc: 아무리 많아도 쓰면 곧 줄어드니까 아껴 사용하라는 뜻
+
+quiz_answer: 주인을 안다 &# 개도 닷새가 되면 주인을 안다
+개도 닷새가 되면
+desc: 남의 은덕은 모르는 배은망덕한 사람을 꾸짖는 말
+
+quiz_answer: 벌레를 잡는다 &# 거미도 줄을 쳐야 벌레를 잡는다
+거미도 줄을 쳐야 
+desc: 모든 일은 준비가 있어야 결실을 얻을 수 있다는 뜻
+
+quiz_answer: 뛰려고 한다 &# 걷기도 전에 뛰려고 한다
+걷기도 전에
+desc: 쉽고 작은 일도 못하면서 더 어렵고 큰일을 하려 한다는 뜻
+
+quiz_answer: 바위 치기 &# 계란으로 바위 치기
+계란으로
+desc: 보잘것없는 힘으로 대들어 보아야 별수가 없음
+
+quiz_answer: 꿰어야 보배
+구슬이 서 말이라도
+
+quiz_answer: 세상을 안다
+굶어 보아야
+
+quiz_answer: 고기
+그물에 든
+
+quiz_answer: 다리가 물렸다
+기르던 개에게
+
+quiz_answer: 흔드는 격
+나무에 오르라 하고
+
+quiz_answer: 능하지 못하다
+날면 기는 것이
+
+quiz_answer: 중천금
+남아 일언
+
+quiz_answer: 식은 죽 먹기
+남의 말 하기는
+
+quiz_answer: 굵어 보인다
+남의 밥에 든 콩이
+
+quiz_answer: 커 보인다
+남의 떡이
+
+quiz_answer: 감 놔라 배 놔라 한다
+남의 잔치에 
+
+quiz_answer: 밤말은 쥐가 듣는다
+낮말은 새가 듣고
+
+quiz_answer: 종의 배고픔을 모른다
+내 배가 부르니
+
+quiz_answer: 서쪽에서 뜨겠네
+내일은 해가
+
+quiz_answer: 발 뻗어라
+누울 자리 봐 가며
+
+quiz_answer: 성낼 적이 있다
+느린 소도
+
+quiz_answer: 재 뿌리기
+다 된 밥에 
+
+quiz_answer: 보리알만 못하다
+닭에게는 보석이
+
+quiz_answer: 지붕 쳐다보듯 한다
+닭 쫓던 개
+
+quiz_answer: 열어 준 셈
+도둑놈 문
+
+quiz_answer: 열쇠 주는 격
+도둑에게
+
+quiz_answer: 개도 안 짖는다
+도둑을 맞으려면
+
+quiz_answer: 법도 쓸데없다
+도둑이 없으면
+
+quiz_answer: 저리다
+도둑이 제 발
+
+quiz_answer: 두드려 보고 건너라
+돌다리도
+
+quiz_answer: 어둡다
+등잔 밑이
+
+quiz_answer: 김칫국부터 마신다
+떡 줄 사람은 생각도 않는데
+
+quiz_answer: 겨 묻은 개 나무란다
+똥 묻은 개가
+
+quiz_answer: 다 겪는다
+말로 온 동네를
+
+quiz_answer: 귀신도 모른다
+말 안하면
+
+quiz_answer: 비지 사러 갔다 두부 사 온다
+말이 고마우면
+
+quiz_answer: 장 파한다
+망건 쓰다
+
+quiz_answer: 자고 때린 놈은 오그리고 잔다
+맞은 놈은 펴고
+
+quiz_answer: 칼 뺀다
+모기 보고 
+
+quiz_answer: 정 맞는다
+모난 돌이
+
+quiz_answer: 아는 게 병
+모르면 약
+
+quiz_answer: 포도청
+목구멍이 
+
+quiz_answer: 보따리 내놓으라 한다
+물에 빠진 놈 건져 놓으니
+
+quiz_answer: 발등 찍힌다
+믿는 도끼에
+
+
+quiz_answer: 소 도둑 된다
+바늘 도둑이
+
+quiz_answer: 사람의 욕심은 못 채운다
+바다는 메워도
+
+quiz_answer: 천리 간다
+발 없는 말이
+
+quiz_answer: 흥정
+배부른 
+
+quiz_answer: 배가 산으로 간다
+사공이 많으면
+
+quiz_answer: 돈 나고 사람 났나
+사람 나고 돈 났지
+
+quiz_answer: 길마 벗을 날 없다
+새끼 많이 둔 소
+
+quiz_answer: 초저젹부터 기다린다
+새벽달 보자고
+
+quiz_answer: 풍월을 읊는다
+서당 개 삼년이면
+
+quiz_answer: 사람 잡는다
+설마가 
+
+quiz_answer: 비빈다
+소도 언덕이 있어야
+
+quiz_answer: 외양간 고친다
+소 잃고
+
+quiz_answer: 염통 안이 곪는 것은 모른다
+손톱 밑에 가시 드는 줄은 알아도
+
+quiz_answer: 먹어야 양반
+수염이 열 자라도
+
+quiz_answer: 망둥이도 뛴다
+숭어가 뛰니까
+
+quiz_answer: 검정 나무란다
+숯이 
+
+quiz_answer: 도낏자루 썩는 줄 모른다
+신선놀음에 
+
+quiz_answer: 쏟아 놓은 말은 주워 담을 수 없다
+쏟아 놓은 쌀은 주워 담을 수 있어도
+
+quiz_answer: 물어가라
+아는 길도
+
+quiz_answer: 백개 채워 달라 한다
+아흔아홉 가진 사람이 하나 가진 사람 보고
+
+quiz_answer: 뒤에서 발꿈치 문다
+앞에서 꼬리치는 개가
+
+quiz_answer: 부뚜막에  먼저 올라간다
+얌전한 고양이가
+
+quiz_answer: 음지가 양지 된다
+양지가 음지 되고
+
+quiz_answer: 안 넘어가는 나무  없다
+열 번 찍어
+
+quiz_answer: 쳐다보지도 말아라
+오르지 못한 나무는
+
+quiz_answer: 날개다
+옷이
+
+quiz_answer: 침 뱉으랴
+웃는 낯에
+
+quiz_answer: 외나무다리에서 만난다
+원수는 
+
+quiz_answer: 솥뚜껑 보고 놀란다
+자라 보고 놀란 가슴
+
+quiz_answer: 남 주자니 아깝다
+저 먹자니 싫고
+
+quiz_answer: 안경이다
+제 눈에
+
+quiz_answer: 한강에 가서 눈 흘긴다
+종로에서 뺨 맞고
+
+quiz_answer: 벼락 맞는다
+죄지은 놈 옆에 있다가
+
+quiz_answer: 살아 한 잔 술만 못하다
+죽어 석 잔 술이
+
+quiz_answer: 볕 들 날 있다
+쥐구멍에도 
+
+quiz_answer: 꿈틀한다
+지렁이도 밟으면
+
+quiz_answer: 들에서도 샌다
+집에서 새는 바가지
+
+quiz_answer: 그냥 지나랴
+참개사 방앗간을
+
+quiz_answer: 한 걸음부터 &# 첫걸음으로 시작된다
+천 리 길도 
+
+quiz_answer: 물 베기
+칼로
+
+quiz_answer: 팥 심은 데 팥 난다
+콩 심은 데 콩 나고
+
+quiz_answer: 태산
+티끌 모아
+
+quiz_answer: 무덤 없다
+핑계 없는
+
+quiz_answer: 별 따기
+하늘의
+
+quiz_answer: 솟아날 구멍이 있다 &# 솟아날 구멍은 있다
+하늘이 무너져도
+
+quiz_answer: 범 무서운 줄 모른다
+하룻강아지 
+
+quiz_answer: 한 귀로 흘린다
+한 귀로 듣고
+
+quiz_answer: 배부르랴
+한 술 밥에
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

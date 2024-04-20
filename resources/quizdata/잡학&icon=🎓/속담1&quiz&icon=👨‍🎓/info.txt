@@ -1,0 +1,4 @@
+&topNickname: 문과
+&quizCount: 100
+&typeName: 속담 맞추기
+속담의 앞 부분을 나오면 뒷 부분을 적는 퀴즈입니다.

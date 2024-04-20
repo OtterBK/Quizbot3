@@ -1,3 +1,7 @@
+//외부모듈
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+//로컬 모듈
 const { addQuizLike, checkQuizLike } = require('./user_quiz_info_manager.js');
 const {  CUSTOM_EVENT_TYPE } = require('../../config/system_setting.js');
 const logger = require('../../utility/logger.js')('FeedbackManager');
@@ -24,7 +28,7 @@ exports.createDynamicQuizFeedbackComponent = (guild_id, quiz_id, quiz_title, cre
     return quiz_feedback_comp;
 }
 
-exports.addLikeAuto(guild, user, quiz_id, quiz_title, creator_name, channel)
+exports.addLikeAuto = (guild, user, quiz_id, quiz_title, creator_name, channel) =>
 {
   addQuizLike(quiz_id, guild.id, user.id)
   .then((result) => {
@@ -46,7 +50,7 @@ exports.checkAlreadyLike = (quiz_id, guild_id) =>
     return checkQuizLike(quiz_id, guild_id);
 }
 
-exports.do_event(event_name, interaction)
+exports.do_event = (event_name, interaction) =>
 {
   if(intersection.custom_id != 'like')
   {
