@@ -1430,7 +1430,7 @@ class NotesSelectUI extends QuizBotControlComponentUI
       //파일명으로 정렬
       const content_list_sorted_by_name = fs.readdirSync(notes_folder_path)
       .sort((a, b) => {
-        return a.localeCompare(b, 'ko');
+        return b.localeCompare(a, 'ko');
       })
       .map(function(v) { 
         return { name:v.replace('.txt', ""),
