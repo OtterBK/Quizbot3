@@ -1417,17 +1417,29 @@ class NotesSelectUI extends QuizBotControlComponentUI
 
   async loadNoteContents(notes_folder_path) 
   {
-    //파일 생성일로 정렬
-    const content_list_sorted_by_mtime = fs.readdirSync(notes_folder_path)
-        .map(function(v) { 
-            return { name:v.replace('.txt', ""),
-                    mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
-                    note_path: `${notes_folder_path}/${v}`
-                  }; 
-        })
-        .sort(function(a, b) { return b.mtime - a.mtime; });
+    // //파일 생성일로 정렬
+    // const content_list_sorted_by_mtime = fs.readdirSync(notes_folder_path)
+    //     .map(function(v) { 
+    //         return { name:v.replace('.txt', ""),
+    //                 mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+    //                 note_path: `${notes_folder_path}/${v}`
+    //               }; 
+    //     })
+    //     .sort(function(a, b) { return b.mtime - a.mtime; });
+  
+      //파일명으로 정렬
+      const content_list_sorted_by_name = fs.readdirSync(notes_folder_path)
+      .sort((a, b) => {
+        return a.localeCompare(b, 'ko');
+      })
+      .map(function(v) { 
+        return { name:v.replace('.txt', ""),
+                // mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+                note_path: `${notes_folder_path}/${v}`
+              }; 
+      });
 
-    return content_list_sorted_by_mtime;
+    return content_list_sorted_by_name;
   }
 
   onInteractionCreate(interaction)

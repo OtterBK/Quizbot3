@@ -62,7 +62,7 @@ exports.addQuizLikeAuto = async (guild, user, quiz_id, quiz_title, creator_name,
     if(result == true)
     {
       channel.send({content: '```' + `👍 [${user.displayName}]님이 [${quiz_title}] 퀴즈를 추천했어요! ` + '```'});
-      logger.info(`Custom quiz got liked by ${guild.name}[${guild_id}]/${user.displayname}[${user_id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
+      logger.info(`Custom quiz got liked by ${guild.name}[${guild_id}]/${user.displayName}[${user_id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
     }
     else
     {

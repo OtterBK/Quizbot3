@@ -1,6 +1,7 @@
 mkdir quizbot3
 sudo sh auto_script/setup_quizbot3.sh --cron --node=16 --dump=/home/ubuntu/auto_script/db_backup/backup_20240118_222832.sql --swap=8G --install-path=/home/ubuntu/Quizbot3/
 [private_config.json 설정해주고]
+[backup_script 경로 지정 수정해주고]
 [quizdata 넣어주고]
 node index.js
 
