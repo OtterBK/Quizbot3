@@ -795,8 +795,8 @@ class QuizLifecycle
                 const interaction = event_object;
                 const quiz_info = this.quiz_session.quiz_info;
 
-                feedback_manager.addQuizLikeAuto(interaction.guild, interaction.member, quiz_info.quiz_id, quiz_info.title, quiz_info.author, interaction.channel);
-                this.quiz_session.already_liked = true;
+                feedback_manager.addQuizLikeAuto(interaction, quiz_info.quiz_id, quiz_info.title);
+                // this.quiz_session.already_liked = true; //유저별 추천 가능이라 무조건 계속 띄우게 변경
 
                 return;
             }
@@ -1554,18 +1554,20 @@ class InitializeCustomQuiz extends Initialize
             }
         }
 
-        feedback_manager.checkAlreadyLike(quiz_id, guild_id)
-        .then((result) => 
-        {
-            if(this.quiz_session == undefined)
-            {
-                return;
-            }
+        // 서버별이 아닌 유저별로 변경되면서 필요 없어짐. 무조건 추천하기 띄움
+        // feedback_manager.checkAlreadyLike(quiz_id, guild_id)
+        // .then((result) => 
+        // {
+        //     if(this.quiz_session == undefined)
+        //     {
+        //         return;
+        //     }
             
-            this.quiz_session.already_liked = result;
+        //     this.quiz_session.already_liked = result;
 
-            logger.info(`this guild's already liked value = ${this.quiz_session.already_liked}, guild_id:${this.quiz_session.guild_id}`);
-        });
+        //     logger.info(`this guild's already liked value = ${this.quiz_session.already_liked}, guild_id:${this.quiz_session.guild_id}`);
+        // });
+        this.quiz_session.already_liked = false; //무조건 띄운다.
     }
 }
 

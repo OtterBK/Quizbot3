@@ -261,7 +261,9 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   const quiz_session = (interaction.guild == undefined ? undefined : quiz_system.getQuizSession(interaction.guild.id));
   if(quiz_session != undefined)
   {
-    if(already_deferred == false && interaction.isButton()) //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
+    if(already_deferred == false 
+      && interaction.isButton() //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
+      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
     {
       already_deferred = true;
       try
@@ -283,7 +285,8 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   {
     if((already_deferred == false)
       && (interaction.isButton() || interaction.isStringSelectMenu())
-      && (interaction.customId.startsWith('request_modal') == false)) //modal 요청 interaction은 defer하면 안됨
+      && interaction.customId.startsWith('request_modal') == false //modal 요청 interaction은 defer하면 안됨
+      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)) 
     {
       already_deferred = true;
       await interaction.deferUpdate(); 

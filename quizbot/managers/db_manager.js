@@ -243,7 +243,7 @@ exports.selectLikeInfo = async (value_fields) => {
 
   const query_string = 
   `select user_id from tb_like_info 
-  where quiz_id = $1 and guild_id = $2`;
+  where quiz_id = $1 and user_id = $2`;
 
   return sendQuery(query_string, value_fields);
 

@@ -2270,7 +2270,7 @@ class UserQuizInfoUI extends QuizbotUI {
 
     if(interaction.customId == 'like') //추천하기 버튼 눌렀을 때
     {
-      feedback_manager.addQuizLikeAuto(interaction.guild, interaction.member, quiz_info.quiz_id, quiz_info.data.quiz_title, quiz_info.data.creator_name, interaction.channel);
+      feedback_manager.addQuizLikeAuto(interaction, quiz_info.quiz_id, quiz_info.data.quiz_title);
       return;
     }
   }

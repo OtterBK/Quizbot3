@@ -45,28 +45,30 @@ exports.createDynamicQuizFeedbackComponent = (guild_id, quiz_id, quiz_title, cre
     return quiz_feedback_comp;
 }
 
-exports.addQuizLikeAuto = async (guild, user, quiz_id, quiz_title, creator_name, channel) =>
+exports.addQuizLikeAuto = async (interaction, quiz_id, quiz_title) =>
 { 
+  const guild = interaction.guild;
+  const user = interaction.user;
   const guild_id = guild.id;
   const user_id = user.id;
 
-  if(await exports.checkAlreadyLike(quiz_id, guild_id))
+  if(await exports.checkAlreadyLike(quiz_id, user_id))
   {
-    channel.send({content: '```' + `💚 [${guild.name}] 서버는 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```'});
+    interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```', ephemeral: true});
     return;
   }
 
-  exports.addQuizLike(quiz_id, guild_id, user.id)
+  exports.addQuizLike(quiz_id, guild_id, user_id)
   .then((result) => {
 
     if(result == true)
     {
-      channel.send({content: '```' + `👍 [${user.displayName}]님이 [${quiz_title}] 퀴즈를 추천했어요! ` + '```'});
-      logger.info(`Custom quiz got liked by ${guild.name}[${guild_id}]/${user.displayName}[${user_id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
+      interaction.reply({content: '```' + `👍 [${quiz_title}] 퀴즈를 추천했어요! ` + '```', ephemeral: true});
+      logger.info(`Custom quiz got liked by ${user.displayName}[${user_id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
     }
     else
     {
-      channel.send({content: '```' + `💚 [${guild.name}] 서버는 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```'});
+      interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```', ephemeral: true});
     }
   });
 }
@@ -91,7 +93,7 @@ exports.addQuizLike = async (quiz_id, guild_id, user_id) =>
     const like_count = like_count_result.rows[0].like_count;
 
     logger.info(`Custom quiz's like updated to ${like_count}. quiz_id: ${quiz_id}`);
-    if(like_count >= 10) //10개 이상이면 인증된 퀴즈
+    if(like_count >= 30) //30개 이상이면 인증된 퀴즈
     {
       logger.info(`Custom quiz has been auto certified. quiz_id: ${quiz_id}`);
       db_manager.certifyQuiz(quiz_id);
@@ -101,14 +103,14 @@ exports.addQuizLike = async (quiz_id, guild_id, user_id) =>
   return true;
 }
 
-exports.checkAlreadyLike = async (quiz_id, guild_id) =>
+exports.checkAlreadyLike = async (quiz_id, user_id) =>
 {
-  if(quiz_id == undefined || guild_id == undefined)
+  if(quiz_id == undefined || user_id == undefined)
   {
     return false;
   }
 
-  const result = await db_manager.selectLikeInfo([quiz_id, guild_id]);
+  const result = await db_manager.selectLikeInfo([quiz_id, user_id]);
 
   if(result == undefined || result.rows?.length == 0) //not exists
   {
