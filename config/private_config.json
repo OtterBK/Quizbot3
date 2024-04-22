@@ -10,5 +10,6 @@
         "PASSWORD" : "changepasswd",
         "DATABASE" : "quizbot3",
         "PORT" : "5432"
-    }
+    },
+    "ADMIN_ID": "INPUT_YOUR_DISCORD_USER_ID"
 }
