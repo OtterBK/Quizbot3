@@ -1003,6 +1003,12 @@ class MainUI extends QuizbotUI
       return new SelectQuizTypeUI();
     }
 
+    if(interaction.customId == '2') //멀티플레이 눌렀을 때
+    {
+      interaction.reply({content: "5월부터 개발 시작 예정입니다.\n빠르면 5월 내로, 늦어도 상반기내로 추가될 예정입니다."});
+      return;
+    }
+
     if(interaction.customId == '3') //퀴즈만들기 눌렀을 때
     {
       return new QuizToolGuide(); //퀴즈만들기 방법 안내
@@ -2252,7 +2258,7 @@ class UserQuizInfoUI extends QuizbotUI {
       
       this.fillInfoAsDevQuizInfo(); 
       
-      quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
+      quiz_system.startQuiz(guild, owner, channel, quiz_info, false); //퀴즈 시작
       quiz_info.addPlayedCount(); //플레이 횟수 + 1
 
       return new AlertQuizStartUI(quiz_info, owner); 

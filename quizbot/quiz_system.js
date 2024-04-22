@@ -101,7 +101,7 @@ exports.getQuizSession = (guild_id) => {
     return quiz_session_map[guild_id];
 }
 
-exports.startQuiz = (guild, owner, channel, quiz_info) =>
+exports.startQuiz = (guild, owner, channel, quiz_info, suspend_start) =>
 {
     const guild_id = guild.id;
     if(quiz_session_map.hasOwnProperty(guild_id))
@@ -110,7 +110,7 @@ exports.startQuiz = (guild, owner, channel, quiz_info) =>
       prev_quiz_session.free();
     }
 
-    const quiz_session = new QuizSession(guild, owner, channel, quiz_info);
+    const quiz_session = new QuizSession(guild, owner, channel, quiz_info, suspend_start);
     quiz_session_map[guild_id] = quiz_session;
 
     return quiz_session;
@@ -428,7 +428,7 @@ class QuizPlayUI
 //#region 퀴즈 게임용 세션
 class QuizSession
 {
-    constructor(guild, owner, channel, quiz_info)
+    constructor(guild, owner, channel, quiz_info, suspend_start)
     {
         logger.info(`Creating Quiz Session, guild_id: ${guild.id}`);
 
@@ -460,6 +460,8 @@ class QuizSession
 
         this.already_liked = true; //이미 like 버튼 눌렀는지 여부. 기본 true 깔고 initializeCustom에서만 false 또는 true 다시 정함
 
+        this.suspended = false;
+
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
         //Initialize ->
@@ -468,8 +470,14 @@ class QuizSession
         //Question ->
         //(CorrectAnswer 또는 Timeover) -> Question
 
+        if(suspend_start == true) //지연된 시작이면 직접 호출때까지 기다리기. (멀티플레이에서 사용)
+        {
+            this.suspended = true;
+            logger.info(`Suspending Quiz Session, guild_id: ${guild.id}`);
+            return;
+        }
+
         this.createCycle();
-        
 
         this.cycleLoop();
     }
@@ -630,6 +638,71 @@ class QuizSession
 
         const cycle = this.getCycle(current_cycle_type);
         cycle.forceStop();
+    }
+
+    async createVoiceConnection()
+    {
+        const voice_channel = this.voice_channel;
+        const guild = this.guild;
+
+         //보이스 커넥션
+         const voice_connection = joinVoiceChannel({
+            channelId: voice_channel.id,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+        });
+        logger.info(`Joined Voice channel, guild_id:${this.guild_id}, voice_channel_id:${voice_channel.id}`);
+
+        //보이스 끊겼을 때 핸들링
+        voice_connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+
+            if(this.force_stop == true || this.current_cycle_type == CYCLE_TYPE.FINISH) //강종이나 게임 종료로 끊긴거면
+            {
+                return;
+            }
+
+            try {
+                //우선 끊어졌으면 재연결 시도를 해본다.
+                logger.info(`Try voice reconnecting..., guild_id:${this.guild_id}`);
+                await Promise.race([
+                    entersState(voice_connection, VoiceConnectionStatus.Signalling, 5_000),
+                    entersState(voice_connection, VoiceConnectionStatus.Connecting, 5_000),
+                ]);
+            } catch (error) {
+                //근데 정말 연결 안되면 강제 종료한다.
+                logger.info(`Failed to voice reconnecting, force stop this quiz session, guild_id:${this.guild_id}`);
+                try{
+                    voice_connection.destroy();
+                }catch(error) {
+                }
+                
+                await this.forceStop();
+            }
+        });
+		
+        //보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
+        const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+            const newUdp = Reflect.get(newNetworkState, 'udp');
+            clearInterval(newUdp?.keepAliveInterval);
+        };
+
+        voice_connection.on('stateChange', (oldState, newState) => {
+            const oldNetworking = Reflect.get(oldState, 'networking');
+            const newNetworking = Reflect.get(newState, 'networking');
+
+            oldNetworking?.off('stateChange', networkStateChangeHandler);
+            newNetworking?.on('stateChange', networkStateChangeHandler);
+        });
+
+        const audio_player = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Stop,
+            },
+        });
+        voice_connection.subscribe(audio_player);
+
+        this.voice_connection = voice_connection;
+        this.audio_player = audio_player;
     }
 
     /** 세션 이벤트 핸들링 **/
@@ -962,6 +1035,7 @@ class Initialize extends QuizLifecycle
     {
         try
         {
+            this.suspended = true; //initialize 오면 suspend는 풀린거임
             await this.basicInitialize();
         }
         catch(err)
@@ -994,67 +1068,8 @@ class Initialize extends QuizLifecycle
     {
         logger.info(`Start basic initialize of quiz session, guild_id:${this.quiz_session.guild_id}`);
 
-        const voice_channel = this.quiz_session.voice_channel;
-        const guild = this.quiz_session.guild;
-
-        //보이스 커넥션
-        const voice_connection = joinVoiceChannel({
-            channelId: voice_channel.id,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator,
-        });
-        logger.info(`Joined Voice channel, guild_id:${this.quiz_session.guild_id}, voice_channel_id:${voice_channel.id}`);
-
-        //보이스 끊겼을 때 핸들링
-        voice_connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
-
-            if(this.quiz_session.force_stop == true || this.quiz_session.current_cycle_type == CYCLE_TYPE.FINISH) //강종이나 게임 종료로 끊긴거면
-            {
-                return;
-            }
-
-            try {
-                //우선 끊어졌으면 재연결 시도를 해본다.
-                logger.info(`Try voice reconnecting..., guild_id:${this.quiz_session.guild_id}`);
-                await Promise.race([
-                    entersState(voice_connection, VoiceConnectionStatus.Signalling, 5_000),
-                    entersState(voice_connection, VoiceConnectionStatus.Connecting, 5_000),
-                ]);
-            } catch (error) {
-                //근데 정말 연결 안되면 강제 종료한다.
-                logger.info(`Failed to voice reconnecting, force stop this quiz session, guild_id:${this.quiz_session.guild_id}`);
-                try{
-                    voice_connection.destroy();
-                }catch(error) {
-                }
-                
-                await this.quiz_session.forceStop();
-            }
-        });
-		
-        //보이스 커넥션 생성 실패 문제 해결 방안 https://github.com/discordjs/discord.js/issues/9185, https://github.com/umutxyp/MusicBot/issues/97
-        const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-            const newUdp = Reflect.get(newNetworkState, 'udp');
-            clearInterval(newUdp?.keepAliveInterval);
-        };
-
-        voice_connection.on('stateChange', (oldState, newState) => {
-            const oldNetworking = Reflect.get(oldState, 'networking');
-            const newNetworking = Reflect.get(newState, 'networking');
-
-            oldNetworking?.off('stateChange', networkStateChangeHandler);
-            newNetworking?.on('stateChange', networkStateChangeHandler);
-        });
-
-        const audio_player = createAudioPlayer({
-            behaviors: {
-                noSubscriber: NoSubscriberBehavior.Stop,
-            },
-        });
-        voice_connection.subscribe(audio_player);
-
-        this.quiz_session.voice_connection = voice_connection;
-        this.quiz_session.audio_player = audio_player;
+        //보이스 커넥션 생성
+        await this.quiz_session.createVoiceConnection();
         
         //옵션 로드
         this.loadOptionData().then((option_data) => {

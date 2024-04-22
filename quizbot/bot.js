@@ -259,7 +259,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   //그 외의 명령어
   let already_deferred = false;
   const quiz_session = (interaction.guild == undefined ? undefined : quiz_system.getQuizSession(interaction.guild.id));
-  if(quiz_session != undefined)
+  if(quiz_session != undefined && quiz_session.suspended == false) //지연되지 않은 세션이 존재할 경우
   {
     if(already_deferred == false 
       && interaction.isButton() //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
