@@ -3497,7 +3497,7 @@ class QuestionCustom extends Question
                 [{ 
                     color: 0x05f1f1, 
                     title: `**${quiz_data['title']}**`,
-                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!"
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n🙏 추천은 퀴즈 제작자에게 힘이됩니다."
                 }], 
                 components: [ feedback_manager.quiz_feedback_comp ]
             });
@@ -3914,7 +3914,7 @@ class Ending extends QuizLifeCycleWithUtility
             [{ 
                 color: 0x05f1f1, 
                 title: `**${quiz_data['title']}**`,
-                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!"
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n🙏 추천은 퀴즈 제작자에게 힘이됩니다. "
             }], 
             components: [ feedback_manager.quiz_feedback_comp ]});
         }

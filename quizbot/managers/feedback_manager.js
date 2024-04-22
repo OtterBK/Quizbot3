@@ -54,7 +54,7 @@ exports.addQuizLikeAuto = async (interaction, quiz_id, quiz_title) =>
 
   if(await exports.checkAlreadyLike(quiz_id, user_id))
   {
-    interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```', ephemeral: true});
+    interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 감사합니다! 😄` + '```', ephemeral: true});
     return;
   }
 
@@ -68,7 +68,7 @@ exports.addQuizLikeAuto = async (interaction, quiz_id, quiz_title) =>
     }
     else
     {
-      interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 😄` + '```', ephemeral: true});
+      interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 감사합니다! 😄` + '```', ephemeral: true});
     }
   });
 }
