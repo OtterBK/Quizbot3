@@ -252,7 +252,7 @@ exports.selectLikeInfo = async (value_fields) => {
 exports.updateQuizLikeCount = async (quiz_id) => {
 
   const query_string = 
-  `UPDATE tb_quiz_info set like_count = (select count(guild_id) from tb_like_info where tb_like_info.quiz_id = $1)
+  `UPDATE tb_quiz_info set like_count = (select count(user_id) from tb_like_info where tb_like_info.quiz_id = $1)
     where quiz_id = $1
     returning like_count;`;
 
