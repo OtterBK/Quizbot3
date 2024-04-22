@@ -3526,7 +3526,14 @@ class QuestionCustom extends Question
         {
             this.is_playing_bgm = false;
             this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result); //비동기로 오디오 재생 시켜주고
+            .then((result) => fade_in_end_time = result)
+            .catch((err) => 
+            {
+                if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == false) //아무런 AUDIO_ERROR 메시지가 없다면 -> 예상되지 않은 예외
+                {
+                    this.progress_bar_fixed_text += "\n\nAUDIO_ERROR: " + "오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n";
+                }
+            }); //비동기로 오디오 재생 시켜주고
             this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
         }
         else //오디오 없으면 10초 타이머로 대체

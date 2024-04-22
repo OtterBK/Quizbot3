@@ -22,6 +22,7 @@ let multi_play_count;
 exports.IPC_MESSAGE_TYPE = {
     CHECK_STATUS: 0,
     SYNC_STATUS: 1,
+    SYNC_ADMIN: 2,
 }
 
 exports.sync_objects = sync_objects;
@@ -51,6 +52,12 @@ exports.initialize = (client) =>
             sync_objects.set('guild_count', status.guild_count);
             sync_objects.set('local_play_count', status.local_play_count);
             sync_objects.set('multi_play_count', status.multi_play_count);
+        }
+        else if(message.ipc_message_type == exports.IPC_MESSAGE_TYPE.SYNC_ADMIN)
+        {
+            const admin_instance = message.admin_instance;
+            sync_objects.set("admin_instance", admin_instance);
+            logger.info("synced admin instance!");
         }
     });
 }
