@@ -1434,7 +1434,7 @@ class NotesSelectUI extends QuizBotControlComponentUI
       })
       .map(function(v) { 
         return { name:v.replace('.txt', ""),
-                // mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+                mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
                 note_path: `${notes_folder_path}/${v}`
               }; 
       });
