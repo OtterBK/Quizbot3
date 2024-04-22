@@ -16,6 +16,7 @@ const ytdl = require('discord-ytdl-core');
 //#endregion
 
 //#region 로컬 modules
+const PRIVATE_CONFIG = require('../config/private_config.json');
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_MAKER_TYPE, QUIZ_TYPE, QUIZ_TAG } = require('../config/system_setting.js');
 const option_system = require("./quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
@@ -25,6 +26,7 @@ const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('QuizUI');
 const { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB } = require('./managers/user_quiz_info_manager.js');
 const { sync_objects } = require('./managers/ipc_manager.js');
+const feedback_manager = require('./managers/feedback_manager.js');
 //#endregion
 
 //#region 사전 정의 UI들
@@ -84,7 +86,7 @@ const select_btn_component2 = new ActionRowBuilder()
     .setStyle(ButtonStyle.Primary),
 )
 
-//퀴즈 만들기
+//페이지 이동
 const modal_page_jump = new ModalBuilder()
 .setCustomId('modal_page_jump')
 .setTitle('페이지 이동')
@@ -99,7 +101,38 @@ const modal_page_jump = new ModalBuilder()
         .setMaxLength(4)
         .setRequired(true)
         .setPlaceholder('예시) 1')
-    )
+    ),
+)
+
+const modal_complex_page_jump = new ModalBuilder() //검색과 이동을 한번에 하는 용도
+.setCustomId('modal_complex_page_jump')
+.setTitle('퀴즈 검색(베타)')
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_keyword')
+        .setLabel('어떤 단어로 검색할까요?')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(1)
+        .setMaxLength(10)
+        .setRequired(false)
+        .setPlaceholder('아무것도 입력하지 않으면 모든 퀴즈가 표시됩니다.')
+    ),
+)
+.addComponents(
+  new ActionRowBuilder()
+    .addComponents(
+      new TextInputBuilder()
+        .setCustomId('txt_input_page_jump')
+        .setLabel('몇 페이지로 이동할까요?')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(1)
+        .setMaxLength(4)
+        .setRequired(true)
+        .setValue('1')
+        .setPlaceholder('예시) 1')
+    ),
 )
 
 const page_select_menu = new StringSelectMenuBuilder().
@@ -264,14 +297,19 @@ const sort_by_select_menu = new ActionRowBuilder()
     .setValue('played_count_of_week'),
 
     new StringSelectMenuOptionBuilder()
-    .setLabel('최신 퀴즈순')
-    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
-    .setValue('birthtime'),
-
-    new StringSelectMenuOptionBuilder()
     .setLabel('전체 인기순')
     .setDescription('가장 많이 플레이된 퀴즈부터 표시합니다.')
     .setValue('played_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('전체 추천순')
+    .setDescription('가장 많이 추천 받은 퀴즈부터 표시합니다.')
+    .setValue('like_count'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('최신 퀴즈순')
+    .setDescription('최근 생성된 퀴즈부터 표시합니다.')
+    .setValue('birthtime'),
 
     new StringSelectMenuOptionBuilder()
     .setLabel('오래된 퀴즈순')
@@ -749,9 +787,15 @@ class QuizBotControlComponentUI extends QuizbotUI {
     }
 
     //페이지 점프 제공했을 때임
-    if(interaction.customId == 'modal_page_jump')
+    if(interaction.customId == 'modal_page_jump' || interaction.customId == 'modal_complex_page_jump')
     {
       const input_page_value = interaction.fields.getTextInputValue('txt_input_page_jump');
+
+      if(input_page_value == undefined || input_page_value == '')
+      {
+        interaction.deferUpdate(); //defer은 해준다.
+        return undefined;
+      }
 
       const selected_page_num = parseInt(input_page_value.trim());
       if(isNaN(selected_page_num)) //입력 값 잘못된거 처리
@@ -766,15 +810,15 @@ class QuizBotControlComponentUI extends QuizbotUI {
         return undefined; //이상한 범위면 return
       }
 
-      interaction.deferUpdate();
-
       if(this.cur_page == selected_page_num) 
       {
+        interaction.deferUpdate(); //defer은 해준다.
         return undefined; //페이지 바뀐게 없다면 return;
       }
       
       this.cur_page = selected_page_num - 1;
       this.displayContents(this.cur_page);
+      interaction.deferUpdate(); //defer은 해준다.
 
       return true;
     }
@@ -1084,6 +1128,8 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
       quiz_info['quiz_type'] = content['quiz_type'];
       quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.BY_DEVELOPER;
 
+      quiz_info['quiz_id'] = undefined; //dev quiz는 quiz_id가 없다
+
       return new QuizInfoUI(quiz_info);
     }
 
@@ -1371,17 +1417,29 @@ class NotesSelectUI extends QuizBotControlComponentUI
 
   async loadNoteContents(notes_folder_path) 
   {
-    //파일 생성일로 정렬
-    const content_list_sorted_by_mtime = fs.readdirSync(notes_folder_path)
-        .map(function(v) { 
-            return { name:v.replace('.txt', ""),
-                    mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
-                    note_path: `${notes_folder_path}/${v}`
-                  }; 
-        })
-        .sort(function(a, b) { return b.mtime - a.mtime; });
+    // //파일 생성일로 정렬
+    // const content_list_sorted_by_mtime = fs.readdirSync(notes_folder_path)
+    //     .map(function(v) { 
+    //         return { name:v.replace('.txt', ""),
+    //                 mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+    //                 note_path: `${notes_folder_path}/${v}`
+    //               }; 
+    //     })
+    //     .sort(function(a, b) { return b.mtime - a.mtime; });
+  
+      //파일명으로 정렬
+      const content_list_sorted_by_name = fs.readdirSync(notes_folder_path)
+      .sort((a, b) => {
+        return b.localeCompare(a, 'ko');
+      })
+      .map(function(v) { 
+        return { name:v.replace('.txt', ""),
+                mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+                note_path: `${notes_folder_path}/${v}`
+              }; 
+      });
 
-    return content_list_sorted_by_mtime;
+    return content_list_sorted_by_name;
   }
 
   onInteractionCreate(interaction)
@@ -1643,7 +1701,7 @@ const modal_question_info = new ModalBuilder()
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(40)
-        .setPlaceholder('예시) 40~80 또는 40 또는 ~80 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~80 또는 40 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1736,7 +1794,7 @@ const modal_question_answering_info = new ModalBuilder()
         .setLabel(`정답용 음악 재생 구간을 지정할 수 있습니다. [최대 ${SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생됨]`)
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setPlaceholder('예시) 40~50 또는 40 또는 ~50 (생략 시, 랜덤 재생)')
+        .setPlaceholder('예시) 40~50 (생략 시, 랜덤 재생)')
     )
 )
 .addComponents(
@@ -1830,6 +1888,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     super();
 
+    this.creator = creator;
     this.creator_id = creator.id;
 
     this.embed = {
@@ -1848,7 +1907,6 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     this.components.push(my_quiz_control_comp);
 
-
   }
 
   onReady()
@@ -1857,7 +1915,8 @@ class UserQuizListUI extends QuizBotControlComponentUI
     this.loadUserQuiz()
     .then(() => 
     { 
-      this.update(); 
+      this.update();
+      this.sendQuizPlayedInfo(); //제작한 퀴즈 플레이 정보 요약
     })
     .catch(err => 
     {
@@ -1909,15 +1968,23 @@ class UserQuizListUI extends QuizBotControlComponentUI
   //DB에서 특정 유저 퀴즈가져오기
   async loadUserQuiz()
   {
-    const user_quiz_list = await loadUserQuizListFromDB(this.creator_id);
+    let creator_id = this.creator_id;
 
-    this.cur_contents = [];
+    if(PRIVATE_CONFIG?.ADMIN_ID != undefined && PRIVATE_CONFIG.ADMIN_ID == creator_id) //어드민일 경우
+    {
+      logger.warn(`Matched to Admin ID ${creator_id}, Loading User Quiz List as Undefined`);
+      creator_id = undefined; //전체 조회
+    }
+
+    const user_quiz_list = await loadUserQuizListFromDB(creator_id);
+
     if(user_quiz_list.length == 0)
     {
       this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
       return;
     }
 
+    this.cur_contents = [];
     for(const quiz_info of user_quiz_list)
     {
       quiz_info.name = quiz_info.data.quiz_title;
@@ -1928,7 +1995,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
   showEditor(user, user_quiz_info)
   {
-    if(user.id != user_quiz_info.data.creator_id)
+    if(user.id != user_quiz_info.data.creator_id && user.id != PRIVATE_CONFIG?.ADMIN_ID) //어드민이면 다 수정 할 수 있음
     {
       user.send({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
       return;
@@ -1969,7 +2036,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     if(created_quiz_id == undefined) //저장 실패
     {
-      modal_interaction.user.send({content: `>>> ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true});
+      modal_interaction.user.send({content: `>>> ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM(제육보끔#1916)으로 문의 바랍니다.`, ephemeral: true});
       return;
     }
 
@@ -1977,6 +2044,51 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     const user = modal_interaction.user;
     return this.showEditor(user, user_quiz_info);
+  }
+
+  sendQuizPlayedInfo()
+  {
+    if(this.creator == undefined)
+    {
+      return;
+    }
+
+    const user = this.creator;
+
+    let total_played_count = 0;
+    let best_quiz = undefined;
+    let best_quiz_of_week = undefined;
+
+    if(this.cur_contents == undefined || this.cur_contents.length == 0)
+    {
+      return;
+    }
+
+    for(const quiz_info of this.cur_contents)
+    {
+      if(quiz_info == undefined)
+      {
+        continue;
+      }
+
+      total_played_count += quiz_info.data.played_count;
+
+      if(best_quiz == undefined
+          || best_quiz.data.played_count < quiz_info.data.played_count)
+      {
+        best_quiz = quiz_info;
+      }
+
+      if(best_quiz_of_week == undefined
+        || best_quiz_of_week.data.played_count < quiz_info.data.played_count)
+      {
+        best_quiz_of_week = quiz_info;
+      }
+    }
+
+    let info_string = 
+	 `🔸 유저분들이 ${user.displayName} 님의 퀴즈를 [${total_played_count}]회 플레이했어요!\n🔸 이번 주에 가장 플레이된 퀴즈는 [${best_quiz_of_week.data.quiz_title ?? "UNKNOWN NAME"}]이네요!\n🔸 모든 퀴즈 중 가장 많이 플레이된 퀴즈는 [${best_quiz.data.quiz_title ?? "UNKNOWN NAME"}]입니다!\n🔸 퀴즈 제작에 참여해주셔서 정말 감사드립니다.🙂`;
+    user.send({content: '```' + info_string + '```', ephemeral: true});
   }
 }
 
@@ -2060,12 +2172,14 @@ class UserQuizInfoUI extends QuizbotUI {
 
     description += `📖 퀴즈 설명:\n${quiz_info.data.description}\n\n\n\n`;
 
-    description += "만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
-    description += "업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "\n";
+    description += "`만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
+    description += "`업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
     
-    description += "플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회\n\n";
+    description += "`플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회`\n";
+    description += "`추천한 유저수: " + (quiz_info.data.like_count ?? 0) + "개`\n";
+    description += "`인증여부: " + (quiz_info.data.certified ? "✔" : "❌") + "`\n\n";
 
-    description += "퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "\n";
+    description += "`퀴즈태그 목록: " + utility.convertTagsValueToString(quiz_info.data.tags_value) + "`\n\n";
 
     if(quiz_info.data.is_private)
     {
@@ -2078,8 +2192,8 @@ class UserQuizInfoUI extends QuizbotUI {
     
     if(this.readonly)
     {
-      description += '⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n';
-      this.components = [quiz_info_comp]; //게임 시작 가능한 comp
+      description += '`⚠️ 퀴즈 도중에는 설정을 변경하실 수 없습니다.\n\n`';
+      this.components = [quiz_info_comp, feedback_manager.quiz_feedback_comp]; //게임 시작 가능한 comp, 퀴즈 feedback comp
     }
     else
     {
@@ -2152,6 +2266,12 @@ class UserQuizInfoUI extends QuizbotUI {
     if(interaction.customId == 'settings') //설정 버튼 눌렀을 때
     {
       return new ServerSettingUI(interaction.guild.id);
+    }
+
+    if(interaction.customId == 'like') //추천하기 버튼 눌렀을 때
+    {
+      feedback_manager.addQuizLikeAuto(interaction, quiz_info.quiz_id, quiz_info.data.quiz_title);
+      return;
     }
   }
 
@@ -2320,6 +2440,8 @@ class UserQuizInfoUI extends QuizbotUI {
     quiz_info['quiz_path'] = undefined;//dev quiz는 quiz_path 필요
     quiz_info['quiz_type'] = QUIZ_TYPE.CUSTOM;
     quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.CUSTOM;
+
+    quiz_info['quiz_id'] = quiz_info.quiz_id;
   }
 
 
@@ -2751,13 +2873,13 @@ class UserQuestionInfoUI extends QuizbotUI
     this.quiz_info.updateModifiedTime();
 
     modal_interaction.deferUpdate();
-    logger.info(`Created New Question... question_id: ${user_question_info.question_id}/${question_id}, user_id: ${modal_interaction.user.id}}`);
-
+    
     this.current_question_index = this.question_list.push(user_question_info) - 1; //새로 추가했으면 무조건 마지막에 넣었을테니
     this.displayQuestionInfo(this.current_question_index); 
     // logger.error(`Failed Create New Question... quiz_id: ${this.quiz_info.quiz_id}, user_Id: ${modal_interaction.user.id}, answers: ${input_question_answers}`);
     this.update(); //ui update
     
+    logger.info(`Created New Question... question_id: ${user_question_info.question_id}/${question_id}, user_id: ${modal_interaction.user.id}}, quiz_title: ${this.quiz_info.data.quiz_title}`);
     return;
   }
 
@@ -2802,6 +2924,11 @@ class UserQuestionInfoUI extends QuizbotUI
 }
 
 //사용자 개발 퀴즈 선택 UI
+const btn_search = new ButtonBuilder()
+  .setCustomId('request_modal_complex_page_jump')
+  .setLabel('검색')
+  .setStyle(ButtonStyle.Secondary)
+
 class UserQuizSelectUI extends QuizBotControlComponentUI  
 {
   constructor()
@@ -2823,6 +2950,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       description: '퀴즈 목록을 불러오는 중...\n잠시만 기다려주세요.🙂',
     };
 
+    this.components[2].components[2] = btn_search; //점프 버튼을 검색 버튼으로 대체, this.components는 clonedeep이라 그냥 바꿔도 된다.
     this.components.push(this.sort_by_select_menu);
     this.components.push(this.search_tag_select_menu);
   }
@@ -2853,20 +2981,38 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       return this;
     }
 
-    if(interaction.customId == 'modal_keyword_search') //키워드 검색을 먼저 본다.
+    //점프 버튼 눌렀을 때임
+    if(interaction.customId == 'request_modal_complex_page_jump')
+    {
+      interaction.showModal(modal_complex_page_jump); //페이지 점프 입력 모달 전달
+      return undefined;
+    }
+
+    let force_refresh = false;
+    if(interaction.customId == 'modal_complex_page_jump') //키워드 검색을 먼저 본다.
     {
       const input_keyword_value = interaction.fields.getTextInputValue('txt_input_keyword');
 
       this.filterByKeyword(input_keyword_value);
 
       this.cur_page = 0;
-      this.displayContents(this.cur_page);
-      return this;
-    }
+      this.displayContents(this.cur_page); 
 
+      if(input_keyword_value == undefined || input_keyword_value == '')
+      {
+        interaction.channel.send({content: `>>> 모든 퀴즈를 표시합니다.`});
+      }
+      else
+      {
+        interaction.channel.send({content: `>>> **${input_keyword_value}** 에 대한 검색 결과입니다.`});
+      }
+
+      force_refresh = true;
+    }
+    
     const is_page_move = this.checkPageMove(interaction);
-    if(is_page_move == undefined) return;
-    if(is_page_move == true) return this;
+    if(is_page_move == undefined && force_refresh == false) return;
+    if(is_page_move == true || force_refresh == true) return this;
 
     const select_num = parseInt(interaction.customId);
     if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
@@ -2967,9 +3113,12 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     let filtered_contents = [];
     for(const quiz_info of this.all_user_quiz_contents)
     {
-      if(quiz_info.data.quiz_title.includes(selected_keyword_value)
-        || quiz_info.data.simple_description.includes(selected_keyword_value)
-        || quiz_info.data.description.includes(selected_keyword_value)) 
+      if(
+        quiz_info.data.quiz_title?.includes(selected_keyword_value)
+        || quiz_info.data.simple_description?.includes(selected_keyword_value)
+        || quiz_info.data.description?.includes(selected_keyword_value)
+        || quiz_info.data.creator_name?.includes(selected_keyword_value)
+        ) 
       {
         filtered_contents.push(quiz_info);
         continue;

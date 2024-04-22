@@ -41,6 +41,16 @@ manager.extend(
 
 manager.on('clusterCreate', cluster =>
 {
+    cluster.on('message', message => 
+    {
+        if(message.ipc_message_type === IPC_MESSAGE_TYPE.SYNC_ADMIN) //그대로 뿌려줌
+        {
+            logger.info("Broadcasting SYNC ADMIN message")
+            manager.broadcast(message);
+            return;
+        }
+    });
+
     logger.info(`Launched Cluster ${cluster.id}`);
 });
 

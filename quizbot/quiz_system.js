@@ -25,6 +25,7 @@ const db_manager = require('./managers/db_manager.js');
 const { initial } = require('lodash');
 const { error } = require('console');
 const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
+const feedback_manager = require('./managers/feedback_manager.js');
 
 //#endregion
 
@@ -457,6 +458,8 @@ class QuizSession
         this.ipv4 = undefined; 
         this.ipv6 = undefined; 
 
+        this.already_liked = true; //이미 like 버튼 눌렀는지 여부. 기본 true 깔고 initializeCustom에서만 false 또는 true 다시 정함
+
         //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
         //기본 LifeCycle 동작은 다음과 같다
         //Initialize ->
@@ -526,6 +529,8 @@ class QuizSession
 
         this.ipv4 = null;
         this.ipv6 = null;
+
+        this.already_liked = null;
 
         logger.info(`Free Quiz Session, guild_id: ${this.guild_id}`);
     }
@@ -782,6 +787,17 @@ class QuizLifecycle
                 let force_stop_message = text_contents.quiz_play_ui.force_stop;
                 force_stop_message = force_stop_message.replace("${who_stopped}", interaction.member.user.username);
                 interaction.channel.send({content: force_stop_message});
+                return;
+            }
+
+            if(event_object.isButton() && this.quiz_session.already_liked == false && event_object.customId == 'like') //추천하기 버튼 눌렀을 때
+            {
+                const interaction = event_object;
+                const quiz_info = this.quiz_session.quiz_info;
+
+                feedback_manager.addQuizLikeAuto(interaction, quiz_info.quiz_id, quiz_info.title);
+                // this.quiz_session.already_liked = true; //유저별 추천 가능이라 무조건 계속 띄우게 변경
+
                 return;
             }
 
@@ -1417,7 +1433,8 @@ class InitializeCustomQuiz extends Initialize
 
     async CustomQuizInitialize()
     {
-        logger.info(`Start custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}`);
+        const guild_id = this.quiz_session.guild_id;
+        logger.info(`Start custom quiz initialize of quiz session, guild_id:${guild_id}`);
 
         const quiz_session = this.quiz_session;
         const quiz_info = this.quiz_session.quiz_info;
@@ -1536,6 +1553,21 @@ class InitializeCustomQuiz extends Initialize
                 quiz_session.ipv6 = ipv6;
             }
         }
+
+        // 서버별이 아닌 유저별로 변경되면서 필요 없어짐. 무조건 추천하기 띄움
+        // feedback_manager.checkAlreadyLike(quiz_id, guild_id)
+        // .then((result) => 
+        // {
+        //     if(this.quiz_session == undefined)
+        //     {
+        //         return;
+        //     }
+            
+        //     this.quiz_session.already_liked = result;
+
+        //     logger.info(`this guild's already liked value = ${this.quiz_session.already_liked}, guild_id:${this.quiz_session.guild_id}`);
+        // });
+        this.quiz_session.already_liked = false; //무조건 띄운다.
     }
 }
 
@@ -3453,7 +3485,23 @@ class QuestionCustom extends Question
         this.answers = current_question['answers'];
         const question_id = current_question['question_id'];
 
-        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question_id: ${question_id}`);
+        const question_num = game_data['question_num'];
+        const quiz_size = quiz_data['quiz_size'];
+        logger.info(`Questioning Custom, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id}`);
+
+        if(this.quiz_session.already_liked == false && question_num == Math.floor(quiz_size / 2)) //절반 정도 했을 때
+        {
+            const channel = this.quiz_session.channel;
+            channel.send({
+                embeds: 
+                [{ 
+                    color: 0x05f1f1, 
+                    title: `**${quiz_data['title']}**`,
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n🙏 추천은 퀴즈 제작자에게 힘이됩니다."
+                }], 
+                components: [ feedback_manager.quiz_feedback_comp ]
+            });
+        }
 
         //이미지 표시
         const image_resource = current_question['image_resource'];
@@ -3480,7 +3528,14 @@ class QuestionCustom extends Question
         {
             this.is_playing_bgm = false;
             this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result); //비동기로 오디오 재생 시켜주고
+            .then((result) => fade_in_end_time = result)
+            .catch((err) => 
+            {
+                if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == false) //아무런 AUDIO_ERROR 메시지가 없다면 -> 예상되지 않은 예외
+                {
+                    this.progress_bar_fixed_text += "\n\nAUDIO_ERROR: " + "오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n";
+                }
+            }); //비동기로 오디오 재생 시켜주고
             this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
         }
         else //오디오 없으면 10초 타이머로 대체
@@ -3848,8 +3903,21 @@ class Ending extends QuizLifeCycleWithUtility
     async act()
     {
         const quiz_data = this.quiz_session.quiz_data;
-        const quiz_type = ['quiz_type'];
         let quiz_ui = this.quiz_session.quiz_ui;
+        const channel = this.quiz_session.channel;
+
+        if(this.quiz_session.already_liked == false)
+        {
+            const channel = this.quiz_session.channel;
+            channel.send({
+            embeds: 
+            [{ 
+                color: 0x05f1f1, 
+                title: `**${quiz_data['title']}**`,
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n🙏 추천은 퀴즈 제작자에게 힘이됩니다. "
+            }], 
+            components: [ feedback_manager.quiz_feedback_comp ]});
+        }
 
         quiz_ui.embed.color = 0xFED049,
 

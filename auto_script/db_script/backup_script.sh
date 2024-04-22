@@ -1,5 +1,5 @@
 #!/bin/bash
-BACKUP_FOLDER=../db_backup
+BACKUP_FOLDER=/home/centos/quizbot3/auto_script/db_backup
 
 
 # Set the current date as part of the backup file name

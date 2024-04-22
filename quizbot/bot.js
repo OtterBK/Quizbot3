@@ -55,6 +55,8 @@ if(PRIVATE_CONFIG.BOT.KOREANBOT_TOKEN != undefined && PRIVATE_CONFIG.BOT.KOREANB
   }
 }
 
+let admin_instance = undefined;
+
 /**  이벤트 등록  **/
 //봇 최초 실행 이벤트
 client.on('ready', () => {
@@ -112,7 +114,7 @@ client.on('ready', () => {
         servers_count = client.guilds.cache.size;
       }
 
-      if(servers_count >= 10000) //10000 이상이면 업뎃 못하고 문의해달라고 한다...귀찮으니 걍 9700정도만
+      if(servers_count >= 10000) //10000 이상이면 업뎃 못하고 문의해달라고 한다...귀찮으니 걍 9900정도만
       {
         const min = 9900;
         const max = 9990;
@@ -130,8 +132,42 @@ client.on('ready', () => {
       .catch(err =>  logger.error(`${err.stack ?? err.message}`));
     }
 
-    setInterval(() => update(), 600000) // 10분마다 서버 수를 업데이트합니다.
+    setInterval(() => update(), 3600000) // 60분마다 서버 수를 업데이트합니다.
   }
+
+  ///////////
+  if(PRIVATE_CONFIG.ADMIN_ID != undefined) //해당 cluster에서 admin instance 찾아본다
+  {
+    const admin_id = PRIVATE_CONFIG.ADMIN_ID;
+
+    logger.info(`Finding Admin instance for ${admin_id}`); 
+
+    client.users.fetch(admin_id)
+    .then((instance) => 
+      {
+        if(instance == undefined)
+        {
+          return;
+        }
+
+        admin_instance = instance;
+        admin_instance.send(`Hello Quizbot Admin! Quizbot has been started! this is ${client.cluster.id} cluster`); //찾았으면 인사해주자
+
+        logger.info(`Found admin instance in cluster ${client.cluster.id}! syncing this admin instance`);
+        client.cluster.send(  //cluster manager 한테 알림
+        {
+          ipc_message_type: ipc_manager.IPC_MESSAGE_TYPE.SYNC_ADMIN,
+          admin_instance: admin_instance,
+        });
+      }
+    ).catch((err) =>
+    {
+      logger.error(`Cannot find admin instance in cluster ${client.cluster.id} err: ${err.message}`);
+    });
+  }
+
+  ///////////
+  createCleanUp();
 
 });
 
@@ -225,7 +261,9 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   const quiz_session = (interaction.guild == undefined ? undefined : quiz_system.getQuizSession(interaction.guild.id));
   if(quiz_session != undefined)
   {
-    if(already_deferred == false && interaction.isButton()) //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
+    if(already_deferred == false 
+      && interaction.isButton() //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
+      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
     {
       already_deferred = true;
       try
@@ -247,7 +285,8 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   {
     if((already_deferred == false)
       && (interaction.isButton() || interaction.isStringSelectMenu())
-      && (interaction.customId.startsWith('request_modal') == false)) //modal 요청 interaction은 defer하면 안됨
+      && interaction.customId.startsWith('request_modal') == false //modal 요청 interaction은 defer하면 안됨
+      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)) 
     {
       already_deferred = true;
       await interaction.deferUpdate(); 
@@ -272,9 +311,55 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
 });
 
 //전역 에러 처리
+let error_count = 0;
 process.on('uncaughtException', (err) => {
-  logger.error(`Uncaught exception error!!! err: ${err.stack}`);
+  logger.error(`Uncaught exception error!!! err_message: ${err.message}\nerr_stack: ${err.stack}`);
+
+  if(err.message.startsWith("Status code:")) //403 또는 410 에러 발생 시,
+  {
+    ++error_count;
+    logger.info(`Current error count ${error_count}`);
+
+    if(error_count >= 3)
+    {
+      if(admin_instance != undefined) //해당 클러스터에서 admin_instance 알고 있을 경우
+      {
+        logger.warn(`Detected Expect Audio Error Status! Alerting to Admin ${admin_id}`);
+        try // 이 조차도 try로 안묶으면 아예 bot 죽음
+        {
+          admin_instance.send("Status code error detected! Check Log!");
+        }
+        catch(err)
+        {
+          logger.error(`Cannot send Admin Alert Message. err: ${err.message}`);
+        }
+      }
+
+      error_count = 0;
+    }
+  }
 });
+
+const createCleanUp = function()
+{
+  const interval = 60000;
+  logger.info(`Creating cleanup timer. current interval: ${interval}ms`);
+
+  let recent_error_count = 0;
+  setInterval(() => 
+  {
+    if(recent_error_count == error_count) //1분동안 에러 난거 없으면 카운트 초기화
+    {
+      logger.debug(`Cleaning up error count ${error_count} -> 0`)
+      error_count = 0;
+      return;
+    }
+
+    recent_error_count = error_count;
+
+  }, interval) // 1분마다 cleanup
+}
+
 
 /** 메인 **/
 //봇 활성화
