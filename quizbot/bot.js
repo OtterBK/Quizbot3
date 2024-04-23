@@ -324,7 +324,7 @@ process.on('uncaughtException', (err) => {
     {
       if(admin_instance != undefined) //해당 클러스터에서 admin_instance 알고 있을 경우
       {
-        logger.warn(`Detected Expect Audio Error Status! Alerting to Admin ${admin_id}`);
+        logger.warn(`Detected Expect Audio Error Status! Alerting to Admin ${PRIVATE_CONFIG.ADMIN_ID}`);
         try // 이 조차도 try로 안묶으면 아예 bot 죽음
         {
           admin_instance.send("Status code error detected! Check Log!");
@@ -342,7 +342,7 @@ process.on('uncaughtException', (err) => {
 
 const createCleanUp = function()
 {
-  const interval = 60000;
+  const interval = 300000;
   logger.info(`Creating cleanup timer. current interval: ${interval}ms`);
 
   let recent_error_count = 0;
