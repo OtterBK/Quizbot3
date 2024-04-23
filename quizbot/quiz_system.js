@@ -1035,7 +1035,7 @@ class Initialize extends QuizLifecycle
     {
         try
         {
-            this.suspended = true; //initialize 오면 suspend는 풀린거임
+            this.suspended = false; //initialize 오면 suspend는 풀린거임
             await this.basicInitialize();
         }
         catch(err)
