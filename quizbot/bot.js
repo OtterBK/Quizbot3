@@ -313,10 +313,15 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
 //전역 에러 처리
 let error_count = 0;
 process.on('uncaughtException', (err) => {
-  logger.error(`Uncaught exception error!!! err_message: ${err.message}\nerr_stack: ${err.stack}`);
-
-  if(err.message.startsWith("Status code:")) //403 또는 410 에러 발생 시,
+  try
   {
+    logger.error(`Uncaught exception error!!! err_message: ${err.message}\nerr_stack: ${err.stack}`);
+
+    if(err.message.startsWith("Status code:") == false) //403 또는 410 에러 발생 시,
+    {
+      return;
+    }
+
     ++error_count;
     logger.info(`Current error count ${error_count}`);
 
@@ -337,6 +342,10 @@ process.on('uncaughtException', (err) => {
 
       error_count = 0;
     }
+  }
+  catch(err)  
+  {
+    logger.error(`Cannot Handle Uncaught Error. err: ${err.message}`);
   }
 });
 
