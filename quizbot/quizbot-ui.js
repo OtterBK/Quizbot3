@@ -2646,8 +2646,8 @@ class UserQuestionInfoUI extends QuizbotUI
 
     /** display */
     this.embed.title = `**[ 📁 ${question_index+1}번째 문제** ]`;
-    this.embed.image.url = is_valid_question_image_url ? question_info.data.question_image_url : '',
-    this.embed.thumbnail.url = is_valid_answer_image_url ? question_info.data.answer_image_url : '',
+    this.embed.image.url = is_valid_question_image_url ? question_info.data.question_image_url : '';
+    this.embed.thumbnail.url = is_valid_answer_image_url ? question_info.data.answer_image_url : '';
     this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
 
     let description = '';
@@ -2671,6 +2671,11 @@ class UserQuestionInfoUI extends QuizbotUI
     {
       description += `__만약 이미지 로딩이 안된다면 다른 URL을 사용하세요.__`;
     }
+
+    if(question_info.data.question_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    {
+      description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
+    }
     description += "\n\n";
 
     description += `🔸 문제 제출시 텍스트:\n**[${question_info.data.question_text ?? ''}]**\n\n`;
@@ -2682,6 +2687,11 @@ class UserQuestionInfoUI extends QuizbotUI
     if(is_valid_hint_image_url == false)
     {
       description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
+    }
+
+    if(question_info.data.hint_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    {
+      description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
     }
     description += "\n\n";
 
@@ -2702,6 +2712,11 @@ class UserQuestionInfoUI extends QuizbotUI
     if(is_valid_answer_image_url == false)
     {
       description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
+    }
+
+    if(question_info.data.answer_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    {
+      description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
     }
     description += "\n\n";
     
