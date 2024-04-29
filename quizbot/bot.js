@@ -330,14 +330,7 @@ process.on('uncaughtException', (err) => {
       if(admin_instance != undefined) //해당 클러스터에서 admin_instance 알고 있을 경우
       {
         logger.warn(`Detected Expect Audio Error Status! Alerting to Admin ${PRIVATE_CONFIG.ADMIN_ID}`);
-        try // 이 조차도 try로 안묶으면 아예 bot 죽음
-        {
-          admin_instance.send("Status code error detected! Check Log!");
-        }
-        catch(err)
-        {
-          logger.error(`Cannot send Admin Alert Message. err: ${err.message}`);
-        }
+        admin_instance.send("Status code error detected! Check Log!");
       }
 
       error_count = 0;

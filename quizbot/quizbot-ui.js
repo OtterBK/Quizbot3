@@ -2672,7 +2672,7 @@ class UserQuestionInfoUI extends QuizbotUI
       description += `__만약 이미지 로딩이 안된다면 다른 URL을 사용하세요.__`;
     }
 
-    if(question_info.data.question_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    if(question_info.data.question_image_url?.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
     {
       description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
     }
@@ -2689,7 +2689,7 @@ class UserQuestionInfoUI extends QuizbotUI
       description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
     }
 
-    if(question_info.data.hint_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    if(question_info.data.hint_image_url?.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
     {
       description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
     }
@@ -2714,7 +2714,7 @@ class UserQuestionInfoUI extends QuizbotUI
       description += '```⚠ __해당 이미지 URL은 사용이 불가능합니다.__```';
     }
 
-    if(question_info.data.answer_image_url.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
+    if(question_info.data.answer_image_url?.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
     {
       description += '```❗ 디스코드에 업로드하신 이미지 URL 같아요.\n이 경우 일정 시간이 지나면 이미지가 삭제돼요...```';
     }
