@@ -106,7 +106,7 @@ const modal_page_jump = new ModalBuilder()
 
 const modal_complex_page_jump = new ModalBuilder() //검색과 이동을 한번에 하는 용도
 .setCustomId('modal_complex_page_jump')
-.setTitle('퀴즈 검색(베타)')
+.setTitle('퀴즈 검색')
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
@@ -2669,7 +2669,7 @@ class UserQuestionInfoUI extends QuizbotUI
     }
     else
     {
-      description += `__만약 이미지 로딩이 안된다면 다른 URL을 사용하세요.__`;
+      description += `__만약 이미지 로딩이 안된다면 다른 URL 사용을 권장합니다.__`;
     }
 
     if(question_info.data.question_image_url?.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
