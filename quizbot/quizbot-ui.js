@@ -559,7 +559,7 @@ class UIHolder
     }
   }
 
-  updatePublicUI() //Public 메시지용 update
+  updatePublicUI(is_retry = false) //Public 메시지용 update
   {
     if(this.initialized == false)
     {
@@ -571,7 +571,25 @@ class UIHolder
         {
           return;
         }
-        logger.error(`Failed to Reply Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.ui.embed)}, err: ${err.stack}`);
+
+        if(err.code === RESTJSONErrorCodes.InvalidFormBodyOrContentType) //embed에서 url들이 잘못됐다. 이 경우 그냥 url 다 지워
+        {
+          logger.warn(`Invalid Form Body from Public UI, Remove all url. guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}`);
+          this.ui.resetEmbedURL();
+
+          if(is_retry == false)
+          {
+            this.updatePublicUI(true); //재시도
+          }
+          else
+          {
+            logger.error(`Failed to Retry Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
+          }
+
+          return;
+        }
+
+        logger.error(`Failed to Reply Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
       });
 
       return;
@@ -583,11 +601,29 @@ class UIHolder
       {
         return;
       }
-      logger.error(`Failed to Update Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.ui.embed)}, err: ${err.stack}`);
+
+      if(err.code === RESTJSONErrorCodes.InvalidFormBodyOrContentType) //embed에서 url들이 잘못됐다. 이 경우 그냥 url 다 지워
+      {
+        logger.warn(`Invalid Form Body from Public UI, Remove all url. guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}`);
+        this.ui.resetEmbedURL();
+
+        if(is_retry == false)
+        {
+          this.updatePublicUI(true); //재시도
+        }
+        else
+        {
+          logger.error(`Failed to Retry Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
+        }
+
+        return;
+      }
+
+      logger.error(`Failed to Update Public UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
     });
   }
 
-  updatePrivateUI() //Private 메시지용 update
+  updatePrivateUI(is_retry = false) //Private 메시지용 update
   {
     if(this.initialized == false || this.base_message == undefined)
     {
@@ -602,7 +638,25 @@ class UIHolder
         {
           return;
         }
-        logger.error(`Failed to Send Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.stack}`);
+
+        if(err.code === RESTJSONErrorCodes.InvalidFormBodyOrContentType) //embed에서 url들이 잘못됐다. 이 경우 그냥 url 다 지워
+        {
+          logger.warn(`Invalid Form Body from Private UI, Remove all url. guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}`);
+          this.ui.resetEmbedURL();
+
+          if(is_retry == false)
+          {
+            this.updatePrivateUI(true); //재시도
+          }
+          else
+          {
+            logger.error(`Failed to Retry Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
+          }
+
+          return;
+        }
+
+        logger.error(`Failed to Send Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
       });
 
       return;
@@ -614,7 +668,25 @@ class UIHolder
       {
         return;
       }
-      logger.error(`Failed to Update Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.embed)}, err: ${err.stack}`);
+
+      if(err.code === RESTJSONErrorCodes.InvalidFormBodyOrContentType) //embed에서 url들이 잘못됐다. 이 경우 그냥 url 다 지워
+      {
+        logger.warn(`Invalid Form Body from Private UI, Remove all url. guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}`);
+        this.ui.resetEmbedURL();
+
+        if(is_retry == false)
+        {
+          this.updatePrivateUI(true); //재시도
+        }
+        else
+        {
+          logger.error(`Failed to Retry Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
+        }
+
+        return;
+      }
+
+      logger.error(`Failed to Update Private UI guild_id:${this.guild_id}, user_id:${this.user_id}, embeds: ${JSON.stringify(this.getUIEmbed())}, err: ${err.stack}`);
     });
   }
 
@@ -736,6 +808,25 @@ class QuizbotUI {
     }
 
     return select_menu;
+  }
+
+  //embed url 전부 제거
+  resetEmbedURL()
+  {
+    if(this.embed.image != undefined)
+    {
+      this.embed.image.url = '';
+    }
+
+    if(this.embed.thumbnail != undefined)
+    {
+      this.embed.thumbnail.url = '';
+    }
+
+    if(this.embed.footer != undefined)
+    {
+      this.embed.footer.icon_url = '';
+    }
   }
 }
 
@@ -1844,6 +1935,12 @@ const question_edit_comp = new ActionRowBuilder()
   .setLabel('정답 이벤트 설정')
   .setStyle(ButtonStyle.Primary),
 )
+.addComponents(
+  new ButtonBuilder()
+  .setCustomId('question_refresh')
+  .setLabel('이미지 재로드')
+  .setStyle(ButtonStyle.Primary),
+)
 
 const question_edit_comp2 = new ActionRowBuilder()
 .addComponents(
@@ -1970,12 +2067,6 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     let creator_id = this.creator_id;
 
-    if(PRIVATE_CONFIG?.ADMIN_ID != undefined && PRIVATE_CONFIG.ADMIN_ID == creator_id) //어드민일 경우
-    {
-      logger.warn(`Matched to Admin ID ${creator_id}, Loading User Quiz List as Undefined`);
-      creator_id = undefined; //전체 조회
-    }
-
     const user_quiz_list = await loadUserQuizListFromDB(creator_id);
 
     if(user_quiz_list.length == 0)
@@ -1990,6 +2081,19 @@ class UserQuizListUI extends QuizBotControlComponentUI
       quiz_info.name = quiz_info.data.quiz_title;
       this.cur_contents.push(quiz_info);
     }
+
+    //어드민일 경우
+    if(PRIVATE_CONFIG?.ADMIN_ID != undefined && PRIVATE_CONFIG.ADMIN_ID == creator_id) 
+    {
+      logger.warn(`Matched to Admin ID ${creator_id}, Loading User Quiz List as Undefined`);
+      const all_quiz_list = await loadUserQuizListFromDB(undefined); //전체 조회
+      for(const quiz_info of all_quiz_list)
+        {
+          quiz_info.name = quiz_info.data.quiz_title;
+          this.cur_contents.push(quiz_info);
+        }
+    }
+
     this.displayContents(0);
   }
 
@@ -2553,6 +2657,12 @@ class UserQuestionInfoUI extends QuizbotUI
       return;
     }
 
+    if(interaction.customId == 'question_refresh')
+    {
+      this.displayQuestionInfo(this.current_question_index);
+      return this;
+    }
+
     if(interaction.customId == 'request_modal_question_add')
     {
       interaction.showModal(modal_question_info);
@@ -2669,7 +2779,7 @@ class UserQuestionInfoUI extends QuizbotUI
     }
     else
     {
-      description += `__만약 이미지 로딩이 안된다면 다른 URL 사용을 권장합니다.__`;
+      // description += `__만약 이미지 로딩이 안된다면 다른 URL 사용을 권장합니다.__`;
     }
 
     if(question_info.data.question_image_url?.includes('cdn.discordapp.com')) //디코에 올린거로는 안됨. 시간 지나면 사라짐
@@ -2891,11 +3001,10 @@ class UserQuestionInfoUI extends QuizbotUI
     
     this.current_question_index = this.question_list.push(user_question_info) - 1; //새로 추가했으면 무조건 마지막에 넣었을테니
     this.displayQuestionInfo(this.current_question_index); 
-    // logger.error(`Failed Create New Question... quiz_id: ${this.quiz_info.quiz_id}, user_Id: ${modal_interaction.user.id}, answers: ${input_question_answers}`);
-    this.update(); //ui update
+
+    this.sendDelayedUI(this, true); //24.05.07 embed 이미지 버그에 따라 새로운 문제면 resend
     
     logger.info(`Created New Question... question_id: ${user_question_info.question_id}/${question_id}, user_id: ${modal_interaction.user.id}}, quiz_title: ${this.quiz_info.data.quiz_title}`);
-    return;
   }
 
   async editQuestionInfo(user_question_info, modal_interaction)
@@ -2905,6 +3014,10 @@ class UserQuestionInfoUI extends QuizbotUI
       logger.info(`Failed edit Question info, current_question_info is undefined quiz_id: ${this.quiz_info.quiz_id}, current_question_index: ${this.current_question_index}`);
       return;
     }
+
+    const previous_question_image_url = user_question_info.data.question_image_url; 
+    //const previous_hint_image_url = user_question_info.data.hint_image_url; //어차피 hint 이미지는 미리보기 없으니 제외
+    const previous_answer_image_url = user_question_info.data.answer_image_url;
 
     if(modal_interaction.customId == 'modal_question_info_edit')
     {
@@ -2930,10 +3043,24 @@ class UserQuestionInfoUI extends QuizbotUI
     this.quiz_info.updateModifiedTime();
 
     modal_interaction.deferUpdate();
-    logger.info(`Edited Question... question_id: ${user_question_info.question_id}/${question_id}`);
 
-    this.displayQuestionInfo(this.current_question_index);
-    this.update(); //ui update
+    this.displayQuestionInfo(this.current_question_index);    
+    
+    //24.05.07 embed 이미지 로드 간혈적으로 안되는 원인 안 것 같다.
+    //embed를 새로 생성하는 것이 아닌 edit을 했을 때, 새로운 이미지 url을 사용하면 이게 바로 바로 로드가 안된다.
+    //백그라운드에서 로드는 되는데, 로드 완료 후 표시를 안하는 듯하다.
+    //따라서 이미지 url 변경일 경우에는 resend
+    if(previous_question_image_url != user_question_info.data.question_image_url
+      || previous_answer_image_url != user_question_info.data.answer_image_url) //이미지 url이 뭐라도 바뀌었다면
+    {
+      this.sendDelayedUI(this, true);
+    }
+    else
+    {
+      this.update(); //ui update -> 단순 업데이트
+    }
+    
+    logger.info(`Edited Question... question_id: ${user_question_info.question_id}/${question_id}`);
   }
 
 }
