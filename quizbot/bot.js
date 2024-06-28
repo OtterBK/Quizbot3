@@ -344,7 +344,7 @@ process.on('uncaughtException', (err) => {
 
 const createCleanUp = function()
 {
-  const interval = 300000;
+  const interval = 60000;
   logger.info(`Creating cleanup timer. current interval: ${interval}ms`);
 
   let recent_error_count = 0;

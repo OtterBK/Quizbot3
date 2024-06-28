@@ -17,7 +17,7 @@
     "pg": "^8.8.0",
     "winston": "^3.8.2",
     "winston-daily-rotate-file": "^4.7.1",
-    "ytdl-core": "^4.11.5",
+    "ytdl-core": "^4.11.3",
 	"play-audio": "^0.5.2"
   }
 }
