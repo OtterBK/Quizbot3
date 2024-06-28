@@ -3104,6 +3104,11 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   onInteractionCreate(interaction)
   {
+    if(this.cur_contents == undefined)
+    {
+      return undefined;
+    }
+
     if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
 
     if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
