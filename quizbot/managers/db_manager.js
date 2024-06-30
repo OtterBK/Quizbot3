@@ -269,3 +269,24 @@ exports.certifyQuiz = async (quiz_id) => {
   return sendQuery(query_string, [quiz_id]);
 
 }
+
+exports.selectRandomQuestionListByTags = async (tags_value, limit) => {
+  
+  const query_string =
+  `
+  WITH matching_quizzes AS (
+    SELECT quiz_id, quiz_title, creator_name, creator_icon_url, simple_description, tags_value
+    FROM tb_quiz_info
+    WHERE (tags_value & $1) = $1
+    and is_private = false
+    and is_use = true
+    and certified = true
+  )
+  SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value
+  FROM tb_question_info qu
+  JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
+  ORDER BY RANDOM()
+  LIMIT $2;`
+  
+  return sendQuery(query_string, [tags_value, limit]);
+}

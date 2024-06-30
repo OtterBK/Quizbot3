@@ -26,6 +26,7 @@ const { initial } = require('lodash');
 const { error } = require('console');
 const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
 const feedback_manager = require('./managers/feedback_manager.js');
+const { loadQuestionListFromDBByTags } = require('./managers/user_quiz_info_manager.js');
 
 //#endregion
 
@@ -308,6 +309,11 @@ class QuizPlayUI
     }
   }
 
+  setTitle(title)
+  {
+    this.embed.title = title;
+  }
+
   async send(previous_delete, remember_ui = true)
   {
     if(previous_delete == true)
@@ -550,6 +556,10 @@ class QuizSession
         {
             this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeCustomQuiz(this));
         }
+        else if(quiz_maker_type == QUIZ_MAKER_TYPE.OMAKASE)
+        {
+            this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeOmakaseQuiz(this));
+        }
         else
         {
             this.inputLifeCycle(CYCLE_TYPE.INITIALIZING, new InitializeUnknownQuiz(this));
@@ -575,6 +585,7 @@ class QuizSession
             case QUIZ_TYPE.OX_LONG: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionOX(this)); break;
 
             case QUIZ_TYPE.CUSTOM: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionCustom(this)); break;
+            case QUIZ_TYPE.OMAKASE: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionOmakase(this)); break;
 
             default: this.inputLifeCycle(CYCLE_TYPE.QUESTIONING, new QuestionUnknown(this));            
         }
@@ -1271,6 +1282,106 @@ class Initialize extends QuizLifecycle
 
         return question_list;
     }
+
+    buildQuestion(question_row)
+    {
+        let question = {};
+        question['type']  = QUIZ_TYPE.CUSTOM;
+        question['hint_used'] = false;
+        question['skip_used'] = false;
+        question['play_bgm_on_question_finish'] = false; //custom 퀴즈에서는 상황에 따라 다르다
+
+        Object.keys(question_row).forEach((key) => {
+            const value = question_row[key];
+            question[key] = value;
+        });
+
+        const question_data = question_row.data;
+
+        /** 문제용 이벤트 */
+        //정답 값 처리
+        const answer_string = question_data['answers'];
+        const answers_row = answer_string.split(","); //custom quiz는 ,로 끊는다
+        const answers = this.makeAnswers(answers_row);
+        question['answers'] = answers;
+
+        //퀴즈용 오디오 url 처리
+        //prepare 단계에서함
+
+        //퀴즈용 음악 구간 처리
+        //prepare 단계에서함
+
+        //퀴즈용 이미지 url 처리
+        question['image_resource'] = question_data['question_image_url'];
+
+        //퀴즈용 텍스트 처리
+        question['question_text'] = question_data['question_text'];
+
+
+        /** 추가 정보 이벤트 */
+        //힌트 값 처리
+        const hint = question_data['hint'];
+        if((hint == undefined || hint === '') && answers.length > 0)
+        {
+            question['hint'] = this.makeHint(answers[0]) //힌트 없으면 알아서 만들기
+        }
+        else
+        {
+            question['hint'] = question_data['hint']; //지정된 값 있으면 그대로
+        }
+
+        //힌트 이미지 처리
+        question['hint_image_url'] = (question_data['hint_image_url'] ?? '').length == 0 ? undefined : question_data['hint_image_url'];
+
+        //타임 오버 됐을 때 10초의 여유 시간 줄지 여부
+        question['use_answer_timer'] = question_data['use_answer_timer'];
+
+
+        /** 정답 공개 이벤트 */
+        //정답용 오디오
+        // prepare 단계에서함
+
+        //정답용 음악 구간
+        // prepare 단계에서함
+
+        //정답 공개용 이미지 url
+        question['answer_image_resource'] = question_data['answer_image_url'];
+
+        //정답 공개용 텍스트
+        question['author'] = [ question_data['answer_text'] ];
+
+        return question;
+    }
+
+    extractIpAddresses(quiz_session)
+    {
+        //Set Ipv4 info
+        const ipv4 = utility.getIPv4Address()[0];
+        if(ipv4 == undefined)
+        {
+            logger.info(`This session has no ipv4!, use default... wtf, guild_id:${quiz_session?.guild_id}`);
+        }
+        else
+        {
+            logger.info(`This session's selected ipv4 is ${ipv4} guild_id:${quiz_session?.guild_id}`);
+            quiz_session.ipv4 = ipv4;
+        }
+
+        //Set Ipv6 info
+        if(SYSTEM_CONFIG.ytdl_ipv6_USE)
+        {
+            const ipv6 = utility.getIPv6Address()[0];
+            if(ipv6 == undefined)
+            {
+                logger.info(`This session is using ipv6, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
+            }
+            else
+            {
+                logger.info(`This session is using ipv6, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
+                quiz_session.ipv6 = ipv6;
+            }
+        }
+    }
 }
 
 class InitializeDevQuiz extends Initialize
@@ -1452,107 +1563,18 @@ class InitializeCustomQuiz extends Initialize
         
         question_row_list.forEach((question_row) => {
 
-            let question = {};
-            question['type']  = QUIZ_TYPE.CUSTOM;
-            question['hint_used'] = false;
-            question['skip_used'] = false;
-            question['play_bgm_on_question_finish'] = false; //custom 퀴즈에서는 상황에 따라 다르다
-
-            Object.keys(question_row).forEach((key) => {
-                const value = question_row[key];
-                question[key] = value;
-            });
-
-            const question_data = question_row.data;
-
-
-            /** 문제용 이벤트 */
-            //정답 값 처리
-            const answer_string = question_data['answers'];
-            const answers_row = answer_string.split(","); //custom quiz는 ,로 끊는다
-            const answers = this.makeAnswers(answers_row);
-            question['answers'] = answers;
-
-            //퀴즈용 오디오 url 처리
-            //prepare 단계에서함
-
-            //퀴즈용 음악 구간 처리
-            //prepare 단계에서함
-
-            //퀴즈용 이미지 url 처리
-            question['image_resource'] = question_data['question_image_url'];
-
-            //퀴즈용 텍스트 처리
-            question['question_text'] = question_data['question_text'];
-
-
-            /** 추가 정보 이벤트 */
-            //힌트 값 처리
-            const hint = question_data['hint'];
-            if((hint == undefined || hint === '') && answers.length > 0)
-            {
-                question['hint'] = this.makeHint(answers[0]) //힌트 없으면 알아서 만들기
-            }
-            else
-            {
-                question['hint'] = question_data['hint']; //지정된 값 있으면 그대로
-            }
-
-            //힌트 이미지 처리
-            question['hint_image_url'] = (question_data['hint_image_url'] ?? '').length == 0 ? undefined : question_data['hint_image_url'];
-
-            //타임 오버 됐을 때 10초의 여유 시간 줄지 여부
-            question['use_answer_timer'] = question_data['use_answer_timer'];
-
-
-            /** 정답 공개 이벤트 */
-            //정답용 오디오
-            // prepare 단계에서함
-
-            //정답용 음악 구간
-            // prepare 단계에서함
-
-            //정답 공개용 이미지 url
-            question['answer_image_resource'] = question_data['answer_image_url'];
-
-            //정답 공개용 텍스트
-            question['author'] = [ question_data['answer_text'] ];
+            let question = this.buildQuestion(question_row);
 
             /**완성했으면 넣자 */
             question_list.push(question);
 
         });
 
+        this.extractIpAddresses(quiz_session);
+
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
         quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
-
-        //Set Ipv4 info
-        const ipv4 = utility.getIPv4Address()[0];
-        if(ipv4 == undefined)
-        {
-            logger.info(`This session has no ipv4!, use default... wtf, guild_id:${quiz_session?.guild_id}`);
-        }
-        else
-        {
-            logger.info(`This session's selected ipv4 is ${ipv4} guild_id:${quiz_session?.guild_id}`);
-            quiz_session.ipv4 = ipv4;
-        }
-
-        //Set Ipv6 info
-        if(SYSTEM_CONFIG.ytdl_ipv6_USE)
-        {
-            const ipv6 = utility.getIPv6Address()[0];
-            if(ipv6 == undefined)
-            {
-                logger.info(`This session is using ipv6, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
-            }
-            else
-            {
-                logger.info(`This session is using ipv6, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
-                quiz_session.ipv6 = ipv6;
-            }
-        }
 
         // 서버별이 아닌 유저별로 변경되면서 필요 없어짐. 무조건 추천하기 띄움
         // feedback_manager.checkAlreadyLike(quiz_id, guild_id)
@@ -1567,7 +1589,83 @@ class InitializeCustomQuiz extends Initialize
 
         //     logger.info(`this guild's already liked value = ${this.quiz_session.already_liked}, guild_id:${this.quiz_session.guild_id}`);
         // });
+
         this.quiz_session.already_liked = false; //무조건 띄운다.
+    }
+}
+
+class InitializeOmakaseQuiz extends Initialize
+{
+    constructor(quiz_session)
+    {
+        super(quiz_session);
+    }
+    
+    async act() //dev 퀴즈 파싱
+    {
+        try
+        {
+            await this.OmakaseQuizInitialize();
+        }
+        catch(err)
+        {
+            this.initialize_success = false;
+            logger.error(`Failed to omakase quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack}`);
+        }
+    }
+
+    async OmakaseQuizInitialize()
+    {
+        const guild_id = this.quiz_session.guild_id;
+        logger.info(`Start omakase quiz initialize of quiz session, guild_id:${guild_id}`);
+
+        const quiz_session = this.quiz_session;
+        const quiz_info = this.quiz_session.quiz_info;
+        const quiz_data = this.quiz_session.quiz_data;
+        //실제 퀴즈들 로드
+        let question_list = [];
+
+        const quiz_tag_of_dev = quiz_info['quiz_tag_of_dev']; //오마카세 퀴즈는 quiz_tag 가 있다.
+        const quiz_tag_of_custom = quiz_info['quiz_tag_of_custom'];
+
+        const max_amount = quiz_info['max_amount'];
+        
+        //build dev questions 
+
+        //build custom questions
+        const question_row_list = await loadQuestionListFromDBByTags(quiz_tag_of_custom, max_amount);
+        
+        question_row_list.forEach((question_row) => {
+
+            let question = this.buildQuestion(question_row);
+
+            question['question_title'] = question.data['quiz_title'];
+
+            let additional_text = '```';
+            
+            const tags_value = question.data['tags_value'];
+            const tags_string = "📌 퀴즈 태그: " + utility.convertTagsValueToString(tags_value) + '\n';
+            additional_text += tags_string;
+            
+            const simple_description = question.data['simple_description'] ?? '';
+            if(simple_description != undefined)
+            {
+                additional_text += "📄 한줄 설명: " + simple_description + '\n';
+            }
+
+            additional_text += '```';
+
+            question['question_text'] = additional_text + "\n\n" + question['question_text'] ?? '';
+
+            question_list.push(question);
+
+        });
+        
+        this.extractIpAddresses(quiz_session); //IP는 언제나 준비
+
+        question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
+        quiz_data['question_list'] = question_list;
+        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
     }
 }
 
@@ -1708,6 +1806,10 @@ class Prepare extends QuizLifecycle
             {
                 await this.prepareCustom(target_question);
                 //정답 표시 정보도 prepareCustom에서 한번에 한다
+            }
+            else if(question_type == QUIZ_TYPE.OMAKASE)
+            {
+                await this.prepareCustom(target_question);
             }
             else
             {
@@ -2097,6 +2199,11 @@ class Prepare extends QuizLifecycle
          * answer_text, 정답 공개용 텍스트
          */
         //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
+    }
+
+    async prepareOmakase(target_question)
+    {
+        this.prepareCustom(target_question);
     }
 
 
@@ -3507,6 +3614,139 @@ class QuestionCustom extends Question
         const image_resource = current_question['image_resource'];
         let quiz_ui = this.quiz_session.quiz_ui; 
         quiz_ui.setImage(image_resource);
+
+        if(image_resource != undefined)
+        {
+            await quiz_ui.update(); //await로 대기 해줘야한다. 안그러면 타이밍 이슈 땜에 이미지가 2번 올라간다.
+        }
+
+        //텍스트 표시
+        const question_text = current_question['question_text'];
+        this.progress_bar_fixed_text = question_text; //텍스트 퀴즈는 progress bar 위에 붙여주면 된다.
+
+        //오디오 재생
+        const audio_player = this.quiz_session.audio_player;
+        const resource = current_question['audio_resource'];
+        let audio_play_time = current_question['audio_length'] ?? 0;
+
+        let fade_in_end_time = undefined; 
+
+        if(audio_play_time != 0) //오디오 재생해야하면
+        {
+            this.is_playing_bgm = false;
+            this.startAudio(audio_player, resource)
+            .then((result) => fade_in_end_time = result)
+            .catch((err) => 
+            {
+                if(this.progress_bar_fixed_text == undefined)
+                {
+                    this.progress_bar_fixed_text = "";
+                }
+                else if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == true) //이미 AUDIO_ERROR 메시지가 있다면
+                {
+                    return;
+                }
+                
+                this.progress_bar_fixed_text += "\n\nAUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n";
+            }); //비동기로 오디오 재생 시켜주고
+            this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+        }
+        else //오디오 없으면 10초 타이머로 대체
+        {
+            this.is_playing_bgm = true;
+            audio_play_time = 10000; //오디오 재생 시간 10초로 변경
+            utility.playBGM(audio_player, BGM_TYPE.COUNTDOWN_10); //10초 카운트다운 브금
+        }
+        this.startProgressBar(audio_play_time); //진행 bar 시작
+
+        let timeover_time = audio_play_time;
+        if(this.current_question['use_answer_timer'] == true) //타임 오버 돼도 10초의 여유를 준다면(인트로 퀴즈등)
+        {
+            const wait_for_answer_time = 10000; //인트로 퀴즈는 문제 내고 10초 더 준다.
+            timeover_time += wait_for_answer_time; //타임오버 되기까지 10초 더 줌
+            const wait_for_answer_timer = this.createWaitForAnswerTimer(audio_play_time, wait_for_answer_time, BGM_TYPE.COUNTDOWN_10); 
+            //audio_play_time 이후에 wait_for_answer_time 만큼 추가 대기임
+            this.checkAutoHint(audio_play_time*2); //자동 힌트 체크, 이 경우에는 음악 끝나면 바로 자동 힌트라는 뜻
+        }
+        else
+        {
+            this.checkAutoHint(timeover_time); //자동 힌트 체크
+        }
+
+        const timeover_promise = this.createTimeoverTimer(timeover_time); //audio_play_time 후에 실행되는 타임오버 타이머 만들어서
+        await Promise.race([timeover_promise]); //race로 돌려서 타임오버 타이머가 끝나는걸 기다림
+
+        //어쨋든 타임오버 타이머가 끝났다.
+        if(this.quiz_session.force_stop == true) //그런데 강제종료다
+        {
+            return; //바로 return
+        }
+
+        if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
+        {
+            if(this.current_question['answer_members'] != undefined) //정답자가 있다?
+            {
+                this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+            }
+            else if(this.current_question['skip_used'] == true) //스킵이다?
+            {
+                this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
+            }
+            this.gracefulAudioExit(audio_player, resource, fade_in_end_time); //타이머가 제 시간에 끝난게 아니라 오디오 재생이 남아있으니 부드러운 오디오 종료 진행
+        }
+        else //타임오버거나 정답자 없다면
+        {
+            this.is_playing_bgm = true;
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+        }
+
+        if(this.is_playing_bgm) //브금 재생 중이었다면
+        {
+            current_question['play_bgm_on_question_finish'] = true; //탄식이나 박수를 보내주자~
+        }
+    }
+}
+
+//Omakase Type Question
+class QuestionOmakase extends Question
+{
+    static cycle_type = CYCLE_TYPE.QUESTIONING;
+    constructor(quiz_session)
+    {
+        super(quiz_session);
+
+        this.is_playing_bgm = false;
+    }
+
+    async act()
+    {
+        let quiz_data = this.quiz_session.quiz_data;
+        let game_data = this.quiz_session.game_data;
+        const option_data = this.quiz_session.option_data;
+
+        const current_question = this.current_question;
+        if(current_question == undefined || this.next_cycle == CYCLE_TYPE.ENDING) //제출할 퀴즈가 없으면 패스
+        {
+            return;
+        }
+
+        game_data['processing_question'] = this.current_question; //현재 제출 중인 퀴즈
+
+        this.answers = current_question['answers'];
+        const question_id = current_question['question_id'];
+
+        const question_num = game_data['question_num'];
+        const quiz_size = quiz_data['quiz_size'];
+        logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id}`);
+
+        //이미지 표시
+        const image_resource = current_question['image_resource'];
+        let quiz_ui = this.quiz_session.quiz_ui; 
+        quiz_ui.setImage(image_resource);
+
+        //오마카세 퀴즈 전용
+        quiz_ui.setTitle(`[ ${quiz_data['icon']} ${current_question['qtitle']} ]`);
+        
 
         if(image_resource != undefined)
         {

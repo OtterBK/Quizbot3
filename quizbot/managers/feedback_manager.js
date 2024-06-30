@@ -3,7 +3,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 //로컬 모듈
 const db_manager = require('./db_manager.js');
-const {  CUSTOM_EVENT_TYPE } = require('../../config/system_setting.js');
+const {  SYSTEM_CONFIG, CUSTOM_EVENT_TYPE } = require('../../config/system_setting.js');
 const logger = require('../../utility/logger.js')('FeedbackManager');
 
 const LikeInfoColumn = 
@@ -93,7 +93,7 @@ exports.addQuizLike = async (quiz_id, guild_id, user_id) =>
     const like_count = like_count_result.rows[0].like_count;
 
     logger.info(`Custom quiz's like updated to ${like_count}. quiz_id: ${quiz_id}`);
-    if(like_count >= 30) //30개 이상이면 인증된 퀴즈
+    if(like_count >= SYSTEM_CONFIG.certify_criteria) //특정 수 이상이면 인증된 퀴즈
     {
       logger.info(`Custom quiz has been auto certified. quiz_id: ${quiz_id}`);
       db_manager.certifyQuiz(quiz_id);
