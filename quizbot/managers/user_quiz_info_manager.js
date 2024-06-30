@@ -262,4 +262,45 @@ const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로
     return user_quiz_list;
 }
 
-module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn };
+const loadQuestionListFromDBByTags = async (tag_value, limit) => { //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
+
+  const additionalColumn = [
+    'quiz_title',
+    'tags_value',
+    'creator_name',
+    'creator_icon_url',
+    'simple_description'
+  ];
+  const question_list = [];
+
+  const result = await db_manager.selectRandomQuestionListByTags(tag_value, limit);
+
+  for(const result_row of result.rows)
+  {
+      let user_question_info = new UserQuestionInfo();
+
+      user_question_info.question_id = result_row.question_id;
+
+      if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
+      {
+          logger.error(`User Question Info ID is undefined... pass this`);
+          continue;
+      }
+
+      for(const column of QuestionInfoColumn)
+      {
+        user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+      }
+
+      for(const column of additionalColumn)
+      {
+        user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+      }
+
+      question_list.push(user_question_info);
+  }
+
+  return question_list;
+}
+
+module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags };

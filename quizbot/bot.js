@@ -114,18 +114,6 @@ client.on('ready', () => {
         servers_count = client.guilds.cache.size;
       }
 
-      if(servers_count >= 10000) //10000 이상이면 업뎃 못하고 문의해달라고 한다...귀찮으니 걍 9900정도만
-      {
-        const min = 9900;
-        const max = 9990;
-
-        // Generate a random decimal number between 0 and 1
-        const randomDecimal = Math.random();
-
-        // Scale and shift the random decimal to fit the desired range
-        servers_count = Math.floor(randomDecimal * (max - min + 1) + min);
-      }
-
       logger.info(`Updating Korean bot server count: ${servers_count}`);
       koreanbots.mybot.update({ servers: servers_count, shards: getInfo().TOTAL_SHARDS }) 
       .then(res => logger.info("서버 수를 정상적으로 업데이트하였습니다!\n반환된 정보:" + JSON.stringify(res)))
@@ -308,6 +296,35 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
     quiz_session.on(CUSTOM_EVENT_TYPE.message, message);
   }
 
+  if(message.content == 'qtest')
+  {
+    const quiz_info = {};
+
+    quiz_info['title']  = "오마카세 퀴즈";
+    quiz_info['icon'] = '🍽';
+
+    quiz_info['type_name'] = "오마카세 퀴즈 테스트"; 
+    quiz_info['description'] = "오마카세 퀴즈 테스트 설명"; 
+
+    quiz_info['author'] = "만든이";
+    quiz_info['author_icon'] = '';
+    quiz_info['thumbnail'] = ''; //썸네일은 그냥 quizbot으로 해두자
+
+    quiz_info['quiz_size'] = 0; 
+    quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
+    quiz_info['winner_nickname'] = "플레이어";
+    quiz_info['quiz_path'] = undefined;//dev quiz는 quiz_path 필요
+    quiz_info['quiz_type'] = QUIZ_TYPE.OMAKASE;
+    quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.OMAKASE;
+
+    quiz_info['quiz_id'] = quiz_info.quiz_id;
+
+    quiz_info['quiz_tag_of_custom'] = 17;
+    quiz_info['max_amount'] = 50;
+
+    quiz_system.startQuiz(message.guild, message.member, message.channel, quiz_info);
+  }
+
 });
 
 //전역 에러 처리
@@ -325,7 +342,7 @@ process.on('uncaughtException', (err) => {
     ++error_count;
     logger.info(`Current error count ${error_count}`);
 
-    if(error_count >= 3)
+    if(error_count >= 4)
     {
       if(admin_instance != undefined) //해당 클러스터에서 admin_instance 알고 있을 경우
       {
