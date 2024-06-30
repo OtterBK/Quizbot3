@@ -12,7 +12,7 @@ exports.SYSTEM_CONFIG = {
     fade_in_volume_initialize_term: 500, //fade in은 초기 볼륨을 설정하고 시작한다. 이때 볼륨 설정하고 일정한 텀을 줘야 제대로 적용된다.
 
     max_question_audio_play_time: 60, //문제용 오디오 최대 허용 길이(s)
-    max_answer_audio_play_time: 12, //정답용 오디오 최대 허용 길이(s)
+    max_answer_audio_play_time: 13, //정답용 오디오 최대 허용 길이(s)
 
     max_check_prepared_queue: 100, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 250, //prepared queue 체크 간격
@@ -53,9 +53,12 @@ exports.SYSTEM_CONFIG = {
     ffmpeg_aging_manager_criteria: 300, //5분 지나도 안꺼지면 ffmpeg는 강종
     ffmpeg_aging_manager_interval: 300, //체크 주기(s)
 
-    custom_audio_ytdl_max_length: 1200, //문제용 오디오으로 사용가능한 오디오 최대 길이(s)
+    custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
+    custom_audio_max_throttle: 500 * 1024,
 
     ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
+
+    certify_criteria: 20, //인증된 퀴즈 전환을 위한 추천 수 기준
 }
 
 exports.CUSTOM_EVENT_TYPE = {
@@ -79,11 +82,13 @@ exports.QUIZ_TYPE = {
     MULTIPLAY: "멀티플레이",
     IMAGE_LONG: "타이머 긴 그림 퀴즈",
     CUSTOM: "커스텀 퀴즈",
+    OMAKASE: "오마카세 퀴즈",
 }
 
 exports.EXPLAIN_TYPE = {
     SHORT_ANSWER_TYPE: "short_answer",
     CUSTOM_ANSWER_TYPE: "custom_answer",
+    OMAKASE_ANSWER_TYPE: "omakase_answer",
 }
 
 exports.BGM_TYPE = {
@@ -103,6 +108,7 @@ exports.BGM_TYPE = {
 exports.QUIZ_MAKER_TYPE = {
     BY_DEVELOPER: '개발자 제작 퀴즈',
     CUSTOM: '유저 제작 퀴즈',
+    OMAKASE: '오마카세 퀴즈',
     UNKNOWN: '알 수 없음',
 }
 
