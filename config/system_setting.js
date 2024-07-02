@@ -40,6 +40,7 @@ exports.SYSTEM_CONFIG = {
     current_notice_path: `${__dirname}/../resources/current_notice.txt`, //실시간 공지
     version_info_path: `${__dirname}/../resources/version_info.txt`, //실시간 버전
 	banned_user_path: `${__dirname}/../resources/banned_user.txt`, //퀴즈만들기 밴
+    tagged_dev_quiz_info: `${__dirname}/../resources/tagged_dev_quiz_info.json`, //공식 퀴즈 태그 설정값
 
     hint_percentage: 2, //4로 설정하면 정답 전체의 1/4만 보여주겠다는 거임
     hint_max_try: 1000, //힌트 만들 때 최대 시도 횟수
@@ -58,7 +59,8 @@ exports.SYSTEM_CONFIG = {
 
     ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
 
-    certify_criteria: 20, //인증된 퀴즈 전환을 위한 추천 수 기준
+    certify_like_criteria: 10, //인증된 퀴즈 전환을 위한 추천 수 기준
+    certify_played_count_criteria: 50, //인증된 퀴즈 전환을 위한 플레이 수 기준
 }
 
 exports.CUSTOM_EVENT_TYPE = {
@@ -103,6 +105,7 @@ exports.BGM_TYPE = {
     ROUND_ALARM: "ROUND_ALARM.webm",
     SCORE_ALARM: "SCORE_ALARM.webm",
     SUCCESS: "SUCCESS.webm",
+    FAILOVER: "FAILOVER.webm",
 }
 
 exports.QUIZ_MAKER_TYPE = {
@@ -131,6 +134,26 @@ exports.QUIZ_TAG = { //태그는 16비트로 하자
 
     '기타':     0b0000100000000000,
 	
-   //남은 비트: 0b1110000000000000
+   //남은 비트: 0b1100000000000000
 }
 
+exports.DEV_QUIZ_TAG = { //공식 퀴즈용 태그
+    // "음악 퀴즈":     0b0000000000000001,
+    // "그림 퀴즈":     0b0000000000000010,
+    // "텍스트 퀴즈":   0b0000000000000100,
+
+    // "가요":     0b0000000000001000,
+    "애니":     0b0000000000010000,
+    "게임":     0b0000000000100000,
+    // "방송":     0b0001000000000000,
+    "드라마":   0b0000000001000000,
+    "영화":     0b0000000010000000,
+    // "스포츠":   0b0010000000000000,
+    
+    "팝송":     0b0000000100000000,
+    "K팝":      0b0000001000000000,
+    // "J팝":      0b0000010000000000,
+
+    // "기타":     0b0000100000000000,
+    "고전가요":     0b0100000000000000,
+}

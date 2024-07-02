@@ -20,6 +20,7 @@ const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('Main');
 const db_manager = require('./managers/db_manager.js');
 const ipc_manager = require('./managers/ipc_manager.js');
+const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
 
 /** global 변수 **/
 
@@ -88,6 +89,9 @@ client.on('ready', () => {
 
   logger.info(`Starting UI Holder Aging Manager`);
   quizbot_ui.startUIHolderAgingManager();
+
+  logger.info(`Initializing Tagged Dev Quiz Manager`);
+  tagged_dev_quiz_manager.initialize(SYSTEM_CONFIG.tagged_dev_quiz_info);
 
   // logger.info(`Starting FFMPEG Aging Manager`);
   // quiz_system.startFFmpegAgingManager();
@@ -295,36 +299,6 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
   {
     quiz_session.on(CUSTOM_EVENT_TYPE.message, message);
   }
-
-  if(message.content == 'qtest')
-  {
-    const quiz_info = {};
-
-    quiz_info['title']  = "오마카세 퀴즈";
-    quiz_info['icon'] = '🍽';
-
-    quiz_info['type_name'] = "오마카세 퀴즈 테스트"; 
-    quiz_info['description'] = "오마카세 퀴즈 테스트 설명"; 
-
-    quiz_info['author'] = "만든이";
-    quiz_info['author_icon'] = '';
-    quiz_info['thumbnail'] = ''; //썸네일은 그냥 quizbot으로 해두자
-
-    quiz_info['quiz_size'] = 0; 
-    quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
-    quiz_info['winner_nickname'] = "플레이어";
-    quiz_info['quiz_path'] = undefined;//dev quiz는 quiz_path 필요
-    quiz_info['quiz_type'] = QUIZ_TYPE.OMAKASE;
-    quiz_info['quiz_maker_type'] = QUIZ_MAKER_TYPE.OMAKASE;
-
-    quiz_info['quiz_id'] = quiz_info.quiz_id;
-
-    quiz_info['quiz_tag_of_custom'] = 17;
-    quiz_info['max_amount'] = 50;
-
-    quiz_system.startQuiz(message.guild, message.member, message.channel, quiz_info);
-  }
-
 });
 
 //전역 에러 처리
@@ -332,15 +306,19 @@ let error_count = 0;
 process.on('uncaughtException', (err) => {
   try
   {
-    logger.error(`Uncaught exception error!!! err_message: ${err.message}\nerr_stack: ${err.stack}`);
-
-    if(err.message.startsWith("Status code:") == false) //403 또는 410 에러 발생 시,
+    if(err == undefined)
     {
       return;
     }
 
+    if(err.message?.startsWith("Status code:") == false) //403 또는 410 에러 발생 시,
+    {
+      logger.error(`Uncaught exception error!!! err_message: ${err.message}\nerr_stack: ${err.stack}`);
+      return;
+    }
+
     ++error_count;
-    logger.info(`Current error count ${error_count}`);
+    logger.error(`Status Code error!!! Current error count ${error_count}, err_message: ${err.message}\n`);
 
     if(error_count >= 4)
     {

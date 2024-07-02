@@ -383,10 +383,10 @@ exports.isValidURL = (url) =>
   }
 }
 
-exports.convertTagsValueToString = (tags_value) => 
+exports.convertTagsValueToString = (tags_value, TAG_INFO = QUIZ_TAG) => 
 {
   let tag_string = '';
-  for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
+  for(const [tag_name, tag_value] of Object.entries(TAG_INFO))
   {
     if((tags_value & tag_value) != tag_value)
     {
