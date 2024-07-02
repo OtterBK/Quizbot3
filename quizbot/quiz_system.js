@@ -1678,6 +1678,8 @@ class InitializeOmakaseQuiz extends Initialize
                 const tags_string = "🔹 퀴즈 태그: " + question_row['tag'] + '\n';
                 additional_text += tags_string;
 
+                additional_text += "🔹 퀴즈 제작: 공식 퀴즈\n";
+
                 additional_text += '```';
 
                 question['question_text'] = additional_text + "\n\n" + (question['question_text'] ?? '');
@@ -1836,7 +1838,8 @@ class Prepare extends QuizLifecycle
         let question_num = game_data['question_num'] + 1;
         game_data['question_num'] = question_num;
 
-        if(question_num >= quiz_size) //모든 퀴즈 제출됐음
+        if(question_num >= quiz_size 
+			|| quiz_data['question_list'].length == 0) //모든 퀴즈 제출됐음
         {
             this.skip_prepare = true;
             return; //더 이상 준비할 게 없으니 return
@@ -2600,7 +2603,8 @@ class Question extends QuizLifeCycleWithUtility
         this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
         this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
 
-        if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
+        if(game_data['question_num'] >= quiz_data['quiz_size'] 
+            || quiz_data['question_list'].length == 0) //모든 퀴즈 제출됐음
         {
             this.next_cycle = CYCLE_TYPE.ENDING;
             this.skip_prepare_cycle = true;
@@ -3704,7 +3708,7 @@ class QuestionCustom extends Question
 
         let fade_in_end_time = undefined; 
 
-        let error_occurred = false;
+        let audio_error_occurred = false;
         if(audio_play_time != 0) //오디오 재생해야하면
         {
 
@@ -3724,16 +3728,16 @@ class QuestionCustom extends Question
                 
                 this.progress_bar_fixed_text += `\n\nAUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n${err.message}`;
                 audio_play_time = 0; //오디오 재생 시간 0초로 변경 -> 브금 재생
-                error_occurred = true;
+                audio_error_occurred = true;
             }); //비동기로 오디오 재생 시켜주고
 
-            if(error_occurred == false)
+            if(audio_error_occurred == false)
             {
                 this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
             }
         }
         
-        if(error_occurred == true || audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
+        if(audio_error_occurred == true || audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
         {
             this.is_playing_bgm = true;
             audio_play_time = 10000; //오디오 재생 시간 10초로 변경
@@ -3847,13 +3851,17 @@ class QuestionOmakase extends Question
 
         let fade_in_end_time = undefined; 
 
-        let error_occurred = false;
+        let audio_error_occurred = false;
         if(audio_play_time != 0) //오디오 재생해야하면
         {
             this.is_playing_bgm = false;
-            this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result)
-            .catch((err) => 
+
+            try
+            {
+                const result = await this.startAudio(audio_player, resource);
+                fade_in_end_time = result;
+            }
+            catch(err)
             {
                 let error_message = '```';
                 error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
@@ -3864,29 +3872,30 @@ class QuestionOmakase extends Question
                 }
                 else
                 {
-                    error_message= `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n${err.message}`;
+                    error_message += `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n${err.message}`;
                 }
                 error_message += '```';
 
                 this.quiz_session.sendMessage({content: error_message});
-                error_occurred = true;
-                
-            }); //비동기로 오디오 재생 시켜주고
+                audio_error_occurred = true;
+            }
 
-            if(error_occurred == false)
+            if(audio_error_occurred == false)
             {
                 this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
             }
-        }
+        } 
 
-        if(error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
+        if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
         {
             this.next_cycle = CYCLE_TYPE.QUESTIONING;
             game_data['question_num'] -= 1;
             utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
             await utility.sleep(11000); //Failover 브금 11초임 
+            
+            return;
         }
-        
+
         if(audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
         {
             this.is_playing_bgm = true;
