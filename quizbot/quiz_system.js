@@ -2171,11 +2171,11 @@ class Prepare extends QuizLifecycle
             const answer_audio_start = target_question_data['answer_audio_start'];
             const answer_audio_end = target_question_data['answer_audio_end'];
 
-            //정답용 오디오가 있다면 3초 간격 둔다, 아마도 문제용 오디오 파싱을 위해 유튜브 접속 직후, 정답용 오디오 파싱을 진행하려하면 403 뜨는 것 같다...아마도(문제랑 정답이 같은 url이면 그런가?)
-            //우선 같은 url일 때만 한번 3초 대기 적용해보자
+            //정답용 오디오가 있다면 2.5초 간격 둔다, 아마도 문제용 오디오 파싱을 위해 유튜브 접속 직후, 정답용 오디오 파싱을 진행하려하면 403 뜨는 것 같다...아마도(문제랑 정답이 같은 url이면 그런가?)
+            //우선 같은 url일 때만 한번 2.5초 대기 적용해보자
             if(answer_audio_url == question_audio_url)
             {
-                await utility.sleep(3000);
+                await utility.sleep(2500);
             }
     
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
