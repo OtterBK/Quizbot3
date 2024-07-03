@@ -27,8 +27,8 @@ exports.SYSTEM_CONFIG = {
     graceful_timeover_max_try: 0, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
     graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-    explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
-    ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
+    explain_wait: 350, //퀴즈 설명 단계에서 각 설명 텀
+    ending_wait: 350, //순위 발표 단계에서 각 순위 표시 텀
 
     explicit_close_audio_stream: false, //audio stream을 명시적으로 닫을 지, discord/voice 라이브러리에 ffmpeg 프로세스가 종료되지 않는 메모리 누수 문제있음, 명시적으로 stream을 닫아줘야함
     //ffmpeg는 drop_ffmpeg.sh 로 스케줄 돌리고 utlity/SeekStream에서 알아서 잘 닫도록 해뒀으니 false로 해야함
@@ -57,6 +57,8 @@ exports.SYSTEM_CONFIG = {
     custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
     custom_audio_max_throttle: 500 * 1024,
 
+    ytdl_cookie_agent_use: true, //쿠키 설정 사용 여부
+    ytdl_cookie_path: `${__dirname}/../resources/ytdl_cookie.json`,
     ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
 
     certify_like_criteria: 10, //인증된 퀴즈 전환을 위한 추천 수 기준

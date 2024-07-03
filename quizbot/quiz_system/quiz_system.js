@@ -15,19 +15,19 @@ const stream = require('stream');
 //#endregion
 
 //#region 로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
-const option_system = require("./quiz_option.js");
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../../config/system_setting.js');
+const option_system = require("../quiz_option/quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
-const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
-const utility = require('../utility/utility.js');
-const logger = require('../utility/logger.js')('QuizSystem');
-const db_manager = require('./managers/db_manager.js');
+const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
+const utility = require('../../utility/utility.js');
+const logger = require('../../utility/logger.js')('QuizSystem');
+const db_manager = require('../managers/db_manager.js');
 const { initial, isFunction } = require('lodash');
 const { error } = require('console');
-const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
-const feedback_manager = require('./managers/feedback_manager.js');
-const { loadQuestionListFromDBByTags } = require('./managers/user_quiz_info_manager.js');
-const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
+const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
+const feedback_manager = require('../managers/feedback_manager.js');
+const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
+const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
 
 //#endregion
 
@@ -166,74 +166,6 @@ function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 �
 
   return ffmpeg_aging_manager;
 }
-
-/** @distube/ytdl-core 에만 있는 agent 기능, 다만 이 ytdl-core는 HTTP 통신 모듈로 기존 ytdl-core와는 다른걸 사용한다.(쿠키 지원을 위해서 인듯. 이름은 기억 안남) 
- * 여기까지는 괜찮다...다만 requestOptions로 ipv6 주소를 localAddress에 넣고 family 값도 6으로 넘겨야 잘 인식하는데
- * 기존 ytdl-core은 이렇게하면 잘 되는데 @distube/ytdl-core는 family 값 지정 기능이 없다...
- * 따라서 유일하게 지원하는 autoSelectFamily를 true로 넘겨야하는데, 이 기능은 nodejs 18부터 지원한다...! 흑흑
- * 우선 어거지로 16 -> 18로 업데이트했는데 큰 문제는 없이 동작한다.
- * 만약 EINVAL(errno -22)에러가 뜨면 IPv6 주소를 IPv4로 파싱하려고 하다 문제가 생긴거니, family 값을 잘 명시해줘야하며
- * 만약 -99에러가 뜨면 정말 해당 ip로 외부 통신이 불가능한것이라 발생한다.(localAddress에 IP주소 잘 넣었는지 확인필요)
- * 
- * 24.02.02 정말 @distube/ytdl-core만을 사용해야하는지 의문이 든다.
- * 유일한 문제점은 해당 모듈이 HTTP 통신 모듈로 undici를 사용하는데, 이 경우 localAddress 옵션이 잘 먹지 않고 bind -22 에러가 난다는 문제다...
- * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다... -> 24.02.08 해당 모듈 문제는 아니었다...nodejs 18로 바꾼게 문제일 수 있으니 16으로 롤백해보기로한다.(ytdl-core 자체의 문제일 수 있다.)
- * 정말 필요한지 한번 다시 고려해보기로 하고 ytdl-core로 롤백하기로 결정하였다.
-*/
-
-//Deprecated
-// function createYtdlAgent(quiz_session=undefined)
-// {
-//     let cookie = undefined;
-//     let local_address = undefined;
-//     let auto_select_family = false;
-
-//     if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
-//     {
-//         try
-//         {
-//             const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
-//             if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
-//             {
-//                 logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
-//                 return false;
-//             }
-
-//             cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
-
-//             logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}`);
-//         }
-//         catch(err)
-//         {
-//             logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}, err: ${err.stack ?? err.message}`);
-//         }
-//     }
-
-//     if(SYSTEM_CONFIG.ytdl_ipv6_USE)
-//     {
-//         const ipv6 = utility.getIPv6Address()[0];
-//         if(ipv6 == undefined)
-//         {
-//             logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
-//         }
-//         else
-//         {
-//             logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
-//             local_address = ipv6;
-//             auto_select_family = true;
-//         }
-//     }
-
-//     const ytdl_agent = ytdl.createAgent(
-//         cookie,
-//         {
-//             autoSelectFamily: auto_select_family,
-//             localAddress: local_address
-//         }
-//     ); //cookie 기반 ytdl agent
-
-//     return ytdl_agent;
-// }
 
 //#region 퀴즈 플레이에 사용될 UI
 class QuizPlayUI
@@ -462,8 +394,11 @@ class QuizSession
 
         this.force_stop = false; //강제종료 여부
 
-        this.ipv4 = undefined; 
-        this.ipv6 = undefined; 
+        this.ytdl_agent_ipv4 = undefined;
+        this.ytdl_agent_ipv6 = undefined;
+
+        // this.ipv4 = undefined;
+        // this.ipv6 = undefined;
 
         this.already_liked = true; //이미 like 버튼 눌렀는지 여부. 기본 true 깔고 initializeCustom에서만 false 또는 true 다시 정함
 
@@ -534,8 +469,11 @@ class QuizSession
 
         this.scoreboard = null; //scoreboard 
 
-        this.ipv4 = null;
-        this.ipv6 = null;
+        this.ytdl_agent_ipv4 = undefined;
+        this.ytdl_agent_ipv6 = undefined;
+
+        // this.ipv4 = undefined;
+        // this.ipv6 = undefined;
 
         this.already_liked = null;
 
@@ -1444,18 +1382,97 @@ class Initialize extends QuizLifecycle
         return question;
     }
 
-    extractIpAddresses(quiz_session)
+    createYtdlAgent()
+    {
+        /** @distube/ytdl-core 에만 있는 agent 기능, 다만 이 ytdl-core는 HTTP 통신 모듈로 기존 ytdl-core와는 다른걸 사용한다.(쿠키 지원을 위해서 인듯. 이름은 기억 안남) 
+         * 여기까지는 괜찮다...다만 requestOptions로 ipv6 주소를 localAddress에 넣고 family 값도 6으로 넘겨야 잘 인식하는데
+         * 기존 ytdl-core은 이렇게하면 잘 되는데 @distube/ytdl-core는 family 값 지정 기능이 없다...
+         * 따라서 유일하게 지원하는 autoSelectFamily를 true로 넘겨야하는데, 이 기능은 nodejs 18부터 지원한다...! 흑흑
+         * 우선 어거지로 16 -> 18로 업데이트했는데 큰 문제는 없이 동작한다.
+         * 만약 EINVAL(errno -22)에러가 뜨면 IPv6 주소를 IPv4로 파싱하려고 하다 문제가 생긴거니, family 값을 잘 명시해줘야하며
+         * 만약 -99에러가 뜨면 정말 해당 ip로 외부 통신이 불가능한것이라 발생한다.(localAddress에 IP주소 잘 넣었는지 확인필요)
+         * 
+         * 24.02.02 정말 @distube/ytdl-core만을 사용해야하는지 의문이 든다.
+         * 유일한 문제점은 해당 모듈이 HTTP 통신 모듈로 undici를 사용하는데, 이 경우 localAddress 옵션이 잘 먹지 않고 bind -22 에러가 난다는 문제다...
+         * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다... -> 24.02.08 해당 모듈 문제는 아니었다...nodejs 18로 바꾼게 문제일 수 있으니 16으로 롤백해보기로한다.(ytdl-core 자체의 문제일 수 있다.)
+         * 정말 필요한지 한번 다시 고려해보기로 하고 ytdl-core로 롤백하기로 결정하였다.
+         * nodejs16으로 바꾸니 connReset 에러가 안뜮다.
+        */
+
+        let cookie = undefined;
+        let local_address = undefined;
+        let auto_select_family = false;
+    
+        if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
+        {
+            try
+            {
+                const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
+                if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
+                {
+                    logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
+                    return false;
+                }
+    
+                cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
+    
+                logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}`);
+            }
+            catch(err)
+            {
+                logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${this.quiz_session.guild_id}, err: ${err.stack ?? err.message}`);
+            }
+        }
+    
+        //ipv4 agent
+        const ipv4 = utility.getIPv4Address()[0];
+        if(ipv4 == undefined)
+        {
+            logger.info(`This session is using ipv4 for agent, but cannot find ipv4, guild_id:${this.quiz_session.guild_id}`);
+            return undefined;
+        }
+    
+        logger.info(`This session is using ipv4 for agent, selected ipv4 is ${ipv4}, guild_id:${this.quiz_session.guild_id}`);
+    
+        this.quiz_session.ytdl_agent_ipv4 = ytdl.createAgent(
+            cookie,
+            {
+                autoSelectFamily: true,
+                localAddress: ipv4
+            }
+        ); //cookie 기반 ytdl agent
+
+        //ipv6 agent
+        const ipv6 = utility.getIPv6Address()[0];
+        if(ipv6 == undefined)
+        {
+            logger.info(`This session is using ipv6 for agent, but cannot find ipv6, guild_id:${this.quiz_session.guild_id}`);
+            return undefined;
+        }
+    
+        logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${this.quiz_session.guild_id}`);
+    
+        this.quiz_session.ytdl_agent_ipv6 = ytdl.createAgent(
+            cookie,
+            {
+                autoSelectFamily: true,
+                localAddress: ipv6
+            }
+        ); //cookie 기반 ytdl agent
+    }
+
+    extractIpAddresses()
     {
         //Set Ipv4 info
         const ipv4 = utility.getIPv4Address()[0];
         if(ipv4 == undefined)
         {
-            logger.info(`This session has no ipv4!, use default... wtf, guild_id:${quiz_session?.guild_id}`);
+            logger.info(`This session has no ipv4!, use default... wtf, guild_id:${this.quiz_session?.guild_id}`);
         }
         else
         {
-            logger.info(`This session's selected ipv4 is ${ipv4} guild_id:${quiz_session?.guild_id}`);
-            quiz_session.ipv4 = ipv4;
+            logger.info(`This session's selected ipv4 is ${ipv4} guild_id:${this.quiz_session?.guild_id}`);
+            this.quiz_session.ipv4 = ipv4;
         }
 
         //Set Ipv6 info
@@ -1464,12 +1481,12 @@ class Initialize extends QuizLifecycle
             const ipv6 = utility.getIPv6Address()[0];
             if(ipv6 == undefined)
             {
-                logger.info(`This session is using ipv6, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
+                logger.info(`This session is using ipv6, but cannot find ipv6... use default ip address..., guild_id:${this.quiz_session?.guild_id}`);
             }
             else
             {
-                logger.info(`This session is using ipv6, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
-                quiz_session.ipv6 = ipv6;
+                logger.info(`This session is using ipv6, selected ipv6 is ${ipv6}, guild_id:${this.quiz_session?.guild_id}`);
+                this.quiz_session.ipv6 = ipv6;
             }
         }
     }
@@ -1586,7 +1603,8 @@ class InitializeCustomQuiz extends Initialize
 
         });
 
-        this.extractIpAddresses(quiz_session);
+        this.createYtdlAgent(); //ytdl 용 agent 준비
+        // this.extractIpAddresses(quiz_session);
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
@@ -1723,6 +1741,7 @@ class InitializeOmakaseQuiz extends Initialize
 
         });
         
+        this.createYtdlAgent(); //ytdl 용 agent 준비
         this.extractIpAddresses(quiz_session); //IP는 언제나 준비
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
@@ -2177,6 +2196,9 @@ class Prepare extends QuizLifecycle
         const ipv4 = this.quiz_session.ipv4;
         const ipv6 = this.quiz_session.ipv6;
 
+        const ytdl_agent_ipv4 = this.quiz_session.ytdl_agent_ipv4;
+        const ytdl_agent_ipv6 = this.quiz_session.ytdl_agent_ipv6;
+
         const target_question_data = target_question.data;
 
         /**
@@ -2193,7 +2215,7 @@ class Prepare extends QuizLifecycle
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
+                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ytdl_agent_ipv4, ytdl_agent_ipv6]);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
@@ -2255,7 +2277,7 @@ class Prepare extends QuizLifecycle
             }
     
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
+                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6], this.quiz_session.ytdl_agent);
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
@@ -2284,7 +2306,7 @@ class Prepare extends QuizLifecycle
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ytdl_agent=[]) 
     {
         let error_message;
 
@@ -2303,63 +2325,62 @@ class Prepare extends QuizLifecycle
         let audio_length_ms; //최종 audio_length
 
         //오디오 정보 가져오기
-        const [ipv4, ipv6] = ip_info;
+        // const [ipv4, ipv6] = ip_info;
+        const [ytdl_agent_ipv4, ytdl_agent_ipv6] = ytdl_agent;
 
         const try_info_list = [];
-        if(ipv6 != undefined) //처음엔 ipv6로 시도
+        if(ytdl_agent_ipv6 != undefined) //처음엔 ipv6로 시도
         {
-            try_info_list.push([ipv6, 6]);
+            try_info_list.push(ytdl_agent_ipv6);
         }
 
-        if(ipv4 != undefined) //그 다음엔 ipv4로 시도
+        if(ytdl_agent_ipv4 != undefined) //그 다음엔 ipv4로 시도
         {
-            try_info_list.push([ipv4, 4]);
+            try_info_list.push(ytdl_agent_ipv4);
         }
 
-        try_info_list.push([undefined, undefined]); //다 안되면 마지막엔 그냥 해보기
+        if(try_info_list.length == 0)
+        {
+            try_info_list.push(undefined); //agent없으면 그냥 해보기
+        }
         logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
 
         let youtube_info = undefined;
-        let available_address;
-        let available_family;
+        let available_ytdl_agent = undefined;
 
         for(let i = 0; i < try_info_list.length; ++i)
         {
-            const [ip, family] = try_info_list[i];
+            const ytdl_agent = try_info_list[i];
 
             try
             {
-                if(ip == undefined || family == undefined)
+                if(ytdl_agent == undefined)
                 {
                     youtube_info = await ytdl.getInfo(audio_url_row);
                 }
                 else
                 {
                     youtube_info = await ytdl.getInfo(audio_url_row, {
-                        requestOptions:
-                        {
-                            localAddress: ip,
-                            family: family
-                        }
+                        agent: ytdl_agent
                     });
                 }
 
                 if(youtube_info != undefined)
                 {
-                    available_address = ip,
-                    available_family = family;
+                    available_ytdl_agent = ytdl_agent;
 
                     if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
                     {
-                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${available_family}...${available_address}`);
+                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv is ${available_ytdl_agent.localAddress}`);
                     }
-
+                    
+                    await utility.sleep(0.5); //0.5초 텀
                     break; //성공했다면
                 }
             }
             catch(err)
             {
-                logger.warn(`Failed ytdl.getInfo... Using ipv${family}...${ip} err_message: ${err.message}, url: ${audio_url_row}`);
+                logger.warn(`Failed ytdl.getInfo... Using ip ${ytdl_agent.localAddress} err_message: ${err.message}, url: ${audio_url_row}`);
 
                 if(i == try_info_list.length - 1) //마지막 시도였다면
                 {
@@ -2476,14 +2497,16 @@ class Prepare extends QuizLifecycle
             highWaterMark: AUDIO_BUFFER_SIZE //오디오 버퍼 사이즈(이게 connReset의 원인일까...?)
         };
 
-        if(available_address != undefined && available_family != undefined) //잘 되는 ip 정보가 있다면
+        if(available_ytdl_agent != undefined) //잘 되는 ip 정보가 있다면
         {
-            download_option['requestOptions'] = {
-                localAddress: available_address,
-                family: available_family
-            };
+            // download_option['requestOptions'] = {
+            //     localAddress: available_address,
+            //     family: available_family
+            // };
 
-            logger.debug(`found available address info!!! ${available_family}, ${available_address}`);
+            // logger.debug(`found available address info!!! ${available_family}, ${available_address}`);
+            // download_option['agent'] = available_ytdl_agent;
+            logger.debug(`found available ytdl agent!!! ${available_ytdl_agent.localAddress}`);
         };
 
         let audio_stream = ytdl(audio_url_row, download_option);
@@ -2506,7 +2529,7 @@ class Prepare extends QuizLifecycle
         **/
 
         /**
-         * 시도해 볼만한 방법들
+         * 오디오 스트리밍 관련 시도해 볼만한 방법들
          * 1. MP3는 잘라도 재생이 잘 된다. MP3는 Discord에서 어떻게 변환하는지 확인하고 Webm과 차이점을 확인
          * 2. 오디오를 전부 받고, Create Resource를 해준다. 그 다음 start_point를 지정한다.
          * ㄴ start_point를 지정할 수 있는지도 불확실하고 성능면에서 비효율적이다.
@@ -3681,7 +3704,7 @@ class QuestionCustom extends Question
                 [{ 
                     color: 0x05f1f1, 
                     title: `**${quiz_data['title']}**`,
-                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세 퀴즈/멀티플레이 퀴즈]에서 사용됩니다.`"
                 }], 
                 components: [ feedback_manager.quiz_feedback_comp ]
             });
@@ -4273,7 +4296,7 @@ class Ending extends QuizLifeCycleWithUtility
             [{ 
                 color: 0x05f1f1, 
                 title: `**${quiz_data['title']}**`,
-                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세 퀴즈/멀티플레이 퀴즈]에서 사용됩니다.`"
             }], 
             components: [ feedback_manager.quiz_feedback_comp ]});
         }
