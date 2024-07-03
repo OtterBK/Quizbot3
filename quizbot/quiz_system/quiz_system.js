@@ -3891,6 +3891,7 @@ class QuestionOmakase extends Question
 
         if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
         {
+            logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.")
             this.next_cycle = CYCLE_TYPE.QUESTIONING;
             game_data['question_num'] -= 1;
             utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
