@@ -47,6 +47,7 @@ const {
   modal_question_info,
   modal_question_additional_info,
   modal_question_info_edit,
+  modal_question_answering_info,
   question_edit_comp,
   question_edit_comp2,
   question_control_btn_component,
@@ -2661,13 +2662,13 @@ class OmakaseQuizRoomUI extends QuizbotUI
     quiz_info['icon'] = '🍴';
 
     quiz_info['type_name'] = "**퀴즈봇 마음대로 퀴즈!**"; 
-    quiz_info['description'] = "장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n장르는 여러 개 선택 가능합니다!\n\n"; 
+    quiz_info['description'] = "장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능합니다!\n문제 수도 설정 가능합니다!\n\n"; 
 
     quiz_info['author'] = guild.name ?? guild.id;
     quiz_info['author_icon'] = guild.iconURL() ?? '';
     quiz_info['thumbnail'] = ''; //썸네일은 고정 이미지가 있지롱 ㅎ
 
-    quiz_info['quiz_size'] = 50; //default
+    quiz_info['quiz_size'] = 30; //default
     quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
     quiz_info['winner_nickname'] = "플레이어";
     quiz_info['quiz_path'] = undefined;//oamakase quiz는 quiz_path 불필요
@@ -2682,7 +2683,7 @@ class OmakaseQuizRoomUI extends QuizbotUI
     quiz_info['custom_quiz_type_tags'] = 0;
     quiz_info['custom_quiz_tags'] = 0;
 
-    quiz_info['max_question_count'] = 50; //default
+    quiz_info['max_question_count'] = 30; //default
 
     quiz_info['room_owner'] = interaction.member;
 

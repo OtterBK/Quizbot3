@@ -809,6 +809,7 @@ module.exports = {
     modal_question_info,
     modal_question_additional_info,
     modal_question_info_edit,
+    modal_question_answering_info,
     question_edit_comp,
     question_edit_comp2,
     question_control_btn_component,

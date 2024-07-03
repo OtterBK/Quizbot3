@@ -1519,6 +1519,7 @@ class InitializeDevQuiz extends Initialize
                     return; //그럼 그냥 return
                 }
     
+                const question_folder_path = quiz_path + "/" + question_folder_name;
                 question_list = this.parseFromQuizTXT(question_folder_path); //quiz.txt 에서 파싱하는 걸로...
                 return;
             }
