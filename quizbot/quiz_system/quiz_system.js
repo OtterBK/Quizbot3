@@ -2316,7 +2316,10 @@ class Prepare extends QuizLifecycle
             try_info_list.push([ipv4, 4]);
         }
 
-        try_info_list.push([undefined, undefined]); //다 안되면 마지막엔 그냥 해보기
+        if(try_info_list.length == 0)
+        {
+            try_info_list.push([undefined, undefined]); //뭐가 없으면 그냥 해보기
+        }
         logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
 
         let youtube_info = undefined;
@@ -3824,7 +3827,7 @@ class QuestionOmakase extends Question
 
         const question_num = game_data['question_num'];
         const quiz_size = quiz_data['quiz_size'];
-        logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id}`);
+        logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id ?? current_question['question']}`);
 
         //이미지 표시
         const image_resource = current_question['image_resource'];

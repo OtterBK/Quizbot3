@@ -2726,7 +2726,7 @@ class OmakaseQuizRoomUI extends QuizbotUI
         && (quiz_info['custom_quiz_type_tags'] == 0)
       )
       {
-        interaction.channel.send({content: ">>> 시작하시려면 퀴즈 장르를 1개라도 선택해주세요!"});
+        interaction.channel.send({content: ">>> 시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!"});
         return;        
       }
 
