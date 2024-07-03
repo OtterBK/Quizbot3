@@ -235,7 +235,7 @@ const quiz_info_comp = new ActionRowBuilder()
   new ButtonBuilder()
     .setCustomId('settings')
     .setLabel('서버 설정')
-    .setStyle(ButtonStyle.Primary),
+    .setStyle(ButtonStyle.Secondary),
   new ButtonBuilder()
     .setCustomId('back')
     .setLabel('뒤로가기')
@@ -686,13 +686,13 @@ const omakase_quiz_info_comp = new ActionRowBuilder()
   .setLabel('시작')
   .setStyle(ButtonStyle.Success),
   new ButtonBuilder()
-    .setCustomId('settings')
-    .setLabel('서버 설정')
-    .setStyle(ButtonStyle.Primary),
-  new ButtonBuilder()
     .setCustomId('request_modal_omakase_setting')
     .setLabel('오마카세 설정')
     .setStyle(ButtonStyle.Primary),
+  new ButtonBuilder()
+    .setCustomId('settings')
+    .setLabel('서버 설정')
+    .setStyle(ButtonStyle.Secondary),
   new ButtonBuilder()
     .setCustomId('back')
     .setLabel('뒤로가기')
