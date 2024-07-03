@@ -57,6 +57,7 @@ exports.SYSTEM_CONFIG = {
     custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
     custom_audio_max_throttle: 500 * 1024,
 
+    ytdl_cookie_path: `${__dirname}/../resources/ytdl_cookie.json`,
     ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부
 
     certify_like_criteria: 10, //인증된 퀴즈 전환을 위한 추천 수 기준

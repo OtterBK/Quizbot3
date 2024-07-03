@@ -15,19 +15,19 @@ const stream = require('stream');
 //#endregion
 
 //#region 로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
-const option_system = require("./quiz_option.js");
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../../config/system_setting.js');
+const option_system = require("../quiz_option/quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
-const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
-const utility = require('../utility/utility.js');
-const logger = require('../utility/logger.js')('QuizSystem');
-const db_manager = require('./managers/db_manager.js');
+const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
+const utility = require('../../utility/utility.js');
+const logger = require('../../utility/logger.js')('QuizSystem');
+const db_manager = require('../managers/db_manager.js');
 const { initial, isFunction } = require('lodash');
 const { error } = require('console');
-const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
-const feedback_manager = require('./managers/feedback_manager.js');
-const { loadQuestionListFromDBByTags } = require('./managers/user_quiz_info_manager.js');
-const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
+const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
+const feedback_manager = require('../managers/feedback_manager.js');
+const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
+const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
 
 //#endregion
 
@@ -3681,7 +3681,7 @@ class QuestionCustom extends Question
                 [{ 
                     color: 0x05f1f1, 
                     title: `**${quiz_data['title']}**`,
-                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세/멀티플레이] 퀴즈에서 사용됩니다.`"
                 }], 
                 components: [ feedback_manager.quiz_feedback_comp ]
             });
@@ -4273,7 +4273,7 @@ class Ending extends QuizLifeCycleWithUtility
             [{ 
                 color: 0x05f1f1, 
                 title: `**${quiz_data['title']}**`,
-                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세/멀티플레이] 퀴즈에서 사용됩니다.`"
             }], 
             components: [ feedback_manager.quiz_feedback_comp ]});
         }

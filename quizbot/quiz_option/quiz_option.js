@@ -4,8 +4,8 @@
 
 
 //로컬 modules
-const db_manager = require('./managers/db_manager.js');
-const logger = require('../utility/logger.js')('OptionManager');
+const db_manager = require('../managers/db_manager.js');
+const logger = require('../../utility/logger.js')('OptionManager');
 
 /** global 변수 **/
 let option_storage_map = {}; //서버별 옵션 값

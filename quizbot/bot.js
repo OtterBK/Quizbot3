@@ -12,10 +12,10 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const PRIVATE_CONFIG = require('../config/private_config.json');
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
 
-const command_register = require('./commands.js');
-const quizbot_ui = require('./quizbot-ui.js');
-const quiz_system = require('./quiz_system.js');
-const option_system = require("./quiz_option.js");
+const command_manager = require('./managers/command_manager.js');
+const quizbot_ui = require('./quiz_ui/quizbot-ui.js');
+const quiz_system = require('./quiz_system/quiz_system.js');
+const option_system = require("./quiz_option/quiz_option.js");
 const utility = require('../utility/utility.js');
 const logger = require('../utility/logger.js')('Main');
 const db_manager = require('./managers/db_manager.js');
@@ -99,7 +99,7 @@ client.on('ready', () => {
   ///////////
   logger.info(`Register commands...`);
 
-  command_register.registerGlobalCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID);
+  command_manager.registerGlobalCommands(PRIVATE_CONFIG.BOT.TOKEN, PRIVATE_CONFIG.BOT.CLIENT_ID);
 
   ///////////
   logger.info(`Setting bot Status...`);
