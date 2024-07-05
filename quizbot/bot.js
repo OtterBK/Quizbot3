@@ -7,13 +7,16 @@ const fs = require('fs');
 const ytdl = require('discord-ytdl-core');
 const { Koreanbots } = require('koreanbots');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const youtubedl = require('youtube-dl-exec');
+const path = require('path');
+const { spawn } = require('child_process');
 
 //로컬 modules
 const PRIVATE_CONFIG = require('../config/private_config.json');
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
 
 const command_manager = require('./managers/command_manager.js');
-const quizbot_ui = require('./quiz_ui/quizbot-ui.js');
+const quizbot_ui = require('./quiz_ui/ui-system-core.js');
 const quiz_system = require('./quiz_system/quiz_system.js');
 const option_system = require("./quiz_option/quiz_option.js");
 const utility = require('../utility/utility.js');
@@ -298,6 +301,28 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
   if(quiz_session != undefined)
   {
     quiz_session.on(CUSTOM_EVENT_TYPE.message, message);
+  }
+
+  if(message.content == 'qtest')
+  {
+    const url = 'https://www.youtube.com/watch?v=zVgKnfN9i34&pp=ygUT64KY66Oo7YagIOyLpOujqOyXow%3D%3D'
+    const result = await youtubedl.exec(url, { 
+      // format: 'webm',
+      paths: 'F:/Develope/discord_bot/Quizbot3/',
+      output: 'test.webm',
+      extractAudio: true,
+      dumpSingleJson: true,
+      noCheckCertificates: true,
+      noWarnings: true,
+      preferFreeFormats: true,
+      addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+     }, 
+     {
+      timeout: 5000,
+      killSignal: 'SIGKILL'
+    })
+
+    console.log(result)
   }
 });
 

@@ -2194,7 +2194,7 @@ class Prepare extends QuizLifecycle
             const question_audio_end = target_question_data['audio_end'];
 
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
+                await this.getAudioStreamResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
 
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
@@ -2256,7 +2256,7 @@ class Prepare extends QuizLifecycle
             }
     
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
+                await this.getAudioStreamResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
     
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
@@ -2285,7 +2285,7 @@ class Prepare extends QuizLifecycle
 
 
     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
+    async getAudioStreamResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
     {
         let error_message;
 
