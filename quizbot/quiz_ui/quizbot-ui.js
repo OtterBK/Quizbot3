@@ -2799,7 +2799,7 @@ class OmakaseQuizRoomUI extends QuizbotUI
       return undefined;
     }
 
-    const max_question_count = parseInt(input_max_question_count.trim());
+    let max_question_count = parseInt(input_max_question_count.trim());
     if(isNaN(max_question_count) || max_question_count <= 0) //입력 값 잘못된거 처리
     {
       interaction.reply({content: `>>> 문제 수 설정에 입력된 ${input_max_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.`, ephemeral: true});
