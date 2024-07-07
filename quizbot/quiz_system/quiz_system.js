@@ -11,7 +11,7 @@ const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
 const ffmpeg = require('fluent-ffmpeg');
 const stream = require('stream');
-// const { SeekStream } = require('play-dl');
+const youtubedl = require('youtube-dl-exec');
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -22,12 +22,11 @@ const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.l
 const utility = require('../../utility/utility.js');
 const logger = require('../../utility/logger.js')('QuizSystem');
 const db_manager = require('../managers/db_manager.js');
-const { initial, isFunction } = require('lodash');
-const { error } = require('console');
 const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
 const feedback_manager = require('../managers/feedback_manager.js');
 const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
 const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
+const path = require('path');
 
 //#endregion
 
@@ -1821,7 +1820,6 @@ class Prepare extends QuizLifecycle
         this.skip_prepare = false;
         this.prepared_question = undefined;
         this.target_question = undefined;
-        this.current_audio_streams = [];
     }
 
     async enter()
@@ -1877,7 +1875,7 @@ class Prepare extends QuizLifecycle
 
                 if(prepare_type === 'DEV')
                 {
-                    await this.prepareAudio(target_question);
+                    await this.prepareAudioFile(target_question);
                 }
                 else if(prepare_type === 'CUSTOM')
                 {
@@ -1892,7 +1890,7 @@ class Prepare extends QuizLifecycle
             {
                 if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.INTRO || question_type == QUIZ_TYPE.SCRIPT)
                 {
-                    await this.prepareAudio(target_question);
+                    await this.prepareAudioFile(target_question);
                 }
                 else if(question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.IMAGE_LONG)
                 {
@@ -1940,13 +1938,6 @@ class Prepare extends QuizLifecycle
 
         let game_data = this.quiz_session.game_data;
 
-        let audio_stream_for_close = game_data['audio_stream_for_close'];
-        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
-        {
-            audio_stream_for_close.push(this.current_audio_streams);
-        }
-        this.current_audio_streams = [];
-
         if(this.prepared_question == undefined) //prepare 시도했는데 실패했다면
         {
             logger.error(`No Prepared quiz, ignore exit step, guild_id:${this.quiz_session?.guild_id}, target_question: ${JSON.stringify(this.target_question?.question)}`);
@@ -1968,7 +1959,6 @@ class Prepare extends QuizLifecycle
             const question = target_question['answer_audio'];
 
             const audio_stream = fs.createReadStream(question, {flags:'r'});
-            this.current_audio_streams.push(audio_stream);
     
             let audio_resource = undefined;
             audio_resource = createAudioResource(audio_stream, {
@@ -2004,154 +1994,131 @@ class Prepare extends QuizLifecycle
         }
     }
 
-    async prepareAudio(target_question)
+    /** 오디오 파일 경로와, 오디오 파일의 전체 재싱길이, 시작 지점을 기준으로 스트림 반환 */
+    makeAudioFileStream(audio_path, audio_duration, audio_start_point, audio_length)
     {
-        const option_data = this.quiz_session.option_data;
-        const game_data = this.quiz_session.game_data;
-
-        const question = target_question['question'];
-        let use_random_start = target_question['use_random_start'] ?? true; //노래 어디서부터 시작할 지 랜덤으로 설정 여부
-        const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; //노래 전체 재생 여부
-
-        //오디오 정보 가져오기
-        const audio_info = await utility.getAudioInfoFromPath(question); //TODO 상당한 리소스를 먹는 것 같은데 확인필요
-        const audio_duration_sec = audio_info.format.duration ?? SYSTEM_CONFIG.max_question_audio_play_time; //duration 없으면 무조건 서버 설정 값 따르게 할거임
-        const stats = fs.statSync(question);
+        const stats = fs.statSync(audio_path);
         const size_in_bytes = stats.size;
-        const bitrate = size_in_bytes / audio_duration_sec * 8;
+        const bitrate = Math.ceil(size_in_bytes / audio_duration * 8);
 
-        //오디오 길이 먼저 넣어주고~
-        const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
-        let audio_length_sec = audio_play_time_sec; 
-        if(audio_duration_sec < audio_length_sec) //오디오 길이가 재생할 시간보다 작으면
-        {
-            audio_length_sec = audio_duration_sec; //그냥 오디오 길이 사용
-            use_random_start = false; //랜덤 시작 지점도 사용 불가능
-        }
-        target_question['audio_length'] = audio_length_sec * 1000;
-
-        let audio_start_point = undefined;
-        let audio_end_point = undefined;
-        if(ignore_option_audio_play_time == false && use_random_start == true)
-        {
-            //오디오 자르기 기능
-            /**
-            오디오 유형을 전부 webm으로 바꿔서 ffmpeg 띄우고 해야함
-            **/
-            let audio_max_start_point = audio_duration_sec - (audio_length_sec + 2.5);  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
-            let audio_min_start_point = 2.5;  //앞에도 2.5초 정도 자르고 싶음
-
-            if(audio_max_start_point > audio_min_start_point) //충분히 재생할 수 있는 start point가 있다면
-            {
-                if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
-                {
-                    const audio_length_sec_sec_half = (audio_length_sec / 2);
-                    const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                    const refined_audio_min_start_point = audio_mid_point - audio_length_sec_sec_half;
-                    const refined_audio_max_start_point = audio_mid_point + audio_length_sec_sec_half;
-    
-                    if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
-                    {
-                        logger.debug(`Refined audio point, question: ${question} min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
-                        audio_min_start_point = refined_audio_min_start_point;
-                        audio_max_start_point = refined_audio_max_start_point;
-                    }
-                }
-
-                audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); 
-                audio_end_point = parseInt(audio_start_point + audio_length_sec);
-            }
-        }
-        
-        //오디오 스트림 미리 생성
-        let audio_stream_for_close = game_data['audio_stream_for_close'];
         let audio_stream = undefined;
         let inputType = StreamType.WebmOpus;
-
-        let cut_audio = true;
-        if(audio_start_point == undefined) 
-        {
-            cut_audio = false;
-            audio_start_point = 0;
-        }
-        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + audio_length_sec); //엄격하게 잘라야함
-
-        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
-
-        // const file_audio_stream = fs.createReadStream(question, {flags:'r'});
-        // this.current_audio_streams.push(file_audio_stream);
-        
-        // TODO 우선 성능 상 discordjs/voice 방식 보다 느린 것 같으니 잠시 빼둠
-        // if(cut_audio == true) //오디오가 cut 됐을 때만
-        // {
-        //     let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
-        //     ffmpeg_handler.format('webm').
-        //     setStartTime(audio_start_point).
-        //     setDuration(audio_length_sec)
-        //     .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
-        //         if(err.message.includes("kill")) return;
-        //         logger.error(`Ffmpeg error:  ${err.message}`);
-        //     })
-        //     .on('end', function() {
-        //         ffmpeg_aging_map.delete(ffmpeg_handler);
-        //     });     
     
-        //     // ffmpeg는 일정 시간 지나도 안꺼지면 강종
-        //     ffmpeg_aging_map.set(ffmpeg_handler, Date.now());
+        if (audio_start_point != undefined && audio_start_point !== 0) {
 
-        //     audio_stream = ffmpeg_handler.stream();
-        // }
-        // else
-        // {
-        //     audio_stream = file_audio_stream;
-        // }
-        
-        // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
-
-        //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
-        //23.11.08 대충 예상컨데 아마 파일은 ReadStream으로만 읽어올 수 있는데 유튜브용 SeekStream을 파일로도 쓸 수 있게 바꿨던 것 같다
-        if(cut_audio == true)
-        {
+            //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
+            //23.11.08 대충 예상컨데 아마 파일은 ReadStream으로만 읽어올 수 있는데 유튜브용 SeekStream을 파일로도 쓸 수 있게 바꿨던 것 같다
             const seek_stream = new SeekStream(
-                question,
-                (audio_length_sec + 10), //duration, 10는 패딩
+                audio_path,
+                (audio_length + 10), //duration, 10는 패딩
                 0, //header length 안넘겨도됨
                 size_in_bytes,
-                bitrate, //TODO BITRATE 정확한 값으로 넘기기
-                question,
+                bitrate, //TODO BITRATE 값인데, undefined로 넘기면 알아서 계산함
+                undefined,
                 {
                     file: true,
                     seek: audio_start_point,
                 }
-            )
+            );
+
             audio_stream = seek_stream.stream;
             inputType = seek_stream.type;
-        }
-        else
+        } 
+        else 
         {
-            audio_stream = fs.createReadStream(question, {flags:'r'});
+            audio_stream = fs.createReadStream(audio_path, { flags: 'r' });
         }
-
-        this.current_audio_streams.push(audio_stream);
-
-        let resource = undefined;
-        // let inputType = StreamType.Arbitrary; //Arbitrary로 해야지 ffmpeg를 edge로 resource를 만든다.
-
-
-        //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
-        //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
-        resource = createAudioResource(audio_stream, {
+    
+        return [audio_stream, inputType];
+    }
+    
+    makeAudioResource(audio_stream, inputType) {
+        let resource = createAudioResource(audio_stream, 
+        {
             inputType: inputType,
             inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            // seek: parseInt(audio_start_point),
-            // to: parseInt(audio_start_point) + parseInt(audio_length_sec), //seekstream 을 사용하니깐 이제 이 옵션 필요없다
-        }); //seek하고 to 옵션은 직접 모듈 수정한거다
-
-        if(SYSTEM_CONFIG.use_inline_volume)
+        });
+    
+        if (SYSTEM_CONFIG.use_inline_volume) 
         {
             resource.volume.setVolume(0);
         }
+    
+        return resource;
+    }
 
+    calculateAudioCutPoints(audio_duration_sec, audio_length_sec, use_improved_audio_cut) 
+    {
+        let audio_max_start_point = audio_duration_sec - (audio_length_sec + 2.5);  // 우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+        let audio_min_start_point = 2.5;  // 앞에도 2.5초 정도 자르고 싶음
+    
+        if (audio_max_start_point > audio_min_start_point)  // 충분히 재생할 수 있는 start point가 있다면
+        {
+            if (use_improved_audio_cut) // 최대한 중간 범위로 좁힌다.
+            { 
+                const refinedPoints = this.refineAudioPoints(audio_min_start_point, audio_max_start_point, audio_length_sec);
+                audio_min_start_point = refinedPoints.audio_min_start_point;
+                audio_max_start_point = refinedPoints.audio_max_start_point;
+            }
+
+            const audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point));
+            const audio_end_point = parseInt(audio_start_point + audio_length_sec);
+            return { audio_start_point, audio_end_point };
+        }
+        return { audio_start_point: undefined, audio_end_point: undefined };
+    }
+    
+    refineAudioPoints(audio_min_start_point, audio_max_start_point, audio_length_sec) 
+    {
+        const audio_length_sec_half = audio_length_sec / 2;
+        const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
+        const refined_audio_min_start_point = audio_mid_point - audio_length_sec_half;
+        const refined_audio_max_start_point = audio_mid_point + audio_length_sec_half;
+    
+        if (audio_min_start_point < refined_audio_min_start_point 
+            && refined_audio_max_start_point < audio_max_start_point) // 좁히기 성공이면
+        { 
+            logger.debug(`Refined audio point, min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
+            return { audio_min_start_point: refined_audio_min_start_point, audio_max_start_point: refined_audio_max_start_point };
+        }
+    
+        return { audio_min_start_point, audio_max_start_point };
+    }
+
+    async prepareAudioFile(target_question)
+    {
+        const { option_data, game_data } = this.quiz_session;
+        const question = target_question['question'];
+        const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; // 노래 전체 재생 여부
+        let use_random_start = target_question['use_random_start'] ?? true; // 노래 어디서부터 시작할 지 랜덤으로 설정 여부
+        
+        // 오디오 정보 가져오기
+        const audio_info = await utility.getAudioInfoFromPath(question); // TODO: 상당한 리소스를 먹는 것 같은데 확인필요
+        const audio_duration_sec = parseInt(audio_info.format.duration) ?? SYSTEM_CONFIG.max_question_audio_play_time; // duration 없으면 무조건 서버 설정 값 따르게 할거임
+        
+        // 오디오 길이 먼저 넣어주고
+        const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
+        let audio_length_sec = Math.min(audio_play_time_sec, audio_duration_sec); // 오디오 길이와 재생할 시간 중 작은 값을 사용
+        use_random_start = audio_duration_sec >= audio_length_sec && use_random_start;
+        target_question['audio_length'] = audio_length_sec * 1000;
+        
+        let audio_start_point;
+        let audio_end_point;
+        
+        if (ignore_option_audio_play_time == false && use_random_start) {
+            const use_improved_audio_cut = (option_data.quiz.improved_audio_cut === OPTION_TYPE.ENABLED);
+            ({ audio_start_point, audio_end_point } = this.calculateAudioCutPoints(audio_duration_sec, audio_length_sec, use_improved_audio_cut));
+        }
+        
+        if (audio_end_point == undefined) {
+            audio_end_point = ignore_option_audio_play_time ? Infinity : (audio_start_point + audio_length_sec);
+        }
+        
+        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point === Infinity ? 'Infinity' : audio_end_point)}`);
+        
+        const [audio_stream, inputType] = this.makeAudioFileStream(question, audio_duration_sec, audio_start_point, audio_length_sec);
+        const resource = this.makeAudioResource(audio_stream, inputType);
+        
         target_question['audio_resource'] = resource;
     }
 
@@ -2173,13 +2140,9 @@ class Prepare extends QuizLifecycle
 
     async prepareCustom(target_question) //TODO 나중에 Dev quiz랑 중복 코드 처리하자...어우 귀찮아
     {
-        const option_data = this.quiz_session.option_data;
-        const game_data = this.quiz_session.game_data;
-        const ipv4 = this.quiz_session.ipv4;
-        const ipv6 = this.quiz_session.ipv6;
-
+        const { option_data, game_data, ipv4, ipv6 } = this.quiz_session;
         const target_question_data = target_question.data;
-
+        
         /**
          * question_audio_url, 문제용 오디오 url
          * audio_start, 최소 시작 구간
@@ -2187,54 +2150,58 @@ class Prepare extends QuizLifecycle
          * audio_play_time. 재생 시간
          */
         const question_audio_url = target_question_data['question_audio_url'];
-        if(question_audio_url != undefined && question_audio_url !== '' && utility.isValidURL(question_audio_url))
-        {
-            const question_audio_play_time = target_question_data['audio_play_time'];
-            const question_audio_start = target_question_data['audio_start'];
-            const question_audio_end = target_question_data['audio_end'];
-
+        
+        if (utility.isValidURL(question_audio_url)) {
+            const { audio_play_time, audio_start, audio_end } = target_question_data;
+        
             const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioStreamResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
-
+                await this.getAudioResourceFromWeb(
+                    question_audio_url, 
+                    audio_play_time, 
+                    audio_start, 
+                    audio_end, 
+                    'question', 
+                    [ipv4, ipv6]
+                );
+        
             target_question['audio_resource'] = question_audio_resource;
             target_question['audio_length'] = question_audio_play_time_ms;
-
-            if(error_message != undefined)
-            {
-                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+        
+            if (error_message) {
+                target_question['question_text'] += `\n\nAUDIO_ERROR: ${error_message}`;
             }
         }
-
+        
         /**
          * question_image_url, 문제용 이미지 url
          */
         //Initial 할 때 이미 처리됨 target_question_data['question_image_url'];
-
+        
         /**
          * question_answers. 문제 정답
          */
         //Initial 할 때 이미 처리됨 target_question_data['answers'];
-
+        
         /**
          * question_text, 문제용 텍스트
          */
         //Initial 할 때 이미 처리됨 target_question_data['question_text'];
-
+        
         /**
          * hint, 문제 힌트
          */
         //Initial 할 때 이미 처리됨 target_question_data['hint'];
-
+        
         /**
          * hint_image_url, 문제 힌트용 이미지
          */
         //Initial 할 때 이미 처리됨 target_question_data['hint_image_url'];
-
+        
         /**
          * use_answer_timer, 타임 오버 됐을 때 10초의 여유 시간 줄지 여부
          */
         //Initial 할 때 이미 처리됨 target_question_data['use_answer_timer'];
-
+        
         /**
          * answer_audio_url, 정답 공개용 오디오 url
          * answer_audio_start, 
@@ -2242,71 +2209,67 @@ class Prepare extends QuizLifecycle
          * answer_audio_play_time
          */
         const answer_audio_url = target_question_data['answer_audio_url'];
-        if(answer_audio_url != undefined && answer_audio_url !== '' && utility.isValidURL(answer_audio_url))
-        {
-            const answer_audio_play_time = target_question_data['answer_audio_play_time'];
-            const answer_audio_start = target_question_data['answer_audio_start'];
-            const answer_audio_end = target_question_data['answer_audio_end'];
-
-            //정답용 오디오가 있다면 3초 간격 둔다, 아마도 문제용 오디오 파싱을 위해 유튜브 접속 직후, 정답용 오디오 파싱을 진행하려하면 403 뜨는 것 같다...아마도(문제랑 정답이 같은 url이면 그런가?)
-            //우선 같은 url일 때만 한번 3초 대기 적용해보자
-            if(answer_audio_url == question_audio_url)
-            {
-                await utility.sleep(3000);
-            }
-    
+        
+        if (utility.isValidURL(answer_audio_url)) {
+            const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
+        
             const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioStreamResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
-    
+                await this.getAudioResourceFromWeb(
+                    answer_audio_url, 
+                    answer_audio_play_time, 
+                    answer_audio_start, 
+                    answer_audio_end, 
+                    'answer', 
+                    [ipv4, ipv6]
+                );
+        
             target_question['answer_audio_resource'] = answer_audio_resource;
             target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
-
-            if(error_message != undefined)
-            {
-                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
+        
+            if (error_message) {
+                target_question['question_text'] += `\n\nAUDIO_ERROR: ${error_message}`;
             }
         }
         
         /**
          * answer_image_url, 정답 공개용 이미지 url
          */
-        //Initial 할 때 이미 처리됨 target_question_data[''answer_image_url'];
-
+        //Initial 할 때 이미 처리됨 target_question_data['answer_image_url'];
+        
         /**
          * answer_text, 정답 공개용 텍스트
          */
         //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
     }
 
-    async prepareOmakase(target_question)
-    {
-        this.prepareCustom(target_question);
-    }
-
-
-    /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioStreamResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
+     /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
+    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
     {
         let error_message;
 
-        if(ytdl.validateURL(audio_url_row) == false)
+        const video_id = utility.extractYoutubeVideoID(audio_url_row);
+
+        if(video_id == undefined)
         {
-            logger.warn(`${audio_url_row} is not validateURL`);
-            error_message = `${audio_url_row} is not validateURL`;
+            logger.warn(`${audio_url_row} has no video id`);
+            error_message = `${audio_url_row} has no video id`;
             return [undefined, undefined, error_message];
         }
 
         const option_data = this.quiz_session.option_data;
 
-        const max_play_time_sec = (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->12s
-
-        let audio_resource; //최종 audio_resource
-        let audio_length_ms; //최종 audio_length
+        const max_play_time_sec = 
+            (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->12s
 
         //오디오 정보 가져오기
+        const cache_file_path = path.join(SYSTEM_CONFIG.custom_audio_cache_path, `${video_id}.webm`);
+
+        logger.debug(`Downloading Youtube Video Cache file path: ${cache_file_path}`);
+
         const [ipv4, ipv6] = ip_info;
 
         const try_info_list = [];
+
         if(ipv6 != undefined) //처음엔 ipv6로 시도
         {
             try_info_list.push([ipv6, 6]);
@@ -2321,45 +2284,63 @@ class Prepare extends QuizLifecycle
         {
             try_info_list.push([undefined, undefined]); //뭐가 없으면 그냥 해보기
         }
-        logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
 
-        let youtube_info = undefined;
-        let available_address;
-        let available_family;
+        logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
 
         for(let i = 0; i < try_info_list.length; ++i)
         {
             const [ip, family] = try_info_list[i];
 
+            let yt_dlp_option = { 
+                paths: SYSTEM_CONFIG.custom_audio_cache_path,
+                output: `${video_id}.webm`,
+                // formatSort: '+size', //파일 크기로 오름차순 정렬
+                format: 'worstaudio[ext=webm]', //정렬된 포맷 중 webm 확장자인것
+                maxFilesize: '5M', //최대 파일 크기
+                matchFilter: `duration <= ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`, //최대 길이
+                writeInfoJson: true, //비디오 정보 json으로 저장
+                noCheckCertificates: true, //ssl 체크 안함
+                noWarnings: true, //경로 미출력
+                preferFreeFormats: true,
+                addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+            }
+
+            if(family == 4)
+            {
+                yt_dlp_option['forceIpv4'] = true;
+                yt_dlp_option['sourceAddress'] = ip;
+            } 
+            else if(family)
+            {
+                yt_dlp_option['forceIpv6'] = true;
+                yt_dlp_option['sourceAddress'] = ip;
+            }
+
+            const subprocess = youtubedl.exec(
+                audio_url_row, 
+                yt_dlp_option,
+                {
+                    timeout: 10000,
+                    killSignal: 'SIGKILL'
+                }
+            );       
+        
+            let stdout = '';
+            let stderr = '';
+        
+            // 표준 출력 스트림 데이터 수집
+            stdout = subprocess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            // 표준 오류 스트림 데이터 수집
+            stderr = subprocess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
             try
             {
-                if(ip == undefined || family == undefined)
-                {
-                    youtube_info = await ytdl.getInfo(audio_url_row);
-                }
-                else
-                {
-                    youtube_info = await ytdl.getInfo(audio_url_row, {
-                        requestOptions:
-                        {
-                            localAddress: ip,
-                            family: family
-                        }
-                    });
-                }
-
-                if(youtube_info != undefined)
-                {
-                    available_address = ip,
-                    available_family = family;
-
-                    if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
-                    {
-                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${available_family}...${available_address}`);
-                    }
-
-                    break; //성공했다면
-                }
+                await subprocess;
             }
             catch(err)
             {
@@ -2370,26 +2351,13 @@ class Prepare extends QuizLifecycle
                     logger.error(`Failed ytdl.getInfo... for all scenario throwing...`);
                     throw err;
                 }
-            }  
+            }
+
+            if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
+            {
+                logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${available_family}...${available_address}`);
+            }
         }
-
-        const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
-            filter: 'audioonly', 
-            quality: 'lowestaudio' 
-        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308 -> 24.02.02 해결책은 아니었다.
-
-        if(audio_format == undefined) 
-        {
-            logger.error(`cannot found audio format from ${youtube_info}`);
-            error_message = `cannot found audio format from ${youtube_info}`;
-            return [undefined, undefined, error_message];
-        }
-
-        const audio_duration_ms = audio_format.approxDurationMs;
-        const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
-        const audio_size = audio_format.contentLength;
-        const audio_bitrate = audio_format.averageBitrate;
-        const audio_byterate = audio_bitrate / 8;
 
         if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
         {
@@ -2398,8 +2366,19 @@ class Prepare extends QuizLifecycle
             return [undefined, undefined, error_message];
         }
 
+        if(fs.existsSync(cache_file_path) == false) 
+        {
+            logger.error(`cannot find downloaded cache file ${video_id}`);
+            error_message = `cannot find downloaded cache file ${video_id}`;
+            return [undefined, undefined, error_message];
+        }
+
+        const audio_duration_ms = audio_format.approxDurationMs;
+        const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
+
         //최종 재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
-        let audio_length_sec = (audio_play_time_row ?? 0) <= 0 ? Math.floor(option_data.quiz.audio_play_time / 1000) : audio_play_time_row; //얼만큼 재생할지
+        let audio_length_sec = 
+            (audio_play_time_row ?? 0) <= 0 ? Math.floor(option_data.quiz.audio_play_time / 1000) : audio_play_time_row; //얼만큼 재생할지
 
         if(audio_start_row == undefined || audio_start_row >= audio_duration_sec) //시작 요청 값 없거나, 시작 요청 구간이 오디오 범위 넘어서면
         {
@@ -2426,12 +2405,9 @@ class Prepare extends QuizLifecycle
             audio_length_sec = max_play_time_sec; //최대치를 넘어설 순 없다
         }
 
-        audio_length_ms = audio_length_sec * 1000;
-
-
         //오디오 시작 지점이 될 수 있는 포인트 범위
         const audio_min_start_point_sec = audio_start_row ?? 0;
-        const audio_max_start_point_sec = (audio_end_row ?? Math.floor(audio_duration_ms/1000)) - audio_length_sec;
+        const audio_max_start_point_sec = (audio_end_row ?? audio_duration_sec) - audio_length_sec;
 
         let audio_final_min_start_point_sec = audio_min_start_point_sec;
         let audio_final_max_start_point_sec = audio_max_start_point_sec;
@@ -2460,84 +2436,9 @@ class Prepare extends QuizLifecycle
             audio_start_point = utility.getRandom(audio_final_min_start_point_sec, audio_final_max_start_point_sec)  //second
         }
         
-        //이건 왜 안쓰지? 아놔 진짜 기억 안나네 아마 ffmpeg 프로세스 실행돼서 그럴듯
-        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); 
-        
         logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
-
-        const download_option = {
-            format: audio_format ,
-            opusEncoded: true,
-            // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
-
-            //10초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
-            //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 10}`], 
-            seek: audio_start_point, 
-
-            dlChunkSize: 0, //disabling chunking is recommended in discord bot
-            bitrate: 128, //max bitrate for discord bot, (부스트 없는 서버 기준),
-            highWaterMark: AUDIO_BUFFER_SIZE //오디오 버퍼 사이즈(이게 connReset의 원인일까...?)
-        };
-
-        if(available_address != undefined && available_family != undefined) //잘 되는 ip 정보가 있다면
-        {
-            download_option['requestOptions'] = {
-                localAddress: available_address,
-                family: available_family
-            };
-
-            logger.debug(`found available address info!!! ${available_family}, ${available_address}`);
-        };
-
-        let audio_stream = ytdl(audio_url_row, download_option);
-
-         /** 
-        23.11.08 확인 결과 
-        -to 옵션이 안먹는다...
-        -> (`-to ${audio_length}`) 에서 ('-t', `${audio_length}`) 로 하니깐 된다.
-
-        23.11.15 
-        ytdl-core 를 업데이트했더니 getInfo가 안된다.
-        ytdl-core 를 원래 쓰던 버전인 4.9.1로 롤백했다(이후 버전은 버그가 많음)
-
-        23.11.16
-        ytdl-core 4.9.1 버전은 youtube 데이터 다운로드가 매우매우 느린 문제가 있다.
-        따라서 다시 최신 버전으로 업데이트 후, 아래의 이슈 확인하여 sig.js를 패치하였다.
-        https://github.com/fent/node-ytdl-core/issues/1250#issuecomment-1712550800 
-
-        getInfo 정상 동작 및 4.9.1 보다 youtube 데이터 다운로드 속도도 빠른걸 확인함
-        **/
-
-        /**
-         * 시도해 볼만한 방법들
-         * 1. MP3는 잘라도 재생이 잘 된다. MP3는 Discord에서 어떻게 변환하는지 확인하고 Webm과 차이점을 확인
-         * 2. 오디오를 전부 받고, Create Resource를 해준다. 그 다음 start_point를 지정한다.
-         * ㄴ start_point를 지정할 수 있는지도 불확실하고 성능면에서 비효율적이다.
-         * 3. 이미 Webm/opus 타입이다. inline 볼륨 꺼보고 해보자
-         * 4. discord-ytdl-core 라는게 있다. 좀 옛날거라 지금은 안될텐데 참고는 해보자
-         * 5. 정상적으로 돌아갈 때랑 잘렸을 때 edge 상태 확인
-         * 6. https://www.npmjs.com/package/discord-ytdl-core?activeTab=explore, 이건 discord-ytdl-core 의 소스코드다
-         * 확인해보면 ytdl 로 받은걸 ffmpeg 를 직접 만들고 실행하는걸 볼 수 있다. 이 중 seek 옵션이 있는데, 이게 시작 위치(second)이고 -t 옵션으로 duration, -to 옵션으로 ~~까지를 설정할 수 있다
-         * https://github.com/skdhg/discord-ytdl-core/issues/17
-         * 이게 되면 veryvery thank u T.T, => 6번으로 해결했다!!!!
-         */
-
-        audio_resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
-            inputType: StreamType.Opus,
-            inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-        });
-
-        if(SYSTEM_CONFIG.use_inline_volume)
-        {
-            // resource.volume.setVolume(0);
-        }
-        
-        return [audio_resource, audio_length_ms, undefined];
     }
 }
-
-
 
 //#endregion
 

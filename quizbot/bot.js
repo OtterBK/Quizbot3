@@ -8,7 +8,6 @@ const ytdl = require('discord-ytdl-core');
 const { Koreanbots } = require('koreanbots');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const youtubedl = require('youtube-dl-exec');
-const path = require('path');
 const { spawn } = require('child_process');
 
 //로컬 modules
@@ -24,6 +23,7 @@ const logger = require('../utility/logger.js')('Main');
 const db_manager = require('./managers/db_manager.js');
 const ipc_manager = require('./managers/ipc_manager.js');
 const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
+const { stdin } = require('process');
 
 /** global 변수 **/
 
@@ -306,23 +306,51 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
   if(message.content == 'qtest')
   {
     const url = 'https://www.youtube.com/watch?v=zVgKnfN9i34&pp=ygUT64KY66Oo7YagIOyLpOujqOyXow%3D%3D'
-    const result = await youtubedl.exec(url, { 
+    const subprocess = youtubedl.exec(url, 
+      { 
       // format: 'webm',
-      paths: 'F:/Develope/discord_bot/Quizbot3/',
+      paths: 'F:/Develope/discord_bot/Quizbot3/cache',
       output: 'test.webm',
-      extractAudio: true,
-      dumpSingleJson: true,
+      format: 'bestaudio[ext=webm]',
+      maxFilesize: '50k',
+      matchFilter: 'duration <= 1500',
+      writeInfoJson: true,
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
-      addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+      addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+      forceIpv4: true,
      }, 
-     {
-      timeout: 5000,
-      killSignal: 'SIGKILL'
-    })
+    //  {
+    //   timeout: 10000,
+    //   killSignal: 'SIGKILL'
+    //   }
+    );
 
-    console.log(result)
+    // console.log(`Running subprocess as ${subprocess.pid}`)
+    // setTimeout(() => {
+    //   subprocess.kill('SIGKILL');
+    //   console.log('cancel');
+    // }, 10000);
+
+    let stdout = '';
+    let stderr = '';
+
+    // 표준 출력 스트림 데이터 수집
+    stdout = subprocess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });;
+    // 표준 오류 스트림 데이터 수집
+    stderr = subprocess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });;
+
+    // 프로세스 종료 이벤트
+    subprocess.on('close', (code) => {
+      console.log(`Subprocess exited with code ${code}`);
+      console.log(`Standard Output:\n${stdout}`);
+      console.log(`Standard Error:\n${stderr}`);
+    });
   }
 });
 

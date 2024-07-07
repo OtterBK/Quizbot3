@@ -17,6 +17,7 @@
     "play-audio": "^0.5.2",
     "winston": "^3.8.2",
     "winston-daily-rotate-file": "^4.7.1",
+    "youtube-dl-exec": "^3.0.6",
     "ytdl-core": "^4.11.5"
   }
 }
