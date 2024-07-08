@@ -34,11 +34,9 @@ const getAudioCache = (cache_filename) =>
 
 const getAudioCacheDuration = (cache_filename) =>
 {
-  const ext = path.extname(cache_filename);
-  const base_name = path.basename(cache_filename, ext);
-  const info_filename = `${base_name}.info.json`;
-
   const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
+  const info_filename = getInfoFileName(cache_filename);
+
   const info_file_path = path.join(cache_path, info_filename);
   const data = fs.readFileSync(info_file_path, 'utf8');
   const json_data = JSON.parse(data);
@@ -47,6 +45,12 @@ const getAudioCacheDuration = (cache_filename) =>
   return duration;
 }
 
+const getInfoFileName = (cache_filename) =>
+{
+    const ext = path.extname(cache_filename);
+    const base_name = path.basename(cache_filename, ext);
+    return `${base_name}.info.json`;
+}
 
 const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: undefined, ipv6: undefined}) => 
 {
@@ -114,9 +118,11 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         if(result.result_type == DOWNLOAD_RESULT_TYPE.SUCCESS) //성공이면 바로 반환 ^^
         {
             logger.info(`Downloaded cache file ${cache_file_name}`);
+            reWriteCacheInfo(getInfoFileName(cache_file_name));
             return {
                 success: true,
-                causation_message: undefined
+                causation_message: undefined,
+                need_retry: false
             };
         }
 
@@ -126,10 +132,11 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
     //다 해봤는데 실패한 경우임
     if(result.result_type == DOWNLOAD_RESULT_TYPE.ERROR)
     {
-        logger.error(`Failed ytdl getInfo... for all scenario`);
+        logger.error(`Failed ytdlp download audio... for all scenario`);
         return {
             success: false,
-            causation_message: `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`
+            causation_message: `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`,
+            need_retry: true
         }
     }
 
@@ -138,7 +145,8 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url}'s durations is over than ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
         return {
             success: false,
-            causation_message: `오디오 길이가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}초를 초과합니다.`
+            causation_message: `오디오 길이가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}초를 초과합니다.`,
+            need_retry: false
         }
     }
 
@@ -147,7 +155,8 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url}'s all audio file size is over than ${SYSTEM_CONFIG.custom_audio_max_file_size}`);
         return {
             success: false,
-            causation_message: `${audio_url}의 모든 오디오 파일 크기가 ${SYSTEM_CONFIG.custom_audio_max_file_size}를 초과합니다.`
+            causation_message: `${audio_url}의 모든 오디오 파일 크기가 ${SYSTEM_CONFIG.custom_audio_max_file_size}를 초과합니다.`,
+            need_retry: false
         }
     }
 
@@ -156,7 +165,8 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url} is video unavailable`);
         return {
             success: false,
-            causation_message: `${audio_url} 링크는 삭제된 오디오입니다.`
+            causation_message: `${audio_url} 링크는 삭제된 오디오입니다.`,
+            need_retry: false
         }
     }
 
@@ -165,7 +175,8 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url} is private video`);
         return {
             success: false,
-            causation_message: `${audio_url} 링크는 비공개 오디오입니다.`
+            causation_message: `${audio_url} 링크는 비공개 오디오입니다.`,
+            need_retry: false
         }
     }
 
@@ -174,14 +185,16 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url}'s cache is already exist`);
         return {
             success: true,
-            causation_message: `${audio_url}의 캐시가 이미 존재합니다.`
+            causation_message: `${audio_url}의 캐시가 이미 존재합니다.`,
+            need_retry: false
         }
     }
 
     //그 외는 나도 몰겄다
     return {
         success: false,
-        causation_message: `확인되지 않은 오류...(추후 고쳐두겠습니다.)`
+        causation_message: `확인되지 않은 오류...(추후 고쳐두겠습니다.)`,
+        need_retry: true
     }
 }
 
@@ -282,30 +295,35 @@ const getDownloadResultType = (result_message) =>
 }
 
 const getExpectedErrorType = (error_message) => 
+{
+    if(error_message == undefined)
     {
-        const lines = error_message.split('\n');
-    
-        for (let i = lines.length - 1; i >= 0; --i) 
-        {
-            const line = lines[i];
-            if(line.includes('ERROR:') == false)
-            {
-                continue;
-            }
-    
-            if(line.includes("Video unavailable"))
-            {
-                return DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE;
-            }
-    
-            if(line.includes("Private video"))
-            {
-                return DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO;
-            }
-        }
-        
         return DOWNLOAD_RESULT_TYPE.ERROR;
     }
+
+    const lines = error_message.split('\n');
+
+    for (let i = lines.length - 1; i >= 0; --i) 
+    {
+        const line = lines[i];
+        if(line.includes('ERROR:') == false)
+        {
+            continue;
+        }
+
+        if(line.includes("Video unavailable"))
+        {
+            return DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE;
+        }
+
+        if(line.includes("Private video"))
+        {
+            return DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO;
+        }
+    }
+    
+    return DOWNLOAD_RESULT_TYPE.ERROR;
+}
 
 const resetCache = () => 
 {
@@ -317,7 +335,7 @@ const resetCache = () =>
         {
             const file_path = path.join(cache_path, filename);
 
-            if(filename.endsWith(".webm") || filename.endsWith(".json"))
+            if(filename.endsWith(".webm") || filename.endsWith(".info.json"))
             {
                 fs.unlinkSync(file_path);
             }
@@ -354,44 +372,58 @@ const forceCaching = async (audio_url_list_path) =>
 
     for (let i = 0; i < audio_url_list.length; i++) 
     {
-        console.log(`caching... ${i+1} / ${audio_url_list.length}`);
+        try
+        {
+            console.log(`caching... ${i+1} / ${audio_url_list.length}`);
 
-        const audio_url = audio_url_list[i];
+            const audio_url = audio_url_list[i];
+        
+            if(audio_url == undefined || audio_url.trim() == '')
+            {
+                continue;
+            }
+        
+            const video_id = utility.extractYoutubeVideoID(audio_url);
+            if(video_id == undefined)
+            {
+                console.error(`${audio_url} has no video id`);
+                failed_url_list += `${audio_url}\n`;
+                ++failed_count;
+                continue;
+            }
+        
+            const cache_file_name = `${video_id}.webm`;
+            const cache_info_name = `${video_id}.info.json`
+        
+            if(cache_files.includes(cache_file_name) && cache_files.includes(cache_info_name))
+            {
+                console.log(`${video_id} is already cached. skip this`);
+                continue;
+            }
+        
+            const result = await downloadAudioCache(audio_url, cache_file_name);
+        
+            if(result.success == false)
+            {
+                console.error(`Failed to caching ${audio_url}. error: ${result.causation_message}`);
     
-        if(audio_url == undefined || audio_url.trim() == '')
-        {
-            continue;
+                if(result.need_retry == false)
+                {
+                    console.warn(`Do not need to retry... skip this`);
+                    continue;
+                }
+    
+                failed_url_list += `${audio_url}\n`;
+                ++failed_count;
+                continue;
+            }
+        
+            ++new_cached_count;
         }
-    
-        const video_id = utility.extractYoutubeVideoID(audio_url);
-        if(video_id == undefined)
+        catch(err)
         {
-            console.error(`${audio_url} has no video id`);
-            failed_url_list += `${audio_url}\n`;
-            ++failed_count;
-            continue;
+            console.error(`Error occurred! ${err.message}`);
         }
-    
-        const cache_file_name = `${video_id}.webm`;
-        const cache_info_name = `${video_id}.info.json`
-    
-        if(cache_files.includes(cache_file_name) && cache_files.includes(cache_info_name))
-        {
-            console.log(`${video_id} is already cached. skip this`);
-            continue;
-        }
-    
-        const result = await downloadAudioCache(audio_url, cache_file_name);
-    
-        if(result.success == false)
-        {
-            console.error(`Failed to caching ${audio_url}. error: ${result.causation_message}`);
-            failed_url_list += `${audio_url}\n`;
-            ++failed_count;
-            continue;
-        }
-    
-        ++new_cached_count;
     }
     
     console.log(`new cached ${new_cached_count}!. failed ${failed_count}...`);
@@ -404,5 +436,56 @@ const forceCaching = async (audio_url_list_path) =>
     return new_cached_count;
 }
 
+const reWriteCacheInfo = (info_filename) =>
+{
+    try
+    {
+        logger.debug(`rewriting info file ${info_filename}`);
 
-module.exports = { getAudioCache, getAudioCacheDuration, downloadAudioCache, resetCache, forceCaching };
+        const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
+        const info_file_path = path.join(cache_path, info_filename);
+        const data = fs.readFileSync(info_file_path, 'utf8');
+        const json_data = JSON.parse(data);
+    
+        delete json_data.formats;
+        delete json_data.thumbnails;
+        delete json_data.automatic_captions;
+        delete json_data.subtitles;
+        delete json_data.heatmap;
+    
+        fs.writeFileSync(info_file_path, JSON.stringify(json_data), 'utf-8',  (err) => 
+        {
+            if (err) 
+            {
+                logger.error(`remove format info write error ${err.message}`);
+            }
+        });
+    }
+    catch(err)
+    {
+        logger.error(`rewrite cache info error. ${err.message}`);
+    }
+}
+
+const reWriteCacheInfos = () =>
+{
+    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
+    const cache_files = fs.readdirSync(cache_path);
+
+    let current = 0;
+    cache_files.forEach(filename => 
+    {
+        console.log(`rewriting... ${++current} / ${cache_files.length}`);
+        if(filename.endsWith('.info.json') == false)
+        {
+            return;
+        }
+
+        reWriteCacheInfo(filename);
+
+    });
+
+    console.log("done rewriting infos");
+}
+
+module.exports = { getAudioCache, getAudioCacheDuration, downloadAudioCache, reWriteCacheInfo, resetCache, forceCaching, reWriteCacheInfos };
