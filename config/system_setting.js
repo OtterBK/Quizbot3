@@ -51,9 +51,10 @@ exports.SYSTEM_CONFIG = {
     ffmpeg_aging_manager_criteria: 300, //5분 지나도 안꺼지면 ffmpeg는 강종
     ffmpeg_aging_manager_interval: 300, //체크 주기(s)
 
-    custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
     custom_audio_max_throttle: 500 * 1024,
+    
     custom_audio_max_file_size: '5M', //문제용 오디오 파일 최대 용량
+    custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
     custom_audio_cache_path: `${__dirname}/../resources/cache`,
 
     ytdl_cookie_path: `${__dirname}/../resources/ytdl_cookie.json`,
