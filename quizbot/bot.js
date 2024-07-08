@@ -25,6 +25,7 @@ const ipc_manager = require('./managers/ipc_manager.js');
 const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('./managers/audio_cache_manager.js');
 const { stdin } = require('process');
+const { dirname } = require('path');
 
 /** global 변수 **/
 
@@ -302,12 +303,6 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
   if(quiz_session != undefined)
   {
     quiz_session.on(CUSTOM_EVENT_TYPE.message, message);
-  }
-
-  if(message.content == 'forcecaching')
-  {
-    const audio_url_list = '../audio_url.txt';
-    audio_cache_manager.forceCaching(audio_url_list);
   }
 });
 

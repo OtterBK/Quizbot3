@@ -14,7 +14,7 @@ const DOWNLOAD_RESULT_TYPE = {
     OVER_MAX_FILE_SIZE: 3,
     ALREADY_EXIST: 3,
     NO_MATCH_FILTER: 4,
-    VIDEO_UNaVAILABLE: 5,
+    VIDEO_UNAVAILABLE: 5,
     PRIVATE_VIDEO: 6,
     UNKNOWN: 9,
 }
@@ -113,6 +113,7 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
 
         if(result.result_type == DOWNLOAD_RESULT_TYPE.SUCCESS) //성공이면 바로 반환 ^^
         {
+            logger.info(`Downloaded cache file ${cache_file_name}`);
             return {
                 success: true,
                 causation_message: undefined
@@ -137,7 +138,7 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         logger.warn(`${audio_url}'s durations is over than ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
         return {
             success: false,
-            causation_message: `오디오 길이가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}초를 초고합니다.`
+            causation_message: `오디오 길이가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}초를 초과합니다.`
         }
     }
 
@@ -150,7 +151,7 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
         }
     }
 
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.VIDEO_UNaVAILABLE)
+    if(result.result_type == DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE)
     {
         logger.warn(`${audio_url} is video unavailable`);
         return {
@@ -218,7 +219,8 @@ const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
     catch(err)
     {
         logger.debug(`download process error occurred! ${err.message}`);
-        result_type = DOWNLOAD_RESULT_TYPE.ERROR;
+
+        result_type = getExpectedErrorType(stderr);
     }
 
     return {
@@ -262,7 +264,7 @@ const getDownloadResultType = (result_message) =>
 
         if(line.includes("Video unavailable"))
         {
-            return DOWNLOAD_RESULT_TYPE.VIDEO_UNaVAILABLE;
+            return DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE;
         }
 
         if(line.includes("Private video"))
@@ -278,6 +280,32 @@ const getDownloadResultType = (result_message) =>
     
     return DOWNLOAD_RESULT_TYPE.UNKNOWN;
 }
+
+const getExpectedErrorType = (error_message) => 
+    {
+        const lines = error_message.split('\n');
+    
+        for (let i = lines.length - 1; i >= 0; --i) 
+        {
+            const line = lines[i];
+            if(line.includes('ERROR:') == false)
+            {
+                continue;
+            }
+    
+            if(line.includes("Video unavailable"))
+            {
+                return DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE;
+            }
+    
+            if(line.includes("Private video"))
+            {
+                return DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO;
+            }
+        }
+        
+        return DOWNLOAD_RESULT_TYPE.ERROR;
+    }
 
 const resetCache = () => 
 {
@@ -326,6 +354,8 @@ const forceCaching = async (audio_url_list_path) =>
 
     for (let i = 0; i < audio_url_list.length; i++) 
     {
+        console.log(`caching... ${i+1} / ${audio_url_list.length}`);
+
         const audio_url = audio_url_list[i];
     
         if(audio_url == undefined || audio_url.trim() == '')
@@ -337,7 +367,7 @@ const forceCaching = async (audio_url_list_path) =>
         if(video_id == undefined)
         {
             console.error(`${audio_url} has no video id`);
-            failed_url_list += `audio_url\n`;
+            failed_url_list += `${audio_url}\n`;
             ++failed_count;
             continue;
         }
@@ -356,7 +386,7 @@ const forceCaching = async (audio_url_list_path) =>
         if(result.success == false)
         {
             console.error(`Failed to caching ${audio_url}. error: ${result.causation_message}`);
-            failed_url_list += `audio_url\n`;
+            failed_url_list += `${audio_url}\n`;
             ++failed_count;
             continue;
         }
@@ -364,13 +394,14 @@ const forceCaching = async (audio_url_list_path) =>
         ++new_cached_count;
     }
     
-
     console.log(`new cached ${new_cached_count}!. failed ${failed_count}...`);
     if(failed_count > 0)
     {
         const failed_log_path = path.join(cache_path, `failed_url.txt`);
         fs.writeFileSync(failed_log_path, failed_url_list, 'utf-8');
     }
+
+    return new_cached_count;
 }
 
 

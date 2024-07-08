@@ -2318,8 +2318,7 @@ class Question extends QuizLifeCycleWithUtility
         this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
         this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
 
-        if(game_data['question_num'] >= quiz_data['quiz_size'] 
-            || quiz_data['question_list'].length == 0) //모든 퀴즈 제출됐음
+        if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
         {
             this.next_cycle = CYCLE_TYPE.ENDING;
             this.skip_prepare_cycle = true;
