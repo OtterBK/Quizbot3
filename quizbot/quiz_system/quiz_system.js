@@ -1951,7 +1951,7 @@ class Prepare extends QuizLifecycle
                 undefined,
                 {
                     file: true,
-                    seek: audio_start_point,
+                    seek: parseInt(audio_start_point),
                 }
             );
 
@@ -1985,7 +1985,7 @@ class Prepare extends QuizLifecycle
     {
         if (audio_max_start_point <= audio_min_start_point)  // 충분히 재생할 수 있는 start point가 없다면
         {
-            return audio_min_start_point;
+            return parseInt(audio_min_start_point);
         }
 
         if (use_improved_audio_cut) // 최대한 중간 범위로 좁힌다.
@@ -2191,8 +2191,8 @@ class Prepare extends QuizLifecycle
             const cache_info = audio_cache_manager.getAudioCacheInfo(video_id);
             if(cache_info?.cache_result.need_retry == false) //이 경우 어차피 재시도해도 캐싱 안되는건 똑같은거임
             {
-                logger.info(`Skip downloading cache reason: ${cache_info.causation_message}`);
-                return [undefined, undefined, cache_info.causation_message];
+                logger.info(`Skip downloading cache reason: ${cache_info.cache_result.causation_message}`);
+                return [undefined, undefined, cache_info.cache_result.causation_message];
             }
 
             logger.info(`No cache file of ${video_id}. downloading cache`);

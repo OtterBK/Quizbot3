@@ -84,6 +84,13 @@ const getAudioCacheInfo = (video_id) =>
     return undefined;
   }
 
+  const stat = fs.statSync(info_file_path);
+  if(stat.isFile() == false) //이건 뭔 경우냐...
+  {
+    fs.unlinkSync(info_file_path);
+    return undefined;
+  }
+
   const data = fs.readFileSync(info_file_path, 'utf8');
   const json_data = JSON.parse(data);
 
