@@ -346,8 +346,8 @@ const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
 
     return {
         result_type: result_type,
-        result_message: stdout,
-        error_message: stderr
+        result_message: stdout.toString(),
+        error_message: stderr.toString()
     };
 }
 
@@ -404,7 +404,7 @@ const getDownloadResultType = (result_message) =>
 
 const getExpectedErrorType = (error_message) => 
 {
-    if(error_message == undefined)
+    if(error_message == undefined || (typeof error_message !== 'string' && !(error_message instanceof String)))
     {
         return DOWNLOAD_RESULT_TYPE.ERROR;
     }
