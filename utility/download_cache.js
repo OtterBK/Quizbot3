@@ -9,10 +9,10 @@ const scanner = readline.createInterface({
 
 waitForInput = async () => {
     scanner.question('are you ready?: ', async (line) => {
-        audio_cache_manager.forceCaching(`${__dirname}/audio_url0.txt`);
-        audio_cache_manager.forceCaching(`${__dirname}/audio_url1.txt`);
-        audio_cache_manager.forceCaching(`${__dirname}/audio_url2.txt`);
-        audio_cache_manager.forceCaching(`${__dirname}/audio_url3.txt`);
+        audio_cache_manager.forceCaching(`${__dirname}/audio_url${0}.txt`, 0);
+        audio_cache_manager.forceCaching(`${__dirname}/audio_url${1}.txt`, 1);
+        audio_cache_manager.forceCaching(`${__dirname}/audio_url${2}.txt`, 2);
+        audio_cache_manager.forceCaching(`${__dirname}/audio_url${3}.txt`, 3);
     });
 }
 

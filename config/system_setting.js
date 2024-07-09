@@ -56,7 +56,7 @@ exports.SYSTEM_CONFIG = {
     custom_audio_max_file_size: '10M', //문제용 오디오 파일 최대 용량
     custom_audio_ytdl_max_length: 1200, //문제용 오디오로 사용가능한 오디오 최대 길이(s)
     // custom_audio_cache_path: `${__dirname}/../resources/cache`,
-    custom_audio_cache_path: `G:/quizdata/cache/cache`,
+    custom_audio_cache_path: `G:/quizdata/cache`,
 
     ytdl_cookie_path: `${__dirname}/../resources/ytdl_cookie.json`,
     ytdl_ipv6_USE: true, //IPv6도 함께 사용할지 여부

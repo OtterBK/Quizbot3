@@ -1923,12 +1923,20 @@ class Prepare extends QuizLifecycle
     /** 오디오 파일 경로와, 오디오 파일의 전체 재싱길이, 시작 지점을 기준으로 스트림 반환 */
     generateAudioFileStream(audio_path, audio_duration, audio_start_point, audio_length)
     {
+        let audio_stream = undefined;
+        let inputType = StreamType.WebmOpus;
+
+        if(audio_path.endsWith('.webm') == false) //webm 아니면 그냥 재생하자
+        {
+            audio_stream = fs.createReadStream(audio_path, { flags: 'r' });
+            inputType = StreamType.Arbitrary;
+    
+            return [audio_stream, inputType];
+        }
+
         const stats = fs.statSync(audio_path);
         const size_in_bytes = stats.size;
         const bitrate = Math.ceil(size_in_bytes / audio_duration * 8);
-
-        let audio_stream = undefined;
-        let inputType = StreamType.WebmOpus;
     
         if (audio_start_point != undefined && audio_start_point !== 0) {
 
@@ -2177,24 +2185,32 @@ class Prepare extends QuizLifecycle
 
         //캐시 체크 및 다운로드
         const cache_file_name = `${video_id}.webm`;
-        let cache_file_path = audio_cache_manager.getAudioCache(cache_file_name);
+        let cache_file_path = audio_cache_manager.getAudioCache(video_id);
         if(cache_file_path == undefined) //no cache file
         {
+            const cache_info = audio_cache_manager.getAudioCacheInfo(video_id);
+            if(cache_info?.cache_result.need_retry == false) //이 경우 어차피 재시도해도 캐싱 안되는건 똑같은거임
+            {
+                logger.info(`Skip downloading cache reason: ${cache_info.causation_message}`);
+                return [undefined, undefined, cache_info.causation_message];
+            }
+
             logger.info(`No cache file of ${video_id}. downloading cache`);
 
             const ip_info = {
                 ipv4: this.quiz_session.ipv4,    
                 ipv6: this.quiz_session.ipv6,
             }
-            const result = await audio_cache_manager.downloadAudioCache(audio_url, cache_file_name, ip_info);
+            const result = await audio_cache_manager.downloadAudioCache(audio_url, video_id, ip_info);
 
             if(result.success == false) //캐시 다운로드 실패...ㅜㅜ
             {
+                logger.info(`Failed to downloading cache reason: ${result.causation_message}`);
                 return [undefined, undefined, result.causation_message];
             }
             else
             {
-                cache_file_path = audio_cache_manager.getAudioCache(cache_file_name);
+                cache_file_path = audio_cache_manager.getAudioCache(video_id);
             }
         }
         else
@@ -2205,7 +2221,16 @@ class Prepare extends QuizLifecycle
         //캐시 다운로드 성공 또는 이미 캐시 존재!
         
         //재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
-        const audio_duration_sec = audio_cache_manager.getAudioCacheDuration(cache_file_name);
+        const audio_info = audio_cache_manager.getAudioCacheInfo(video_id);
+        const audio_duration_sec = audio_info.duration ?? 0;
+
+        if(audio_duration_sec == undefined)
+        {
+            logger.warn(`no audio duration by getAudioCacheDuration. ${cache_file_name}`);
+            const audio_info =  await utility.getAudioInfoFromPath(question);
+            audio_duration_sec = parseInt(audio_info.format.duration);
+        }
+
         const option_data = this.quiz_session.option_data;
         let audio_length_sec = Math.floor(option_data.quiz.audio_play_time / 1000); //우선 서버 설정값
 
@@ -3423,27 +3448,25 @@ class QuestionCustom extends Question
         let fade_in_end_time = undefined; 
 
         let audio_error_occurred = false;
-        if(audio_play_time != 0) //오디오 재생해야하면
+        if(this.progress_bar_fixed_text?.includes('AUDIO_ERROR'))
         {
+            audio_error_occurred = true;
+        }
 
+        if(audio_error_occurred == false && audio_play_time != 0) //오디오 재생해야하면
+        {
             this.is_playing_bgm = false;
-            this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result)
-            .catch((err) => 
+
+            try
             {
-                if(this.progress_bar_fixed_text == undefined)
-                {
-                    this.progress_bar_fixed_text = "";
-                }
-                else if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == true) //이미 AUDIO_ERROR 메시지가 있다면
-                {
-                    return;
-                }
-                
-                this.progress_bar_fixed_text += `\n\nAUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n${err.message}`;
+                const result = await this.startAudio(audio_player, resource);
+                fade_in_end_time = result;
+            }
+            catch(err)
+            {
                 audio_play_time = 0; //오디오 재생 시간 0초로 변경 -> 브금 재생
                 audio_error_occurred = true;
-            }); //비동기로 오디오 재생 시켜주고
+            }
 
             if(audio_error_occurred == false)
             {
@@ -3451,7 +3474,18 @@ class QuestionCustom extends Question
             }
         }
         
-        if(audio_error_occurred == true || audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
+        if(audio_error_occurred == true) //에러 발생 시, 음악만 바꾼다. (오디오 용도가 그냥 브금이었을 수도 있으니깐)
+        {
+            logger.warn("Audio error occurred on Custom Quiz! Play failover bgm.");
+
+            this.progress_bar_fixed_text += `\n😭 오디오 추출에 실패하여 임시 BGM을 대신 재생합니다.`;
+
+            this.is_playing_bgm = true;
+            audio_play_time = 11000; //오디오 재생 시간 11초로 변경
+            utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
+        }
+
+        if(audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
         {
             this.is_playing_bgm = true;
             audio_play_time = 10000; //오디오 재생 시간 10초로 변경
@@ -3566,7 +3600,12 @@ class QuestionOmakase extends Question
         let fade_in_end_time = undefined; 
 
         let audio_error_occurred = false;
-        if(audio_play_time != 0) //오디오 재생해야하면
+        if(this.progress_bar_fixed_text?.includes('AUDIO_ERROR'))
+        {
+            audio_error_occurred = true;
+        }
+
+        if(audio_error_occurred == false && audio_play_time != 0) //오디오 재생해야하면
         {
             this.is_playing_bgm = false;
 
@@ -3579,15 +3618,7 @@ class QuestionOmakase extends Question
             {
                 let error_message = '```';
                 error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
-
-                if(this.progress_bar_fixed_text?.includes('AUDIO_ERROR') == true) //이미 AUDIO_ERROR 메시지가 있다면
-                {
-                    error_message += this.progress_bar_fixed_text.trim();
-                }
-                else
-                {
-                    error_message += `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n${err.message}`;
-                }
+                error_message += this.progress_bar_fixed_text?.trim();
                 error_message += '```';
 
                 this.quiz_session.sendMessage({content: error_message});

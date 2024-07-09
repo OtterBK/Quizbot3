@@ -294,6 +294,15 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
 
 });
 
+const { demuxProbe, joinVoiceChannel, createAudioPlayer, createAudioResource,StreamType, AudioPlayerStatus } = require('@discordjs/voice');
+const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
+const path = require('path');
+
+async function probeAndCreateResource(readableStream) {
+	const { stream, type } = await demuxProbe(readableStream);
+	return createAudioResource(stream, { inputType: type });
+}
+
 //메시지 이벤트
 client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
 

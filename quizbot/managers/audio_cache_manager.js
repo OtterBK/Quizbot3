@@ -12,19 +12,60 @@ const DOWNLOAD_RESULT_TYPE = {
     ERROR: 1,
     OVER_DURATION: 2,
     OVER_MAX_FILE_SIZE: 3,
-    ALREADY_EXIST: 3,
-    NO_MATCH_FILTER: 4,
-    VIDEO_UNAVAILABLE: 5,
-    PRIVATE_VIDEO: 6,
-    UNKNOWN: 9,
+    ALREADY_EXIST: 4,
+    NO_MATCH_FILTER: 5,
+    VIDEO_UNAVAILABLE: 6,
+    PRIVATE_VIDEO: 7,
+    PREMIUM: 8,
+    UNKNOWN: 10,
 }
 
-const getAudioCache = (cache_filename) => 
+const getHashedPath = (target) => 
 {
-    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-    const cache_file_path = path.join(cache_path, cache_filename);
+    if(target == undefined || target.length == 0)
+    {
+        return undefined;
+    }
 
-    if(fs.existsSync(cache_file_path))
+    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
+    const sub_path = target.charAt(0).toUpperCase();
+    
+    return path.join(cache_path, sub_path);
+}
+
+const getAudioCache = (video_id) => 
+{
+    const cache_path = getHashedPath(video_id);
+    let cache_file_path = path.join(cache_path, `${video_id}.webm`); //우선 webm으로 찾는다
+
+    if(fs.existsSync(cache_file_path)) //바로 찾으면 개꿀~
+    {
+        return cache_file_path;
+    }
+
+    //하 없으면 찾아보자
+    const cache_info = getAudioCacheInfo(video_id);
+    if(cache_info == undefined)
+    {
+        return undefined;
+    }
+
+    const cache_result = cache_info.cache_result;
+    if(cache_result == undefined)
+    {
+        return undefined;
+    }
+
+    if(cache_result.success == false || cache_info.ext == undefined)
+    {
+        return undefined;
+    }
+    
+    //캐싱 성공은 했어?
+    const ext = cache_info.ext;
+    cache_file_path = path.join(cache_path, `${video_id}.${ext}`);
+
+    if(fs.existsSync(cache_file_path)) //다시 찾아보자
     {
         return cache_file_path;
     }
@@ -32,37 +73,81 @@ const getAudioCache = (cache_filename) =>
     return undefined;
 }
 
-const getAudioCacheDuration = (cache_filename) =>
+const getAudioCacheInfo = (video_id) =>
 {
-  const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-  const info_filename = getInfoFileName(cache_filename);
-
+  const cache_path = getHashedPath(video_id);
+  const info_filename = `${video_id}.info.json`;
   const info_file_path = path.join(cache_path, info_filename);
+
+  if(fs.existsSync(info_file_path) == false)
+  {
+    return undefined;
+  }
+
   const data = fs.readFileSync(info_file_path, 'utf8');
   const json_data = JSON.parse(data);
-  const duration = json_data.duration;
 
-  return duration;
+  return json_data;
 }
 
-const getInfoFileName = (cache_filename) =>
+const reWriteCacheInfo = (video_id, cache_result) =>
 {
-    const ext = path.extname(cache_filename);
-    const base_name = path.basename(cache_filename, ext);
-    return `${base_name}.info.json`;
+    try
+    {
+        logger.debug(`rewriting info file ${video_id}.info.json`);
+
+        const cache_info = getAudioCacheInfo(video_id);
+
+        if(cache_info == undefined)
+        {
+            logger.debug(`${video_id}'s info is not exists. will generate cache info`);
+        }
+
+        delete cache_info.formats;
+        delete cache_info.thumbnails;
+        delete cache_info.automatic_captions;
+        delete cache_info.subtitles;
+        delete cache_info.heatmap;
+
+        if(cache_result != undefined)
+        {
+            cache_info['cache_result'] = cache_result;
+        }
+
+        const cache_path = getHashedPath(video_id);
+        const info_filename = `${video_id}.info.json`;
+        const info_file_path = path.join(cache_path, info_filename);
+
+        if(fs.existsSync(cache_path) == false)
+        {
+            fs.mkdirSync(cache_path, { recursive: true });
+        }
+    
+        fs.writeFileSync(info_file_path, JSON.stringify(cache_info), 'utf-8',  (err) => 
+        {
+            if (err) 
+            {
+                logger.error(`remove format info write error ${err.message}`);
+            }
+        });
+    }
+    catch(err)
+    {
+        logger.error(`rewrite cache info error. ${err.message}`);
+    }
 }
 
-const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: undefined, ipv6: undefined}) => 
+const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined, ipv6: undefined}) => 
 {
-    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
+    const cache_path = getHashedPath(video_id);
 
-    logger.debug(`Downloading Youtube Video Cache file... audio_url: ${audio_url}, filename: ${cache_file_name}`);
+    logger.debug(`Downloading Youtube Video Cache file... audio_url: ${audio_url}, video_id: ${video_id}`);
 
     const default_option = {
         paths: cache_path,
-        output: cache_file_name,
+        output: `${video_id}.%(ext)s`,
         formatSort: '+size', //파일 크기로 오름차순 정렬
-        format: 'bestaudio[ext=webm]', //정렬된 포맷 중 webm 확장자인것 -> 즉 webm이면서 파일 크기가 가장 작은거
+        format: 'bestaudio[ext=webm]/bestaudio', //정렬된 포맷 중 webm 확장자인것. 없으면 젤 작은 audio -> 즉 webm이면서 파일 크기가 가장 작은거
         maxFilesize: SYSTEM_CONFIG.custom_audio_max_file_size, //최대 파일 크기
         matchFilter: `duration <= ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`, //최대 길이
         writeInfoJson: true, //비디오 정보 json으로 저장
@@ -101,8 +186,8 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
 
     logger.debug(`Downloading cache scenario is ${download_scenario.length}`);
 
-    let causation_message = undefined;
     let result = undefined;
+    let cache_result = {};
 
     while(download_scenario.length > 0)
     {
@@ -117,13 +202,17 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
 
         if(result.result_type == DOWNLOAD_RESULT_TYPE.SUCCESS) //성공이면 바로 반환 ^^
         {
-            logger.info(`Downloaded cache file ${cache_file_name}`);
-            reWriteCacheInfo(getInfoFileName(cache_file_name));
-            return {
+            cache_result = {
                 success: true,
-                causation_message: undefined,
+                causation_message: '',
                 need_retry: false
             };
+
+            reWriteCacheInfo(video_id, cache_result);
+
+            logger.info(`Downloaded cache file ${video_id}`);
+            
+            return cache_result;
         }
 
         break; //에러도 아니고 성공도 아니면 예상된 문제들임
@@ -133,69 +222,81 @@ const downloadAudioCache = async (audio_url, cache_file_name, ip_info={ipv4: und
     if(result.result_type == DOWNLOAD_RESULT_TYPE.ERROR)
     {
         logger.error(`Failed ytdlp download audio... for all scenario`);
-        return {
+        cache_result = {
             success: false,
-            causation_message: `AUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`,
+            causation_message: `오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`,
             need_retry: true
         }
     }
-
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.OVER_DURATION)
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.OVER_DURATION)
     {
         logger.warn(`${audio_url}'s durations is over than ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-        return {
+        cache_result = {
             success: false,
             causation_message: `오디오 길이가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}초를 초과합니다.`,
             need_retry: false
         }
     }
-
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.OVER_MAX_FILE_SIZE)
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.OVER_MAX_FILE_SIZE)
     {
         logger.warn(`${audio_url}'s all audio file size is over than ${SYSTEM_CONFIG.custom_audio_max_file_size}`);
-        return {
+        cache_result = {
             success: false,
             causation_message: `${audio_url}의 모든 오디오 파일 크기가 ${SYSTEM_CONFIG.custom_audio_max_file_size}를 초과합니다.`,
             need_retry: false
         }
     }
-
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE)
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.VIDEO_UNAVAILABLE)
     {
         logger.warn(`${audio_url} is video unavailable`);
-        return {
+        cache_result = {
             success: false,
             causation_message: `${audio_url} 링크는 삭제된 오디오입니다.`,
             need_retry: false
         }
     }
-
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO)
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO)
     {
         logger.warn(`${audio_url} is private video`);
-        return {
+        cache_result = {
             success: false,
             causation_message: `${audio_url} 링크는 비공개 오디오입니다.`,
             need_retry: false
         }
     }
-
-    if(result.result_type == DOWNLOAD_RESULT_TYPE.ALREADY_EXIST) //이럴수가 있나 싶긴한데... 
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.ALREADY_EXIST) //이럴수가 있나 싶긴한데... 
     {
         logger.warn(`${audio_url}'s cache is already exist`);
-        return {
+        cache_result = {
             success: true,
-            causation_message: `${audio_url}의 캐시가 이미 존재합니다.`,
+            causation_message: '',
             need_retry: false
         }
     }
-
-    //그 외는 나도 몰겄다
-    return {
-        success: false,
-        causation_message: `확인되지 않은 오류...(추후 고쳐두겠습니다.)`,
-        need_retry: true
+    else if(result.result_type == DOWNLOAD_RESULT_TYPE.PREMIUM) 
+    {
+        logger.warn(`${audio_url} is premium music`);
+        cache_result = {
+            success: true,
+            causation_message: `${audio_url} 링크는 유튜브 프리미엄 뮤직입니다.`,
+            need_retry: false
+        }
     }
+    else
+    {
+        logger.warn(`Unknown result message url: ${audio_url}, stdout: ${result.result_message}`);
+        logger.debug(`${audio_url}'s stdout: ${result.result_message}`);
+
+        //그 외는 나도 몰겄다
+        cache_result = {
+            success: false,
+            causation_message: `확인되지 않은 오류...(추후 고쳐두겠습니다.)`,
+            need_retry: true
+        }
+    }
+
+    reWriteCacheInfo(video_id, cache_result);
+    return cache_result;
 }
 
 const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
@@ -249,7 +350,7 @@ const getDownloadResultType = (result_message) =>
 
     for (let i = lines.length - 1; i >= 0; --i) 
     {
-        const line = lines[i];
+        const line = lines[i].trim();
         if(line.startsWith('[download]') == false)
         {
             continue;
@@ -270,7 +371,7 @@ const getDownloadResultType = (result_message) =>
             return DOWNLOAD_RESULT_TYPE.NO_MATCH_FILTER;
         }
 
-        if(line.includes("File is larger than max-filesize"))
+        if(line.includes("File is larger"))
         {
             return DOWNLOAD_RESULT_TYPE.OVER_MAX_FILE_SIZE;
         }
@@ -305,7 +406,7 @@ const getExpectedErrorType = (error_message) =>
 
     for (let i = lines.length - 1; i >= 0; --i) 
     {
-        const line = lines[i];
+        const line = lines[i].trim();
         if(line.includes('ERROR:') == false)
         {
             continue;
@@ -320,34 +421,17 @@ const getExpectedErrorType = (error_message) =>
         {
             return DOWNLOAD_RESULT_TYPE.PRIVATE_VIDEO;
         }
+
+        if(line.includes("Music Premium"))
+        {
+            return DOWNLOAD_RESULT_TYPE.PREMIUM;
+        }
     }
     
     return DOWNLOAD_RESULT_TYPE.ERROR;
 }
 
-const resetCache = () => 
-{
-    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-    const cache_files = fs.readdirSync(cache_path);
-
-    cache_files.forEach(filename => {
-        try
-        {
-            const file_path = path.join(cache_path, filename);
-
-            if(filename.endsWith(".webm") || filename.endsWith(".info.json"))
-            {
-                fs.unlinkSync(file_path);
-            }
-        }
-        catch(err)
-        {
-            console.error(`캐시${filename} 삭제 오류: `, err.message);
-        }
-    });
-}
-
-const forceCaching = async (audio_url_list_path) =>
+const forceCaching = async (audio_url_list_path, thread_index=0) =>
 {
     if(fs.existsSync(audio_url_list_path) == false)
     {
@@ -357,14 +441,6 @@ const forceCaching = async (audio_url_list_path) =>
 
     const audio_url_list_data = fs.readFileSync(audio_url_list_path, 'utf8');
     const audio_url_list = audio_url_list_data.split('\n');
-
-    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-    const cache_files = fs.readdirSync(cache_path);
-    const cached_list = [];
-
-    cache_files.forEach(filename => {
-        cached_list.push(filename);
-    });
 
     let new_cached_count = 0;
     let failed_count = 0;
@@ -392,16 +468,22 @@ const forceCaching = async (audio_url_list_path) =>
                 continue;
             }
         
-            const cache_file_name = `${video_id}.webm`;
-            const cache_info_name = `${video_id}.info.json`
-        
-            if(cache_files.includes(cache_file_name) && cache_files.includes(cache_info_name))
+            const cache_file_path = getAudioCache(video_id);
+            const cache_info = getAudioCacheInfo(video_id);
+
+            if(cache_file_path != undefined && cache_info != undefined)
             {
                 console.log(`${video_id} is already cached. skip this`);
                 continue;
             }
+
+            if(cache_info?.cache_result?.need_retry == false) //이 경우 어차피 재시도해도 캐싱 안되는건 똑같은거임
+            {
+                console.log(`Skip downloading cache reason: ${cache_info.cache_result.causation_message}`);
+                continue;
+            }
         
-            const result = await downloadAudioCache(audio_url, cache_file_name);
+            const result = await downloadAudioCache(audio_url, video_id);
         
             if(result.success == false)
             {
@@ -422,70 +504,18 @@ const forceCaching = async (audio_url_list_path) =>
         }
         catch(err)
         {
-            console.error(`Error occurred! ${err.message}`);
+            console.error(`Error occurred! ${err.stack}`);
         }
     }
     
     console.log(`new cached ${new_cached_count}!. failed ${failed_count}...`);
     if(failed_count > 0)
     {
-        const failed_log_path = path.join(cache_path, `failed_url.txt`);
+        const failed_log_path = path.join(SYSTEM_CONFIG.custom_audio_cache_path, `failed_url${thread_index}.txt`);
         fs.writeFileSync(failed_log_path, failed_url_list, 'utf-8');
     }
 
     return new_cached_count;
 }
 
-const reWriteCacheInfo = (info_filename) =>
-{
-    try
-    {
-        logger.debug(`rewriting info file ${info_filename}`);
-
-        const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-        const info_file_path = path.join(cache_path, info_filename);
-        const data = fs.readFileSync(info_file_path, 'utf8');
-        const json_data = JSON.parse(data);
-    
-        delete json_data.formats;
-        delete json_data.thumbnails;
-        delete json_data.automatic_captions;
-        delete json_data.subtitles;
-        delete json_data.heatmap;
-    
-        fs.writeFileSync(info_file_path, JSON.stringify(json_data), 'utf-8',  (err) => 
-        {
-            if (err) 
-            {
-                logger.error(`remove format info write error ${err.message}`);
-            }
-        });
-    }
-    catch(err)
-    {
-        logger.error(`rewrite cache info error. ${err.message}`);
-    }
-}
-
-const reWriteCacheInfos = () =>
-{
-    const cache_path = SYSTEM_CONFIG.custom_audio_cache_path;
-    const cache_files = fs.readdirSync(cache_path);
-
-    let current = 0;
-    cache_files.forEach(filename => 
-    {
-        console.log(`rewriting... ${++current} / ${cache_files.length}`);
-        if(filename.endsWith('.info.json') == false)
-        {
-            return;
-        }
-
-        reWriteCacheInfo(filename);
-
-    });
-
-    console.log("done rewriting infos");
-}
-
-module.exports = { getAudioCache, getAudioCacheDuration, downloadAudioCache, reWriteCacheInfo, resetCache, forceCaching, reWriteCacheInfos };
+module.exports = { getAudioCache, getAudioCacheInfo, downloadAudioCache, reWriteCacheInfo, forceCaching };
