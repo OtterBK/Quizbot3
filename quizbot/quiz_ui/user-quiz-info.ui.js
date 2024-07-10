@@ -116,7 +116,7 @@ class UserQuizInfoUI extends QuizbotUI {
       description += "`만들어진 날짜: " + quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
       description += "`업데이트 날짜: " + quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
       
-      description += "`플레이된 횟수: " + (quiz_info.data.played_count ?? 0) + "회`\n";
+      description += "`플레이한 서버: " + (quiz_info.data.played_count ?? 0) + "개`\n";
       description += "`추천한 유저수: " + (quiz_info.data.like_count ?? 0) + "개`\n";
       description += "`인증여부: " + (quiz_info.data.certified ? "⭕" : "❌") + "`\n\n";
   
