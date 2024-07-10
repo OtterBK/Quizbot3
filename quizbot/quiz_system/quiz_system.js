@@ -2151,7 +2151,7 @@ class Prepare extends QuizLifecycle
         target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
     
         if (answer_error_message) {
-            target_question['question_text'] += `\n\nAUDIO_ERROR: ${answer_error_message}`;
+            target_question['author'] += `\n\nAUDIO_ERROR: ${answer_error_message}`;
         }
         
         /**
@@ -3616,12 +3616,6 @@ class QuestionOmakase extends Question
             }
             catch(err)
             {
-                let error_message = '```';
-                error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
-                error_message += this.progress_bar_fixed_text?.trim();
-                error_message += '```';
-
-                this.quiz_session.sendMessage({content: error_message});
                 audio_error_occurred = true;
             }
 
@@ -3633,11 +3627,18 @@ class QuestionOmakase extends Question
 
         if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
         {
-            logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.")
+            logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.");
             this.next_cycle = CYCLE_TYPE.QUESTIONING;
             game_data['question_num'] -= 1;
             utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
             await utility.sleep(11000); //Failover 브금 11초임 
+
+            let error_message = '```';
+            error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
+            error_message += this.progress_bar_fixed_text?.trim();
+            error_message += '```';
+
+            this.quiz_session.sendMessage({content: error_message});
             
             return;
         }
