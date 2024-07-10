@@ -2151,7 +2151,7 @@ class Prepare extends QuizLifecycle
         target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
     
         if (answer_error_message) {
-            target_question['author'] += `\n\nAUDIO_ERROR: ${answer_error_message}`;
+            target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
         }
         
         /**
