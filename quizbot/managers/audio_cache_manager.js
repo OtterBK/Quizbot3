@@ -103,11 +103,12 @@ const reWriteCacheInfo = (video_id, cache_result) =>
     {
         logger.debug(`rewriting info file ${video_id}.info.json`);
 
-        const cache_info = getAudioCacheInfo(video_id);
+        let cache_info = getAudioCacheInfo(video_id);
 
         if(cache_info == undefined)
         {
-            logger.debug(`${video_id}'s info is not exists. will generate cache info`);
+            logger.debug(`${video_id}'s info is not exists. generating cache info`);
+            cache_info = {};
         }
 
         delete cache_info.formats;
@@ -229,7 +230,7 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
     if(result.result_type == DOWNLOAD_RESULT_TYPE.ERROR)
     {
         logger.error(`Failed ytdlp download audio... for all scenario`);
-        
+
         cache_result = {
             success: false,
             causation_message: `오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`,
