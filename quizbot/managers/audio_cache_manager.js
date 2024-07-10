@@ -229,11 +229,14 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
     if(result.result_type == DOWNLOAD_RESULT_TYPE.ERROR)
     {
         logger.error(`Failed ytdlp download audio... for all scenario`);
+        
         cache_result = {
             success: false,
             causation_message: `오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.`,
             need_retry: true
         }
+
+        logFailedUrl(audio_url);
     }
     else if(result.result_type == DOWNLOAD_RESULT_TYPE.OVER_DURATION)
     {
@@ -300,6 +303,8 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
             causation_message: `확인되지 않은 오류...(추후 고쳐두겠습니다.)`,
             need_retry: true
         }
+
+        logFailedUrl(audio_url);
     }
 
     reWriteCacheInfo(video_id, cache_result);
@@ -436,6 +441,19 @@ const getExpectedErrorType = (error_message) =>
     }
     
     return DOWNLOAD_RESULT_TYPE.ERROR;
+}
+
+const logFailedUrl = (url_list) =>
+{
+    const cache_root_path = SYSTEM_CONFIG.custom_audio_cache_path;
+    const failed_url_path = path.join(cache_root_path, "failed_url.txt");
+    fs.appendFile(failed_url_path, `${url_list}\n`, 'utf8', (err) => 
+    {
+        if (err) 
+        {
+          console.error(`Log Failed Url write url_list: ${url_list}, error: ${err.message}`);
+        } 
+    });
 }
 
 const forceCaching = async (audio_url_list_path, thread_index=0) =>
