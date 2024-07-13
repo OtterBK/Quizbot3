@@ -10,8 +10,7 @@ const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.l
 const quiz_system = require('../quiz_system/quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('../../utility/utility.js');
 const {
-  omakase_quiz_info_comp,
-  modal_omakase_setting,
+  quiz_info_comp,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu
@@ -22,14 +21,13 @@ const {
 } = require("./common-ui.js");
 
 
-const { AlertQuizStartUI } = require("./alert-quiz-start-ui.js");
-const { ServerSettingUI } = require("./server-setting-ui.js");
+const { QuizInfoUI } = require('./quiz-info-ui.js');
 
 //#endregion
 
 /** OMAKASE QUIZ Room*/
 /** 오마카세 퀴즈 설정 용. 로비 형식임 */
-class OmakaseQuizRoomUI extends QuizbotUI
+class OmakaseQuizRoomUI extends QuizInfoUI
 {
   static createDefaultOmakaseQuizInfo = (interaction) =>
   {
@@ -46,7 +44,8 @@ class OmakaseQuizRoomUI extends QuizbotUI
     quiz_info['author_icon'] = guild.iconURL() ?? '';
     quiz_info['thumbnail'] = ''; //썸네일은 고정 이미지가 있지롱 ㅎ
 
-    quiz_info['quiz_size'] = 30; //default
+    quiz_info['quiz_size'] = 100; //default
+    quiz_info['selected_question_count'] = 30; //default
     quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
     quiz_info['winner_nickname'] = "플레이어";
     quiz_info['quiz_path'] = undefined;//oamakase quiz는 quiz_path 불필요
@@ -61,7 +60,7 @@ class OmakaseQuizRoomUI extends QuizbotUI
     quiz_info['custom_quiz_type_tags'] = 0;
     quiz_info['custom_quiz_tags'] = 0;
 
-    quiz_info['max_question_count'] = 30; //default
+    quiz_info['selected_question_count'] = 30; //default
 
     quiz_info['room_owner'] = interaction.member;
 
@@ -70,9 +69,8 @@ class OmakaseQuizRoomUI extends QuizbotUI
 
   constructor(quiz_info)
   {
-    super();
+    super(quiz_info);
 
-    this.quiz_info = quiz_info;
     this.custom_quiz_warned = false; //커스텀 퀴즈 설정 시 주의 사항 안내했는지 여부
 
     this.embed = {
@@ -88,14 +86,19 @@ class OmakaseQuizRoomUI extends QuizbotUI
       },
     };
 
-    this.refreshUI();
+    this.components = [quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
 
-    this.components = [omakase_quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
+    this.refreshUI();
   }
 
   onInteractionCreate(interaction) 
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
+    if(interaction.customId == 'dev_quiz_tags_select_menu'
+      || interaction.customId == 'custom_quiz_type_tags_select_menu'
+      || interaction.customId == 'custom_quiz_tags_select_menu') //퀴즈 장르 설정 시
+    {
+      return this.applyQuizTagsSetting(interaction);
+    }
 
     if(interaction.customId == 'start') //시작 버튼 눌렀을 때
     {
@@ -108,93 +111,9 @@ class OmakaseQuizRoomUI extends QuizbotUI
         interaction.channel.send({content: ">>> 시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!"});
         return;        
       }
-
-      const guild = interaction.guild;
-      const owner = interaction.member; //주최자
-      const channel = interaction.channel;
-
-      const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
-      if(check_ready == undefined || check_ready.result == false)
-      {
-        const reason = check_ready.reason;
-        let reason_message = text_contents.quiz_info_ui.failed_start;
-        reason_message = reason_message.replace("${reason}", reason);
-        interaction.channel.send({content: reason_message});
-        return;
-      }
-      
-      quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
-
-      return new AlertQuizStartUI(quiz_info, owner); 
     }
 
-    if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 때
-    {
-      //TODO 순위표 만들기
-    }
-
-    if(interaction.customId == 'settings') //설정 버튼 눌렀을 때
-    {
-      return new ServerSettingUI(interaction.guild.id);
-    }
-
-    /** 오마카세 퀴즈 전용*/
-    if(interaction.customId == 'request_modal_omakase_setting') //오마카세 설정 버튼 눌렀을 때
-    {
-      interaction.showModal(modal_omakase_setting); //퀴즈 생성 모달 전달
-      return;
-    }
-
-    if(interaction.customId == 'modal_omakase_setting') //오마카세 설정 값 제출 시,
-    {
-      return this.applyOmakaseSettings(interaction);
-    }
-
-    if(interaction.customId == 'dev_quiz_tags_select_menu'
-      || interaction.customId == 'custom_quiz_type_tags_select_menu'
-      || interaction.customId == 'custom_quiz_tags_select_menu') //퀴즈 장르 설정 시
-    {
-      return this.applyQuizTagsSetting(interaction);
-    }
-  }
-
-  applyOmakaseSettings(interaction)
-  {
-    const quiz_info = this.quiz_info;
-    const room_owner = quiz_info['room_owner'];
-
-    // if(room_owner.id != interaction.member.id)
-    // {
-    //   interaction.reply({content: `>>> 방장인 ${room_owner.displayName} 님만 설정이 가능합니다.`, ephemeral: true});
-    //   return undefined;
-    // }
-
-    const input_max_question_count = interaction.fields.getTextInputValue('txt_input_max_question_count');
-
-    if(input_max_question_count == undefined || input_max_question_count == '')
-    {
-      interaction.deferUpdate(); //defer은 해준다.
-      return undefined;
-    }
-
-    let max_question_count = parseInt(input_max_question_count.trim());
-    if(isNaN(max_question_count) || max_question_count <= 0) //입력 값 잘못된거 처리
-    {
-      interaction.reply({content: `>>> 문제 수 설정에 입력된 ${input_max_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.`, ephemeral: true});
-      return undefined;
-    }
-
-    if(max_question_count > 100)
-    {
-      max_question_count = 100;
-    }
-    
-    interaction.reply({content: `>>> 제출할 문제 수를 ${max_question_count}개로 설정했습니다.`, ephemeral: true});
-    quiz_info['quiz_size'] = max_question_count;
-    quiz_info['max_question_count'] = max_question_count;
-
-    this.refreshUI();
-    return this;
+    return super.onInteractionCreate(interaction);
   }
 
   calcTagsValue(values)
@@ -270,7 +189,7 @@ class OmakaseQuizRoomUI extends QuizbotUI
     let description = text_contents.quiz_info_ui.description;
 
     description = description.replace('${quiz_type_name}', `${quiz_info['type_name']}`);
-    description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
+    description = description.replace('${quiz_size}', `[ ${quiz_info['selected_question_count'] ?? quiz_info['quiz_size']} / 100 ]`);
     description = description.replace('${quiz_description}', `${quiz_info['description']}`);
     
     let tag_info_text = "\n";

@@ -18,7 +18,7 @@ const {
 } = require("./common-ui.js");
 
 
-const { QuizInfoUI } = require("./quiz-info-ui.js");;
+const { DevQuizInfoUI } = require("./dev-quiz-info-ui.js");;
 
 //#endregion
 
@@ -97,7 +97,7 @@ class DevQuizSelectUI extends QuizBotControlComponentUI
 
       quiz_info['quiz_id'] = undefined; //dev quiz는 quiz_id가 없다
 
-      return new QuizInfoUI(quiz_info);
+      return new DevQuizInfoUI(quiz_info);
     }
 
     if(content['sub_contents'] != undefined) //하위 디렉터리가 있다면

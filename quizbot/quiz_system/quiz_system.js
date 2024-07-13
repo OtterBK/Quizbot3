@@ -1460,7 +1460,14 @@ class InitializeDevQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        let selected_question_count = quiz_info['selected_question_count'] ?? quiz_info['quiz_size'];
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
     }
 }
 
@@ -1480,7 +1487,7 @@ class InitializeCustomQuiz extends Initialize
         catch(err)
         {
             this.initialize_success = false;
-            logger.error(`Failed to custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack}`);
+            logger.error(`Failed to custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack ?? err}`);
         }
     }
 
@@ -1516,7 +1523,14 @@ class InitializeCustomQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        let selected_question_count = quiz_info['selected_question_count'] ?? quiz_info['quiz_size'];
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
 
         // 서버별이 아닌 유저별로 변경되면서 필요 없어짐. 무조건 추천하기 띄움
         // feedback_manager.checkAlreadyLike(quiz_id, guild_id)
@@ -1571,9 +1585,9 @@ class InitializeOmakaseQuiz extends Initialize
         const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
         const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
         const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
-        const max_question_count = quiz_info['max_question_count']; //최대 문제 개수도 있다.
+        const selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
         
-        const limit = max_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
+        const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
 
         //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
         const [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
@@ -1653,7 +1667,13 @@ class InitializeOmakaseQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = (question_list.length < max_question_count ? question_list.length : max_question_count); //퀴즈 수 재정의 하자
+
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
     }
 }
 

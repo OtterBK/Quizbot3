@@ -228,14 +228,14 @@ const quiz_info_comp = new ActionRowBuilder()
   .setCustomId('start')
   .setLabel('시작')
   .setStyle(ButtonStyle.Success),
-  // new ButtonBuilder()
-  //   .setCustomId('scoreboard')
-  //   .setLabel('순위표')
-  //   .setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder()
+    .setCustomId('request_modal_quiz_setting')
+    .setLabel('문제 수 설정')
+    .setStyle(ButtonStyle.Primary),
   new ButtonBuilder()
     .setCustomId('settings')
     .setLabel('서버 설정')
-    .setStyle(ButtonStyle.Secondary),
+    .setStyle(ButtonStyle.Primary),
   new ButtonBuilder()
     .setCustomId('back')
     .setLabel('뒤로가기')
@@ -679,40 +679,20 @@ const btn_search = new ButtonBuilder()
 
 //#region OMAKASE QUIZ
 
-const omakase_quiz_info_comp = new ActionRowBuilder()
-.addComponents(
-  new ButtonBuilder()
-  .setCustomId('start')
-  .setLabel('시작')
-  .setStyle(ButtonStyle.Success),
-  new ButtonBuilder()
-    .setCustomId('request_modal_omakase_setting')
-    .setLabel('오마카세 설정')
-    .setStyle(ButtonStyle.Primary),
-  new ButtonBuilder()
-    .setCustomId('settings')
-    .setLabel('서버 설정')
-    .setStyle(ButtonStyle.Secondary),
-  new ButtonBuilder()
-    .setCustomId('back')
-    .setLabel('뒤로가기')
-    .setStyle(ButtonStyle.Secondary),
-)
-
-const modal_omakase_setting = new ModalBuilder()
-.setCustomId('modal_omakase_setting')
-.setTitle('오마카세 설정')
+const modal_quiz_setting = new ModalBuilder()
+.setCustomId('modal_quiz_setting')
+.setTitle('문제 수 설정')
 .addComponents(
   new ActionRowBuilder()
     .addComponents(
       new TextInputBuilder()
-        .setCustomId('txt_input_max_question_count')
+        .setCustomId('txt_input_selected_question_count')
         .setLabel('몇 개의 문제를 제출할까요? (최대 100)')
         .setStyle(TextInputStyle.Short)
         .setMinLength(1)
         .setMaxLength(3)
         .setRequired(true)
-        .setPlaceholder('예시) 50')
+        .setPlaceholder('예시) 30')
     ),
 )
 
@@ -814,8 +794,7 @@ module.exports = {
     question_edit_comp2,
     question_control_btn_component,
     btn_search,
-    omakase_quiz_info_comp,
-    modal_omakase_setting,
+    modal_quiz_setting,
     omakase_dev_quiz_tags_select_menu,
     omakase_custom_quiz_type_tags_select_menu,
     omakase_custom_quiz_tags_select_menu
