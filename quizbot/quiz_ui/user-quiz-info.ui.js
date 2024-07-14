@@ -207,9 +207,9 @@ class UserQuizInfoUI extends QuizInfoUI {
         }
         
         this.fillInfoAsDevQuizInfo();
-        
+
         quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
-        quiz_info.addPlayedCount(); //플레이 횟수 + 1
+        this.user_quiz_info.addPlayedCount(); //플레이 횟수 + 1
   
         return new AlertQuizStartUI(quiz_info, owner); 
       }
