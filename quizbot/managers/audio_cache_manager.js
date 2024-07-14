@@ -520,6 +520,8 @@ const convertToWebm = (video_id) =>
         })
         .on('error', function(err) 
         {
+            resolve();
+            
             logger.error(`converting error occurred!: ${converted_file_path}, ${err.message}`);
             resolve();
         });

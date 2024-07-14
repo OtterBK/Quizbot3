@@ -14,7 +14,7 @@ exports.SYSTEM_CONFIG = {
     max_question_audio_play_time: 60, //문제용 오디오 최대 허용 길이(s)
     max_answer_audio_play_time: 13, //정답용 오디오 최대 허용 길이(s)
 
-    max_check_prepared_queue: 100, //prepared queue 최대 확인 횟수
+    max_check_prepared_queue: 120, //prepared queue 최대 확인 횟수
     prepared_queue_check_interval: 250, //prepared queue 체크 간격
 
     ui_holder_aging_manager_criteria: 900, //얼마나 오래된 holder를 삭제할 지(s)

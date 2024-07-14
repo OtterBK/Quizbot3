@@ -2220,6 +2220,8 @@ class Prepare extends QuizLifecycle
             }
 
             logger.info(`No cache file of ${video_id}. downloading cache`);
+            
+            this.quiz_session.sendMessage({content: `해당 오디오에 대한 캐시가 없어 다운로드 중입니다...\n시간이 좀 걸리 수 있습니다. ㅜㅜ 😥`});
 
             const ip_info = {
                 ipv4: this.quiz_session.ipv4,    
@@ -2399,12 +2401,12 @@ class Question extends QuizLifeCycleWithUtility
                 this.quiz_session.sendMessage({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
 
                 const memoryUsage = process.memoryUsage();
-                logger.error('Memory Usage:', {
+                logger.error('Memory Usage:', JSON.stringify({
                     'Heap Used': `${memoryUsage.heapUsed / 1024 / 1024} MB`,
                     'Heap Total': `${memoryUsage.heapTotal / 1024 / 1024} MB`,
                     'RSS': `${memoryUsage.rss / 1024 / 1024} MB`,
                     'External': `${memoryUsage.external / 1024 / 1024} MB`,
-                });
+                }));
 
                 return false;
             }
