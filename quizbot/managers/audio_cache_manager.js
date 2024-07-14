@@ -164,6 +164,7 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
         format: 'bestaudio[ext=webm]/bestaudio', //정렬된 포맷 중 webm 확장자인것. 없으면 젤 작은 audio -> 즉 webm이면서 파일 크기가 가장 작은거
         maxFilesize: SYSTEM_CONFIG.custom_audio_max_file_size, //최대 파일 크기
         matchFilter: `duration <= ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`, //최대 길이
+        noPlaylist: true,
         writeInfoJson: true, //비디오 정보 json으로 저장
         noCheckCertificates: true, //ssl 체크 안함
         noWarnings: true, //경로 미출력

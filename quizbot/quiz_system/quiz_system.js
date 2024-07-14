@@ -2158,11 +2158,14 @@ class Prepare extends QuizLifecycle
          * answer_audio_end
          * answer_audio_play_time
          */
-        const answer_audio_url = target_question_data['answer_audio_url'];
+        setTimeout(async () => { //정답 오디오 준비는 비동기로 실행한다.
+            const before_question_num = this.quiz_session.game_data['question_num'];
+            
+            const answer_audio_url = target_question_data['answer_audio_url'];
 
-        const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
-    
-        const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
+            const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
+
+            const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
             await this.generateAudioResourceFromWeb(
                 answer_audio_url, 
                 answer_audio_start, 
@@ -2170,13 +2173,22 @@ class Prepare extends QuizLifecycle
                 SYSTEM_CONFIG.max_answer_audio_play_time, 
                 [ipv4, ipv6]
             );
+
+            const after_question_num = this.quiz_session.game_data['question_num'];
+
+            if(before_question_num != after_question_num)
+            {
+                return; 
+            }
     
-        target_question['answer_audio_resource'] = answer_audio_resource;
-        target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
-    
-        if (answer_error_message) {
-            target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
-        }
+            target_question['answer_audio_resource'] = answer_audio_resource;
+            target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+        
+            if (answer_error_message) 
+            {
+                target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
+            }
+          }, 0);        
         
         /**
          * answer_image_url, 정답 공개용 이미지 url
@@ -2221,7 +2233,7 @@ class Prepare extends QuizLifecycle
 
             logger.info(`No cache file of ${video_id}. downloading cache`);
             
-            this.quiz_session.sendMessage({content: `해당 오디오에 대한 캐시가 없어 다운로드 중입니다...\n시간이 좀 걸리 수 있습니다. ㅜㅜ 😥`});
+            this.quiz_session.sendMessage({content: '`현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥`'});
 
             const ip_info = {
                 ipv4: this.quiz_session.ipv4,    

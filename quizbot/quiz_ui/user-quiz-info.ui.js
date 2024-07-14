@@ -29,6 +29,7 @@ const {
 
 const { QuizInfoUI } = require("./quiz-info-ui.js");
 const { UserQuestionInfoUI } = require("./user-question-info-ui.js");
+const { AlertQuizStartUI } = require("./alert-quiz-start-ui.js");
 
 //#endregion
 
