@@ -188,9 +188,30 @@ class UserQuizInfoUI extends QuizInfoUI {
         return;
       }
 
-      if(interaction.customId == 'start') //시작하기 버튼 눌렀을 때
+      if(interaction.customId == 'start') //시작하기 버튼 눌렀을 때, 이건 어쩔 수 없이 여기서 해야함
       {
+        const quiz_info = this.quiz_info;
+  
+        const guild = interaction.guild;
+        const owner = interaction.member; //주최자
+        const channel = interaction.channel;
+  
+        const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
+        if(check_ready == undefined || check_ready.result == false)
+        {
+          const reason = check_ready.reason;
+          let reason_message = text_contents.quiz_info_ui.failed_start;
+          reason_message = reason_message.replace("${reason}", reason);
+          interaction.channel.send({content: reason_message});
+          return;
+        }
+        
         this.fillInfoAsDevQuizInfo();
+        
+        quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
+        quiz_info.addPlayedCount(); //플레이 횟수 + 1
+  
+        return new AlertQuizStartUI(quiz_info, owner); 
       }
 
       //그 외에는 알아서...

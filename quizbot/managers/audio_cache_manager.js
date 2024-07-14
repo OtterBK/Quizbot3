@@ -6,6 +6,10 @@ const fs = require('fs');
 const cloneDeep = require("lodash/cloneDeep.js");
 const { json } = require('express');
 const utility = require('../../utility/utility.js');
+const ffmpeg_path = require('ffmpeg-static');
+const ffmpeg = require('fluent-ffmpeg');
+
+ffmpeg.setFfmpegPath(ffmpeg_path);
 
 const DOWNLOAD_RESULT_TYPE = {
     SUCCESS: 0,
@@ -42,6 +46,8 @@ const getAudioCache = (video_id) =>
     {
         return cache_file_path;
     }
+
+    return undefined; //이제 webm으로 다 변환해두기 때문에 밑어 더 볼 필요는 없음
 
     //하 없으면 찾아보자
     const cache_info = getAudioCacheInfo(video_id);
@@ -216,9 +222,11 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
                 need_retry: false
             };
 
-            reWriteCacheInfo(video_id, cache_result);
-
             logger.info(`Downloaded cache file ${video_id}`);
+
+            reWriteCacheInfo(video_id, cache_result);
+            
+            await convertToWebm(video_id); 
             
             return cache_result;
         }
@@ -348,6 +356,8 @@ const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
         logger.debug(`download process error occurred! ${err.message}`);
 
         result_type = getExpectedErrorType(stderr);
+
+        logger.error(`its unknown type error: ${err}`);
     }
 
     return {
@@ -454,6 +464,65 @@ const logFailedUrl = (url_list) =>
         {
           console.error(`Log Failed Url write url_list: ${url_list}, error: ${err.message}`);
         } 
+    });
+}
+
+const convertToWebm = (video_id) => 
+{
+    if(video_id == undefined)
+    {
+        return;
+    }
+
+    const cache_info = getAudioCacheInfo(video_id);
+    if(cache_info == undefined)
+    {
+        return;
+    }
+
+    const ext = cache_info.ext;
+    if(ext == 'webm') //이미 webm이면 패스
+    {
+        return;
+    }
+
+    const cache_file_path = path.join(getHashedPath(video_id), `${video_id}.${ext}`);
+    if(fs.existsSync(cache_file_path) == false) //변환 대상 찾아보자
+    {
+        logger.error(`convert target ${cache_file_path} is not exists`);
+        return;
+    }
+
+    const converted_file_name = path.basename(cache_file_path, path.extname(cache_file_path)) + '.webm';
+    const converted_file_path = path.resolve(path.dirname(cache_file_path), converted_file_name);
+
+    logger.info(`converting file ${video_id}.${ext} to webm`);
+
+    let ffmpeg_handler = new ffmpeg(cache_file_path);
+    ffmpeg_handler.format('webm');
+
+    return new Promise((resolve, reject)=>{ 
+        
+        ffmpeg_handler.saveToFile(converted_file_path)
+        .on('end', function() 
+        {
+            resolve();
+            
+            logger.info(`converted to ${converted_file_path}`);
+
+            fs.unlink(cache_file_path, err => 
+            {
+                if(err != null && err.code == 'ENOENT') 
+                {
+                    console.log(`Failed to unlink ${cache_file_path}, err: ${err.message}`);
+                }
+            }); //기존 파일 삭제    
+        })
+        .on('error', function(err) 
+        {
+            logger.error(`converting error occurred!: ${converted_file_path}, ${err.message}`);
+            resolve();
+        });
     });
 }
 

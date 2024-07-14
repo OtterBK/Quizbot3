@@ -1945,18 +1945,22 @@ class Prepare extends QuizLifecycle
     {
         let audio_stream = undefined;
         let inputType = StreamType.WebmOpus;
+ 
+        const stats = fs.statSync(audio_path);
+        const size_in_bytes = stats.size;
+        const bitrate = Math.ceil(size_in_bytes / audio_duration * 8);
 
         if(audio_path.endsWith('.webm') == false) //webm 아니면 그냥 재생하자
         {
-            audio_stream = fs.createReadStream(audio_path, { flags: 'r' });
+            const bytes_of_start_point = Math.ceil((size_in_bytes / audio_duration) * audio_start_point);
+            audio_stream = fs.createReadStream(audio_path, { 
+                flags: 'r',
+                // start: bytes_of_start_point //이거 안 먹는다...
+            });
             inputType = StreamType.Arbitrary;
     
             return [audio_stream, inputType];
         }
-
-        const stats = fs.statSync(audio_path);
-        const size_in_bytes = stats.size;
-        const bitrate = Math.ceil(size_in_bytes / audio_duration * 8);
     
         if (audio_start_point != undefined && audio_start_point !== 0) {
 
