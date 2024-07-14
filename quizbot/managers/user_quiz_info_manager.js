@@ -262,7 +262,12 @@ const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로
     return user_quiz_list;
 }
 
-const loadQuestionListFromDBByTags = async (tag_value, limit) => { //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
+const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, limit) => { //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
+
+  if(quiz_type_tags_value == 0) //퀴즈 유형을 선택하지 않았다면
+  {
+    return [0, []];
+  }
 
   const additionalColumn = [
     'quiz_title',
@@ -273,34 +278,40 @@ const loadQuestionListFromDBByTags = async (tag_value, limit) => { //tag로 문�
   ];
   const question_list = [];
 
-  const result = await db_manager.selectRandomQuestionListByTags(tag_value, limit);
+  const result = await db_manager.selectRandomQuestionListByTags(quiz_type_tags_value, tag_value, limit);
 
   for(const result_row of result.rows)
   {
-      let user_question_info = new UserQuestionInfo();
+    let user_question_info = new UserQuestionInfo();
 
-      user_question_info.question_id = result_row.question_id;
+    user_question_info.question_id = result_row.question_id;
 
-      if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
-      {
-          logger.error(`User Question Info ID is undefined... pass this`);
-          continue;
-      }
+    if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
+    {
+        logger.error(`User Question Info ID is undefined... pass this`);
+        continue;
+    }
 
-      for(const column of QuestionInfoColumn)
-      {
-        user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
-      }
+    for(const column of QuestionInfoColumn)
+    {
+      user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+    }
 
-      for(const column of additionalColumn)
-      {
-        user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
-      }
+    for(const column of additionalColumn)
+    {
+      user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+    }
 
-      question_list.push(user_question_info);
+    question_list.push(user_question_info);
   }
 
-  return question_list;
+  let total_question_count = 0;
+  if(result.rows.length > 0)
+  {
+    total_question_count = parseInt(result.rows[0]['total_count']); //그냥 맨 윗꺼 가져오자
+  }
+
+  return [total_question_count, question_list];
 }
 
 module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags };

@@ -5,7 +5,7 @@ const { messageType } = require('discord-hybrid-sharding');
 
 //로컬 모듈
 const logger = require('../../utility/logger.js')('IPCManager');
-const quiz_system = require('../quiz_system.js');
+const quiz_system = require('../quiz_system/quiz_system.js');
 
 /** 
  * 샤딩으로인한 공유 객체 및 이벤트 관리

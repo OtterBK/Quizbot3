@@ -383,10 +383,10 @@ exports.isValidURL = (url) =>
   }
 }
 
-exports.convertTagsValueToString = (tags_value) => 
+exports.convertTagsValueToString = (tags_value, TAG_INFO = QUIZ_TAG) => 
 {
   let tag_string = '';
-  for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
+  for(const [tag_name, tag_value] of Object.entries(TAG_INFO))
   {
     if((tags_value & tag_value) != tag_value)
     {
@@ -430,4 +430,11 @@ exports.getIPv4Address = () => {
   }
 
   return ipv4Addresses;
+};
+
+exports.extractYoutubeVideoID = (url) => {
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)?([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+
+  return match ? match[1] : undefined;
 };

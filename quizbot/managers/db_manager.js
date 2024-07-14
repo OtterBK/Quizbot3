@@ -260,33 +260,35 @@ exports.updateQuizLikeCount = async (quiz_id) => {
 
 }
 
-exports.certifyQuiz = async (quiz_id) => {
+exports.certifyQuiz = async (quiz_id, played_count_criteria) => {
 
   const query_string = 
   `UPDATE tb_quiz_info set certified = true
-    where quiz_id = $1;`;
+    where quiz_id = $1 and (certified = false or certified is null) and played_count >= $2;`;
 
-  return sendQuery(query_string, [quiz_id]);
+  return sendQuery(query_string, [quiz_id, played_count_criteria]);
 
 }
 
-exports.selectRandomQuestionListByTags = async (tags_value, limit) => {
+exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit) => {
   
   const query_string =
   `
   WITH matching_quizzes AS (
     SELECT quiz_id, quiz_title, creator_name, creator_icon_url, simple_description, tags_value
     FROM tb_quiz_info
-    WHERE (tags_value & $1) = $1
+    WHERE (tags_value & $1) > 0
+    and ($2 = 0 or (tags_value & $2) > 0)
     and is_private = false
     and is_use = true
     and certified = true
   )
-  SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value
+  SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value,
+    COUNT(*) OVER() AS total_count
   FROM tb_question_info qu
   JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
   ORDER BY RANDOM()
-  LIMIT $2;`
+  LIMIT $3;`
   
-  return sendQuery(query_string, [tags_value, limit]);
+  return sendQuery(query_string, [quiz_type_tags_value, tags_value, limit]);
 }

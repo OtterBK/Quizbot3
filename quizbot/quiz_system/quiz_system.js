@@ -4,29 +4,25 @@
 
 //#region 외부 모듈 로드
 const fs = require('fs');
-const ytdl = require('discord-ytdl-core');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioResource, StreamType, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes, TeamMemberMembershipState } = require('discord.js');
 const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
-const ffmpeg = require('fluent-ffmpeg');
-const stream = require('stream');
-// const { SeekStream } = require('play-dl');
 //#endregion
 
 //#region 로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../config/system_setting.js');
-const option_system = require("./quiz_option.js");
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../../config/system_setting.js');
+const option_system = require("../quiz_option/quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
-const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language]; 
-const utility = require('../utility/utility.js');
-const logger = require('../utility/logger.js')('QuizSystem');
-const db_manager = require('./managers/db_manager.js');
-const { initial } = require('lodash');
-const { error } = require('console');
-const { SeekStream } = require('../utility/SeekStream/SeekStream.js');
-const feedback_manager = require('./managers/feedback_manager.js');
-const { loadQuestionListFromDBByTags } = require('./managers/user_quiz_info_manager.js');
+const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
+const utility = require('../../utility/utility.js');
+const logger = require('../../utility/logger.js')('QuizSystem');
+const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
+const feedback_manager = require('../managers/feedback_manager.js');
+const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
+const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
+const audio_cache_manager = require('../managers/audio_cache_manager.js');
+
 
 //#endregion
 
@@ -45,8 +41,6 @@ const CYCLE_TYPE =
     FINISH: 'FINISH', //세션 정상 종료. 삭제 대기 중
     FORCEFINISH: 'FORCEFINISH', //세션 강제 종료. 삭제 대기 중
 }
-
-const AUDIO_BUFFER_SIZE = 1024 * 1024 * 10; //10mb
 //#endregion
 
 //#region global 변수 정의
@@ -165,74 +159,6 @@ function ffmpegAgingManager() //TODO ps-node 모듈을 이용한 방식으로 �
 
   return ffmpeg_aging_manager;
 }
-
-/** @distube/ytdl-core 에만 있는 agent 기능, 다만 이 ytdl-core는 HTTP 통신 모듈로 기존 ytdl-core와는 다른걸 사용한다.(쿠키 지원을 위해서 인듯. 이름은 기억 안남) 
- * 여기까지는 괜찮다...다만 requestOptions로 ipv6 주소를 localAddress에 넣고 family 값도 6으로 넘겨야 잘 인식하는데
- * 기존 ytdl-core은 이렇게하면 잘 되는데 @distube/ytdl-core는 family 값 지정 기능이 없다...
- * 따라서 유일하게 지원하는 autoSelectFamily를 true로 넘겨야하는데, 이 기능은 nodejs 18부터 지원한다...! 흑흑
- * 우선 어거지로 16 -> 18로 업데이트했는데 큰 문제는 없이 동작한다.
- * 만약 EINVAL(errno -22)에러가 뜨면 IPv6 주소를 IPv4로 파싱하려고 하다 문제가 생긴거니, family 값을 잘 명시해줘야하며
- * 만약 -99에러가 뜨면 정말 해당 ip로 외부 통신이 불가능한것이라 발생한다.(localAddress에 IP주소 잘 넣었는지 확인필요)
- * 
- * 24.02.02 정말 @distube/ytdl-core만을 사용해야하는지 의문이 든다.
- * 유일한 문제점은 해당 모듈이 HTTP 통신 모듈로 undici를 사용하는데, 이 경우 localAddress 옵션이 잘 먹지 않고 bind -22 에러가 난다는 문제다...
- * 또한 해당 모듈로 바꾼 뒤부터 connReset 에러가 난다... -> 24.02.08 해당 모듈 문제는 아니었다...nodejs 18로 바꾼게 문제일 수 있으니 16으로 롤백해보기로한다.(ytdl-core 자체의 문제일 수 있다.)
- * 정말 필요한지 한번 다시 고려해보기로 하고 ytdl-core로 롤백하기로 결정하였다.
-*/
-
-//Deprecated
-// function createYtdlAgent(quiz_session=undefined)
-// {
-//     let cookie = undefined;
-//     let local_address = undefined;
-//     let auto_select_family = false;
-
-//     if(SYSTEM_CONFIG.ytdl_cookie_agent_use)
-//     {
-//         try
-//         {
-//             const ytdl_cookie_path = SYSTEM_CONFIG.ytdl_cookie_path;
-//             if(ytdl_cookie_path == undefined || fs.existsSync(ytdl_cookie_path) == false)
-//             {
-//                 logger.error(`Failed to create cookie ytdl agent cookie  ${'YTDL Cookie'} ${ytdl_cookie_path} is not exists`);
-//                 return false;
-//             }
-
-//             cookie = JSON.parse(fs.readFileSync(ytdl_cookie_path));
-
-//             logger.info(`This session is using cookie ytdl agent, cookie file is ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}`);
-//         }
-//         catch(err)
-//         {
-//             logger.info(`Failed to create cookie ytdl agent cookie path: ${ytdl_cookie_path}, guild_id:${quiz_session?.guild_id}, err: ${err.stack ?? err.message}`);
-//         }
-//     }
-
-//     if(SYSTEM_CONFIG.ytdl_ipv6_USE)
-//     {
-//         const ipv6 = utility.getIPv6Address()[0];
-//         if(ipv6 == undefined)
-//         {
-//             logger.info(`This session is using ipv6 for agent, but cannot find ipv6... use default ip address..., guild_id:${quiz_session?.guild_id}`);
-//         }
-//         else
-//         {
-//             logger.info(`This session is using ipv6 for agent, selected ipv6 is ${ipv6}, guild_id:${quiz_session?.guild_id}`);
-//             local_address = ipv6;
-//             auto_select_family = true;
-//         }
-//     }
-
-//     const ytdl_agent = ytdl.createAgent(
-//         cookie,
-//         {
-//             autoSelectFamily: auto_select_family,
-//             localAddress: local_address
-//         }
-//     ); //cookie 기반 ytdl agent
-
-//     return ytdl_agent;
-// }
 
 //#region 퀴즈 플레이에 사용될 UI
 class QuizPlayUI
@@ -652,6 +578,11 @@ class QuizSession
             return;
         }
         current_cycle.on(event_name, event_object);
+    }
+
+    sendMessage(message)
+    {
+        this.channel.send(message);
     }
 }
 //#endregion
@@ -1112,7 +1043,7 @@ class Initialize extends QuizLifecycle
     }
 
     //정답 인정 목록 뽑아내기
-    makeAnswers(answers_row)
+    generateAnswers(answers_row)
     {
         if(answers_row == undefined)
         {
@@ -1168,7 +1099,7 @@ class Initialize extends QuizLifecycle
     }
 
     //힌트 뽑아내기
-    makeHint(base_answer)
+    generateHint(base_answer)
     {
         base_answer = base_answer.trim();
 
@@ -1264,7 +1195,7 @@ class Initialize extends QuizLifecycle
             //정답 키워드 파싱
             let answer_string = question['answer_string'] ?? '';
             let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
-            const answers = this.makeAnswers(answers_row);
+            const answers = this.generateAnswers(answers_row);
             question['answers'] = answers;
 
             if(quiz_type != QUIZ_TYPE.OX) //ox 퀴즈는 힌트가 없다
@@ -1273,7 +1204,7 @@ class Initialize extends QuizLifecycle
                 let hint = undefined;
                 if(answers_row.length > 0)
                 {
-                    hint = this.makeHint(answers_row[0]) ?? undefined;
+                    hint = this.generateHint(answers_row[0]) ?? undefined;
                 }
                 question['hint'] = hint;
             }
@@ -1283,7 +1214,7 @@ class Initialize extends QuizLifecycle
         return question_list;
     }
 
-    buildQuestion(question_row)
+    buildCustomQuestion(question_row)
     {
         let question = {};
         question['type']  = QUIZ_TYPE.CUSTOM;
@@ -1302,7 +1233,7 @@ class Initialize extends QuizLifecycle
         //정답 값 처리
         const answer_string = question_data['answers'];
         const answers_row = answer_string.split(","); //custom quiz는 ,로 끊는다
-        const answers = this.makeAnswers(answers_row);
+        const answers = this.generateAnswers(answers_row);
         question['answers'] = answers;
 
         //퀴즈용 오디오 url 처리
@@ -1323,7 +1254,7 @@ class Initialize extends QuizLifecycle
         const hint = question_data['hint'];
         if((hint == undefined || hint === '') && answers.length > 0)
         {
-            question['hint'] = this.makeHint(answers[0]) //힌트 없으면 알아서 만들기
+            question['hint'] = this.generateHint(answers[0]) //힌트 없으면 알아서 만들기
         }
         else
         {
@@ -1349,6 +1280,91 @@ class Initialize extends QuizLifecycle
 
         //정답 공개용 텍스트
         question['author'] = [ question_data['answer_text'] ];
+
+        return question;
+    }
+
+    buildDevQuestion(quiz_path, question_folder_name)
+    {
+        const quiz_data = this.quiz_session.quiz_data;
+
+        const question_folder_path = quiz_path + "/" + question_folder_name;
+        const question_type = quiz_data['quiz_type'];
+        
+        //우선 퀴즈 1개 생성
+        let question = {};
+        question['type'] = question_type;
+        question['hint_used'] = false;
+        question['skip_used'] = false;
+        question['play_bgm_on_question_finish'] = false; //Question cycle 종료 후 bgm 플레이 여부
+
+        //작곡가 파싱
+        let author_string = undefined;
+        let try_parse_author =  question_folder_name.split("&^"); //가수는 &^로 끊었다.
+
+        if(try_parse_author.length > 1) //가수 데이터가 있다면 넣어주기
+        {
+            author_string = try_parse_author[1];
+
+            let authors = [];
+            author_string.split("&^").forEach((author_row) => {
+                const author = author_row.trim();
+                authors.push(author);
+            })
+
+            question['author'] = authors;
+        }
+
+        //정답 키워드 파싱
+        let answer_string = try_parse_author[0];
+        answer_string = question_folder_name.split("&^")[0];
+        let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
+        const answers = this.generateAnswers(answers_row);
+        question['answers'] = answers;
+
+
+        //힌트 만들기
+        let hint = undefined;
+        if(answers_row.length > 0)
+        {
+            hint = this.generateHint(answers_row[0]) ?? undefined;
+        }
+        question['hint'] = hint;
+
+        //실제 문제로 낼 퀴즈 파일
+    
+        const question_file_list = fs.readdirSync(question_folder_path);
+        question_file_list.forEach(question_folder_filename => { 
+            const file_path = question_folder_path + "/" + question_folder_filename;
+            
+            // const stat = fs.lstatSync(file_path); //이것도 성능 잡아먹는다. 어차피 개발자 퀴즈니깐 할 필요 없음
+            // if(stat.isDirectory()) return; //폴더는 건너뛰고
+
+            if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.SCRIPT || question_type == QUIZ_TYPE.IMAGE_LONG || question_type == QUIZ_TYPE.OMAKASE)
+            {
+                question['question'] = file_path; //SONG, IMAGE 타입은 그냥 손에 잡히는게 question 이다.
+            } 
+            else if(question_type == QUIZ_TYPE.INTRO) //인트로 타입의 경우
+            {
+                if(utility.isImageFile(question_folder_filename)) //이미지 파일이면
+                {
+                    question['answer_image'] = file_path; //answer 썸네일이다.
+                }
+                else if(question_folder_filename.startsWith('q')) //이게 question이다.
+                {
+                    question['question'] = file_path;
+                    question['ignore_option_audio_play_time'] = true; //인트로의 노래 재생시간은 서버 영향을 받지 않음
+                    question['use_random_start'] = false; //인트로는 랜덤 스타트 안씀
+                    return;
+                }
+                else if(question_folder_filename.startsWith('a')) //이게 answer_audio이다.
+                {
+                    question['answer_audio'] = file_path; 
+                    question['answer_audio_play_time'] = undefined;  //TODO 이거 지정 가능
+                }
+            } 
+            
+        });
 
         return question;
     }
@@ -1416,11 +1432,9 @@ class InitializeDevQuiz extends Initialize
         
         const quiz_folder_list = fs.readdirSync(quiz_path); 
                     
+        const question_type = quiz_data['quiz_type'];
         quiz_folder_list.forEach(question_folder_name => {
 
-            const question_folder_path = quiz_path + "/" + question_folder_name;
-            const question_type = quiz_data['quiz_type'];
-            
             if(question_folder_name.includes("info.txt")) return;
 
             if(question_folder_name.includes("quiz.txt")) //엇 quiz.txt 파일이다.
@@ -1429,85 +1443,13 @@ class InitializeDevQuiz extends Initialize
                 {
                     return; //그럼 그냥 return
                 }
-
+    
+                const question_folder_path = quiz_path + "/" + question_folder_name;
                 question_list = this.parseFromQuizTXT(question_folder_path); //quiz.txt 에서 파싱하는 걸로...
                 return;
             }
 
-            //우선 퀴즈 1개 생성
-            let question = {};
-            question['type'] = question_type;
-            question['hint_used'] = false;
-            question['skip_used'] = false;
-            question['play_bgm_on_question_finish'] = false; //Question cycle 종료 후 bgm 플레이 여부
-
-            //작곡가 파싱
-            let author_string = undefined;
-            let try_parse_author =  question_folder_name.split("&^"); //가수는 &^로 끊었다.
-
-            if(try_parse_author.length > 1) //가수 데이터가 있다면 넣어주기
-            {
-                author_string = try_parse_author[1];
-
-                let authors = [];
-                author_string.split("&^").forEach((author_row) => {
-                    const author = author_row.trim();
-                    authors.push(author);
-                })
-
-                question['author'] = authors;
-            }
-
-            //정답 키워드 파싱
-            let answer_string = try_parse_author[0];
-            answer_string = question_folder_name.split("&^")[0];
-            let answers_row = answer_string.split("&#"); //정답은 &#으로 끊었다.
-            const answers = this.makeAnswers(answers_row);
-            question['answers'] = answers;
-
-
-            //힌트 만들기
-            let hint = undefined;
-            if(answers_row.length > 0)
-            {
-                hint = this.makeHint(answers_row[0]) ?? undefined;
-            }
-            question['hint'] = hint;
-
-            //실제 문제로 낼 퀴즈 파일
-        
-            const question_file_list = fs.readdirSync(question_folder_path);
-            question_file_list.forEach(question_folder_filename => { 
-                const file_path = question_folder_path + "/" + question_folder_filename;
-                
-                // const stat = fs.lstatSync(file_path); //이것도 성능 잡아먹는다. 어차피 개발자 퀴즈니깐 할 필요 없음
-                // if(stat.isDirectory()) return; //폴더는 건너뛰고
-
-                if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.SCRIPT || question_type == QUIZ_TYPE.IMAGE_LONG)
-                {
-                    question['question'] = file_path; //SONG, IMAGE 타입은 그냥 손에 잡히는게 question 이다.
-                } 
-                else if(question_type == QUIZ_TYPE.INTRO) //인트로 타입의 경우
-                {
-                    if(utility.isImageFile(question_folder_filename)) //이미지 파일이면
-                    {
-                        question['answer_image'] = file_path; //answer 썸네일이다.
-                    }
-                    else if(question_folder_filename.startsWith('q')) //이게 question이다.
-                    {
-                        question['question'] = file_path;
-                        question['ignore_option_audio_play_time'] = true; //인트로의 노래 재생시간은 서버 영향을 받지 않음
-                        question['use_random_start'] = false; //인트로는 랜덤 스타트 안씀
-                        return;
-                    }
-                    else if(question_folder_filename.startsWith('a')) //이게 answer_audio이다.
-                    {
-                        question['answer_audio'] = file_path; 
-                        question['answer_audio_play_time'] = undefined;  //TODO 이거 지정 가능
-                    }
-                } 
-                
-            });
+            const question = this.buildDevQuestion(quiz_path, question_folder_name);
 
             //question_list에 넣어주기
             if(question != undefined) 
@@ -1518,7 +1460,14 @@ class InitializeDevQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        let selected_question_count = quiz_info['selected_question_count'] ?? quiz_info['quiz_size'];
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
     }
 }
 
@@ -1538,7 +1487,7 @@ class InitializeCustomQuiz extends Initialize
         catch(err)
         {
             this.initialize_success = false;
-            logger.error(`Failed to custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack}`);
+            logger.error(`Failed to custom quiz initialize of quiz session, guild_id:${this.quiz_session.guild_id}, cycle_info:${this.cycle_info}, quiz_data: ${JSON.stringify(this.quiz_session.quiz_data)}, err: ${err.stack ?? err}`);
         }
     }
 
@@ -1563,7 +1512,7 @@ class InitializeCustomQuiz extends Initialize
         
         question_row_list.forEach((question_row) => {
 
-            let question = this.buildQuestion(question_row);
+            let question = this.buildCustomQuestion(question_row);
 
             /**완성했으면 넣자 */
             question_list.push(question);
@@ -1574,7 +1523,14 @@ class InitializeCustomQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        let selected_question_count = quiz_info['selected_question_count'] ?? quiz_info['quiz_size'];
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
 
         // 서버별이 아닌 유저별로 변경되면서 필요 없어짐. 무조건 추천하기 띄움
         // feedback_manager.checkAlreadyLike(quiz_id, guild_id)
@@ -1625,38 +1581,84 @@ class InitializeOmakaseQuiz extends Initialize
         //실제 퀴즈들 로드
         let question_list = [];
 
-        const quiz_tag_of_dev = quiz_info['quiz_tag_of_dev']; //오마카세 퀴즈는 quiz_tag 가 있다.
-        const quiz_tag_of_custom = quiz_info['quiz_tag_of_custom'];
-
-        const max_amount = quiz_info['max_amount'];
+        //오마카세 퀴즈 설정 값
+        const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
+        const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
+        const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
+        const selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
         
+        const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
+
+        //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
+        const [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
+        const [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit);
+
+        //각각 문제 수 비율로 limit을 나눠 가진다.
+        const total_all_question_count = total_dev_question_count + total_custom_question_count; //둘 합치고
+        const dev_quiz_count = Math.round(total_dev_question_count / total_all_question_count * limit);
+        const custom_quiz_count = Math.round(total_custom_question_count / total_all_question_count * limit);
+
+        logger.info(`Omakase Question count of this session. dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
+        
+        //좀 더 세부적으로 섞어야할 것 같은데...너무 귀찮다 우선 걍 이렇게 ㄱㄱ하자
+
         //build dev questions 
+        dev_question_list.slice(0, dev_quiz_count).forEach(question_row => {
+            const quiz_path = question_row['quiz_path'];
+            const question_path = question_row['path'];
+            const question = this.buildDevQuestion(quiz_path, question_path);
+
+            //question_list에 넣어주기
+            if(question != undefined) 
+            {
+                question['question_title'] = question_row['title'];
+
+                let additional_text = '```';
+            
+                const tags_string = "🔹 퀴즈 태그: " + question_row['tag'] + '\n';
+                additional_text += tags_string;
+
+                additional_text += "🔹 퀴즈 제작: 공식 퀴즈\n";
+
+                additional_text += '```';
+
+                question['question_text'] = additional_text + "\n\n" + (question['question_text'] ?? '');
+
+                question['prepare_type'] = "DEV";
+                question_list.push(question);
+            }
+        });
 
         //build custom questions
-        const question_row_list = await loadQuestionListFromDBByTags(quiz_tag_of_custom, max_amount);
-        
-        question_row_list.forEach((question_row) => {
+        custom_question_list.slice(0, custom_quiz_count).forEach((question_row) => {
 
-            let question = this.buildQuestion(question_row);
+            let question = this.buildCustomQuestion(question_row);
 
             question['question_title'] = question.data['quiz_title'];
 
             let additional_text = '```';
             
             const tags_value = question.data['tags_value'];
-            const tags_string = "📌 퀴즈 태그: " + utility.convertTagsValueToString(tags_value) + '\n';
+            const tags_string = "🔹 퀴즈 태그: " + utility.convertTagsValueToString(tags_value) + '\n';
             additional_text += tags_string;
             
+            const creator_name = question.data['creator_name'] ?? '';
+            if(creator_name != undefined)
+            {
+                additional_text += "🔹 퀴즈 제작: " + creator_name + '\n';
+            }
+
             const simple_description = question.data['simple_description'] ?? '';
             if(simple_description != undefined)
             {
-                additional_text += "📄 한줄 설명: " + simple_description + '\n';
+                additional_text += "🔹 한줄 설명: " + simple_description + '\n';
             }
 
             additional_text += '```';
 
-            question['question_text'] = additional_text + "\n\n" + question['question_text'] ?? '';
+            question['question_text'] = additional_text + "\n\n" + (question['question_text'] ?? '');
 
+            question['prepare_type'] = "CUSTOM";
             question_list.push(question);
 
         });
@@ -1665,7 +1667,13 @@ class InitializeOmakaseQuiz extends Initialize
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
-        quiz_data['quiz_size'] = question_list.length; //퀴즈 수 재정의 하자
+
+        if(selected_question_count > question_list.length)
+        {
+            selected_question_count = question_list.length;
+        }
+
+        quiz_data['quiz_size'] = selected_question_count; //퀴즈 수 재정의 하자
     }
 }
 
@@ -1758,7 +1766,6 @@ class Prepare extends QuizLifecycle
         this.skip_prepare = false;
         this.prepared_question = undefined;
         this.target_question = undefined;
-        this.current_audio_streams = [];
     }
 
     async enter()
@@ -1776,7 +1783,8 @@ class Prepare extends QuizLifecycle
         let question_num = game_data['question_num'] + 1;
         game_data['question_num'] = question_num;
 
-        if(question_num >= quiz_size) //모든 퀴즈 제출됐음
+        if(question_num >= quiz_size 
+			|| quiz_data['question_list'].length == 0) //모든 퀴즈 제출됐음
         {
             this.skip_prepare = true;
             return; //더 이상 준비할 게 없으니 return
@@ -1809,13 +1817,26 @@ class Prepare extends QuizLifecycle
             }
             else if(question_type == QUIZ_TYPE.OMAKASE)
             {
-                await this.prepareCustom(target_question);
+                const prepare_type = target_question['prepare_type'];
+
+                if(prepare_type === 'DEV')
+                {
+                    await this.prepareLocalAudio(target_question);
+                }
+                else if(prepare_type === 'CUSTOM')
+                {
+                    await this.prepareCustom(target_question);   
+                }
+                else
+                {
+                    logger.error(`Unknown Prepare Type for OMAKASE Quiz! target_question: ${JSON.stringify(target_question)}`);
+                }
             }
             else
             {
                 if(question_type == QUIZ_TYPE.SONG || question_type == QUIZ_TYPE.INTRO || question_type == QUIZ_TYPE.SCRIPT)
                 {
-                    await this.prepareAudio(target_question);
+                    await this.prepareLocalAudio(target_question);
                 }
                 else if(question_type == QUIZ_TYPE.IMAGE || question_type == QUIZ_TYPE.IMAGE_LONG)
                 {
@@ -1863,13 +1884,6 @@ class Prepare extends QuizLifecycle
 
         let game_data = this.quiz_session.game_data;
 
-        let audio_stream_for_close = game_data['audio_stream_for_close'];
-        if(SYSTEM_CONFIG.explicit_close_audio_stream) //오디오 Stream 명시적으로 닫아줄거임
-        {
-            audio_stream_for_close.push(this.current_audio_streams);
-        }
-        this.current_audio_streams = [];
-
         if(this.prepared_question == undefined) //prepare 시도했는데 실패했다면
         {
             logger.error(`No Prepared quiz, ignore exit step, guild_id:${this.quiz_session?.guild_id}, target_question: ${JSON.stringify(this.target_question?.question)}`);
@@ -1891,7 +1905,6 @@ class Prepare extends QuizLifecycle
             const question = target_question['answer_audio'];
 
             const audio_stream = fs.createReadStream(question, {flags:'r'});
-            this.current_audio_streams.push(audio_stream);
     
             let audio_resource = undefined;
             audio_resource = createAudioResource(audio_stream, {
@@ -1927,154 +1940,138 @@ class Prepare extends QuizLifecycle
         }
     }
 
-    async prepareAudio(target_question)
+    /** 오디오 파일 경로와, 오디오 파일의 전체 재싱길이, 시작 지점을 기준으로 스트림 반환 */
+    generateAudioFileStream(audio_path, audio_duration, audio_start_point, audio_length)
     {
-        const option_data = this.quiz_session.option_data;
-        const game_data = this.quiz_session.game_data;
-
-        const question = target_question['question'];
-        let use_random_start = target_question['use_random_start'] ?? true; //노래 어디서부터 시작할 지 랜덤으로 설정 여부
-        const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; //노래 전체 재생 여부
-
-        //오디오 정보 가져오기
-        const audio_info = await utility.getAudioInfoFromPath(question); //TODO 상당한 리소스를 먹는 것 같은데 확인필요
-        const audio_duration_sec = audio_info.format.duration ?? SYSTEM_CONFIG.max_question_audio_play_time; //duration 없으면 무조건 서버 설정 값 따르게 할거임
-        const stats = fs.statSync(question);
-        const size_in_bytes = stats.size;
-        const bitrate = size_in_bytes / audio_duration_sec * 8;
-
-        //오디오 길이 먼저 넣어주고~
-        const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
-        let audio_length_sec = audio_play_time_sec; 
-        if(audio_duration_sec < audio_length_sec) //오디오 길이가 재생할 시간보다 작으면
-        {
-            audio_length_sec = audio_duration_sec; //그냥 오디오 길이 사용
-            use_random_start = false; //랜덤 시작 지점도 사용 불가능
-        }
-        target_question['audio_length'] = audio_length_sec * 1000;
-
-        let audio_start_point = undefined;
-        let audio_end_point = undefined;
-        if(ignore_option_audio_play_time == false && use_random_start == true)
-        {
-            //오디오 자르기 기능
-            /**
-            오디오 유형을 전부 webm으로 바꿔서 ffmpeg 띄우고 해야함
-            **/
-            let audio_max_start_point = audio_duration_sec - (audio_length_sec + 2.5);  //우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
-            let audio_min_start_point = 2.5;  //앞에도 2.5초 정도 자르고 싶음
-
-            if(audio_max_start_point > audio_min_start_point) //충분히 재생할 수 있는 start point가 있다면
-            {
-                if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //최대한 중간 범위로 좁힌다.
-                {
-                    const audio_length_sec_sec_half = (audio_length_sec / 2);
-                    const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
-                    const refined_audio_min_start_point = audio_mid_point - audio_length_sec_sec_half;
-                    const refined_audio_max_start_point = audio_mid_point + audio_length_sec_sec_half;
-    
-                    if(audio_min_start_point < refined_audio_min_start_point && refined_audio_max_start_point < audio_max_start_point) //좁히기 성공이면
-                    {
-                        logger.debug(`Refined audio point, question: ${question} min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
-                        audio_min_start_point = refined_audio_min_start_point;
-                        audio_max_start_point = refined_audio_max_start_point;
-                    }
-                }
-
-                audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point)); 
-                audio_end_point = parseInt(audio_start_point + audio_length_sec);
-            }
-        }
-        
-        //오디오 스트림 미리 생성
-        let audio_stream_for_close = game_data['audio_stream_for_close'];
         let audio_stream = undefined;
         let inputType = StreamType.WebmOpus;
+ 
+        const stats = fs.statSync(audio_path);
+        const size_in_bytes = stats.size;
+        const bitrate = Math.ceil(size_in_bytes / audio_duration * 8);
 
-        let cut_audio = true;
-        if(audio_start_point == undefined) 
+        if(audio_path.endsWith('.webm') == false) //webm 아니면 그냥 재생하자
         {
-            cut_audio = false;
-            audio_start_point = 0;
-        }
-        if(audio_end_point == undefined) audio_end_point = ignore_option_audio_play_time == true ? Infinity : parseInt(audio_start_point + audio_length_sec); //엄격하게 잘라야함
-
-        logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_end_point == Infinity ? 'Infinity' : audio_end_point)}`);
-
-        // const file_audio_stream = fs.createReadStream(question, {flags:'r'});
-        // this.current_audio_streams.push(file_audio_stream);
-        
-        // TODO 우선 성능 상 discordjs/voice 방식 보다 느린 것 같으니 잠시 빼둠
-        // if(cut_audio == true) //오디오가 cut 됐을 때만
-        // {
-        //     let ffmpeg_handler = new ffmpeg(file_audio_stream, {timeout: 10000, })
-        //     ffmpeg_handler.format('webm').
-        //     setStartTime(audio_start_point).
-        //     setDuration(audio_length_sec)
-        //     .once('error', function(err, stdout, stderr) { //에러나면 ffmpeg 프로세스 안꺼지는 버그 있음, //TODO 이걸로도 안꺼지면 timeout kill 방식 고려
-        //         if(err.message.includes("kill")) return;
-        //         logger.error(`Ffmpeg error:  ${err.message}`);
-        //     })
-        //     .on('end', function() {
-        //         ffmpeg_aging_map.delete(ffmpeg_handler);
-        //     });     
+            const bytes_of_start_point = Math.ceil((size_in_bytes / audio_duration) * audio_start_point);
+            audio_stream = fs.createReadStream(audio_path, { 
+                flags: 'r',
+                // start: bytes_of_start_point //이거 안 먹는다...
+            });
+            inputType = StreamType.Arbitrary;
     
-        //     // ffmpeg는 일정 시간 지나도 안꺼지면 강종
-        //     ffmpeg_aging_map.set(ffmpeg_handler, Date.now());
+            return [audio_stream, inputType];
+        }
+    
+        if (audio_start_point != undefined && audio_start_point !== 0) {
 
-        //     audio_stream = ffmpeg_handler.stream();
-        // }
-        // else
-        // {
-        //     audio_stream = file_audio_stream;
-        // }
-        
-        // this.current_audio_streams.push(audio_stream); //어차피 ffmpeg handler를 죽일거라 필요없음
-
-        //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
-        //23.11.08 대충 예상컨데 아마 파일은 ReadStream으로만 읽어올 수 있는데 유튜브용 SeekStream을 파일로도 쓸 수 있게 바꿨던 것 같다
-        if(cut_audio == true)
-        {
+            //SeekStream 가져다 쓰는 방식, 열심히 커스텀했다
+            //23.11.08 대충 예상컨데 아마 파일은 ReadStream으로만 읽어올 수 있는데 유튜브용 SeekStream을 파일로도 쓸 수 있게 바꿨던 것 같다
             const seek_stream = new SeekStream(
-                question,
-                (audio_length_sec + 10), //duration, 10는 패딩
+                audio_path,
+                (audio_length + 10), //duration, 10는 패딩
                 0, //header length 안넘겨도됨
                 size_in_bytes,
-                bitrate, //TODO BITRATE 정확한 값으로 넘기기
-                question,
+                bitrate, //TODO BITRATE 값인데, undefined로 넘기면 알아서 계산함
+                undefined,
                 {
                     file: true,
-                    seek: audio_start_point,
+                    seek: parseInt(audio_start_point),
                 }
-            )
+            );
+
             audio_stream = seek_stream.stream;
             inputType = seek_stream.type;
-        }
-        else
+        } 
+        else 
         {
-            audio_stream = fs.createReadStream(question, {flags:'r'});
+            audio_stream = fs.createReadStream(audio_path, { flags: 'r' });
         }
-
-        this.current_audio_streams.push(audio_stream);
-
-        let resource = undefined;
-        // let inputType = StreamType.Arbitrary; //Arbitrary로 해야지 ffmpeg를 edge로 resource를 만든다.
-
-
-        //미리 Opus로 변환할 수 있게 inputTye 정의해주면 성능면에서 좋다고 함
-        //(Discord에서 스트리밍 가능하게 변환해주기 위해 FFMPEG 프로세스가 계속 올라와있는데 Opus 로 변환하면 이 과정이 필요없음)
-        resource = createAudioResource(audio_stream, {
+    
+        return [audio_stream, inputType];
+    }
+    
+    generateAudioResource(audio_stream, inputType) {
+        let resource = createAudioResource(audio_stream, 
+        {
             inputType: inputType,
             inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-            // seek: parseInt(audio_start_point),
-            // to: parseInt(audio_start_point) + parseInt(audio_length_sec), //seekstream 을 사용하니깐 이제 이 옵션 필요없다
-        }); //seek하고 to 옵션은 직접 모듈 수정한거다
-
-        if(SYSTEM_CONFIG.use_inline_volume)
+        });
+    
+        if (SYSTEM_CONFIG.use_inline_volume) 
         {
             resource.volume.setVolume(0);
         }
+    
+        return resource;
+    }
 
+    getRandomAudioStartPoint(audio_min_start_point, audio_max_start_point, audio_length_sec, use_improved_audio_cut) 
+    {
+        if (audio_max_start_point <= audio_min_start_point)  // 충분히 재생할 수 있는 start point가 없다면
+        {
+            return parseInt(audio_min_start_point);
+        }
+
+        if (use_improved_audio_cut) // 최대한 중간 범위로 좁힌다.
+        { 
+            const refinedPoints = this.refineAudioPoints(audio_min_start_point, audio_max_start_point, audio_length_sec);
+            audio_min_start_point = refinedPoints.audio_min_start_point;
+            audio_max_start_point = refinedPoints.audio_max_start_point;
+        }
+
+        const audio_start_point = parseInt(utility.getRandom(audio_min_start_point, audio_max_start_point));
+        return audio_start_point;
+    }
+    
+    refineAudioPoints(audio_min_start_point, audio_max_start_point, audio_length_sec) 
+    {
+        const audio_length_sec_half = audio_length_sec / 2;
+        const audio_mid_point = (audio_min_start_point + audio_max_start_point) / 2;
+        const refined_audio_min_start_point = audio_mid_point - audio_length_sec_half;
+        const refined_audio_max_start_point = audio_mid_point + audio_length_sec_half;
+    
+        if (audio_min_start_point < refined_audio_min_start_point 
+            && refined_audio_max_start_point < audio_max_start_point) // 좁히기 성공이면
+        { 
+            logger.debug(`Refined audio point, min: ${audio_min_start_point} -> ${refined_audio_min_start_point}, max: ${audio_max_start_point} -> ${refined_audio_max_start_point}`);
+            return { audio_min_start_point: refined_audio_min_start_point, audio_max_start_point: refined_audio_max_start_point };
+        }
+    
+        return { audio_min_start_point, audio_max_start_point };
+    }
+
+    async prepareLocalAudio(target_question)
+    {
+        const { option_data, game_data } = this.quiz_session;
+        const question = target_question['question'];
+        const ignore_option_audio_play_time = target_question['ignore_option_audio_play_time'] ?? false; // 노래 전체 재생 여부
+        let use_random_start = target_question['use_random_start'] ?? true; // 노래 어디서부터 시작할 지 랜덤으로 설정 여부
+        
+        // 오디오 정보 가져오기
+        const audio_info = await utility.getAudioInfoFromPath(question); // TODO: 상당한 리소스를 먹는 것 같은데 확인필요
+        const audio_duration_sec = parseInt(audio_info.format.duration) ?? SYSTEM_CONFIG.max_question_audio_play_time; // duration 없으면 무조건 서버 설정 값 따르게 할거임
+        
+        // 오디오 길이 먼저 넣어주고
+        const audio_play_time_sec = option_data.quiz.audio_play_time / 1000; 
+        let audio_length_sec = Math.min(audio_play_time_sec, audio_duration_sec); // 오디오 길이와 재생할 시간 중 작은 값을 사용
+        use_random_start = audio_duration_sec >= audio_length_sec && use_random_start;
+        target_question['audio_length'] = audio_length_sec * 1000;
+        
+        let audio_start_point;
+        
+        if (ignore_option_audio_play_time == false && use_random_start) 
+        {
+            const audio_max_start_point = audio_duration_sec - (audio_length_sec + 2.5);  // 우선 이 지점 이후로는 시작 지점이 될 수 없음, +2.5 하는 이유는 padding임
+            const audio_min_start_point = 2.5;  // 앞에도 2.5초 정도 자르고 싶음
+            const use_improved_audio_cut = (option_data.quiz.improved_audio_cut === OPTION_TYPE.ENABLED);
+            
+            audio_start_point = this.getRandomAudioStartPoint(audio_min_start_point, audio_max_start_point, audio_length_sec, use_improved_audio_cut);
+            logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
+        }
+        
+        const [audio_stream, inputType] = this.generateAudioFileStream(question, audio_duration_sec, audio_start_point, audio_length_sec);
+        const resource = this.generateAudioResource(audio_stream, inputType);
+        
         target_question['audio_resource'] = resource;
     }
 
@@ -2096,13 +2093,9 @@ class Prepare extends QuizLifecycle
 
     async prepareCustom(target_question) //TODO 나중에 Dev quiz랑 중복 코드 처리하자...어우 귀찮아
     {
-        const option_data = this.quiz_session.option_data;
-        const game_data = this.quiz_session.game_data;
-        const ipv4 = this.quiz_session.ipv4;
-        const ipv6 = this.quiz_session.ipv6;
-
+        const { option_data, game_data, ipv4, ipv6 } = this.quiz_session;
         const target_question_data = target_question.data;
-
+        
         /**
          * question_audio_url, 문제용 오디오 url
          * audio_start, 최소 시작 구간
@@ -2110,54 +2103,55 @@ class Prepare extends QuizLifecycle
          * audio_play_time. 재생 시간
          */
         const question_audio_url = target_question_data['question_audio_url'];
-        if(question_audio_url != undefined && question_audio_url !== '' && utility.isValidURL(question_audio_url))
-        {
-            const question_audio_play_time = target_question_data['audio_play_time'];
-            const question_audio_start = target_question_data['audio_start'];
-            const question_audio_end = target_question_data['audio_end'];
-
-            const [question_audio_resource, question_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(question_audio_url, question_audio_play_time, question_audio_start, question_audio_end, 'question', [ipv4, ipv6]);
-
-            target_question['audio_resource'] = question_audio_resource;
-            target_question['audio_length'] = question_audio_play_time_ms;
-
-            if(error_message != undefined)
-            {
-                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
-            }
+        
+        const { audio_play_time, audio_start, audio_end } = target_question_data;
+    
+        const [question_audio_resource, question_audio_play_time_ms, question_error_message] = 
+            await this.generateAudioResourceFromWeb(
+                question_audio_url, 
+                audio_start, 
+                audio_end, 
+                SYSTEM_CONFIG.max_question_audio_play_time, 
+                [ipv4, ipv6]
+            );
+    
+        target_question['audio_resource'] = question_audio_resource;
+        target_question['audio_length'] = question_audio_play_time_ms;
+    
+        if (question_error_message) {
+            target_question['question_text'] += `\n\nAUDIO_ERROR: ${question_error_message}`;
         }
-
+        
         /**
          * question_image_url, 문제용 이미지 url
          */
         //Initial 할 때 이미 처리됨 target_question_data['question_image_url'];
-
+        
         /**
          * question_answers. 문제 정답
          */
         //Initial 할 때 이미 처리됨 target_question_data['answers'];
-
+        
         /**
          * question_text, 문제용 텍스트
          */
         //Initial 할 때 이미 처리됨 target_question_data['question_text'];
-
+        
         /**
          * hint, 문제 힌트
          */
         //Initial 할 때 이미 처리됨 target_question_data['hint'];
-
+        
         /**
          * hint_image_url, 문제 힌트용 이미지
          */
         //Initial 할 때 이미 처리됨 target_question_data['hint_image_url'];
-
+        
         /**
          * use_answer_timer, 타임 오버 됐을 때 10초의 여유 시간 줄지 여부
          */
         //Initial 할 때 이미 처리됨 target_question_data['use_answer_timer'];
-
+        
         /**
          * answer_audio_url, 정답 공개용 오디오 url
          * answer_audio_start, 
@@ -2165,299 +2159,145 @@ class Prepare extends QuizLifecycle
          * answer_audio_play_time
          */
         const answer_audio_url = target_question_data['answer_audio_url'];
-        if(answer_audio_url != undefined && answer_audio_url !== '' && utility.isValidURL(answer_audio_url))
-        {
-            const answer_audio_play_time = target_question_data['answer_audio_play_time'];
-            const answer_audio_start = target_question_data['answer_audio_start'];
-            const answer_audio_end = target_question_data['answer_audio_end'];
 
-            //정답용 오디오가 있다면 3초 간격 둔다, 아마도 문제용 오디오 파싱을 위해 유튜브 접속 직후, 정답용 오디오 파싱을 진행하려하면 403 뜨는 것 같다...아마도(문제랑 정답이 같은 url이면 그런가?)
-            //우선 같은 url일 때만 한번 3초 대기 적용해보자
-            if(answer_audio_url == question_audio_url)
-            {
-                await utility.sleep(3000);
-            }
+        const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
     
-            const [answer_audio_resource, answer_audio_play_time_ms, error_message] = 
-                await this.getAudioResourceFromWeb(answer_audio_url, answer_audio_play_time, answer_audio_start, answer_audio_end, 'answer', [ipv4, ipv6]);
+        const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
+            await this.generateAudioResourceFromWeb(
+                answer_audio_url, 
+                answer_audio_start, 
+                answer_audio_end, 
+                SYSTEM_CONFIG.max_answer_audio_play_time, 
+                [ipv4, ipv6]
+            );
     
-            target_question['answer_audio_resource'] = answer_audio_resource;
-            target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
-
-            if(error_message != undefined)
-            {
-                target_question['question_text'] += "\n\nAUDIO_ERROR: "+ error_message;
-            }
+        target_question['answer_audio_resource'] = answer_audio_resource;
+        target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+    
+        if (answer_error_message) {
+            target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
         }
         
         /**
          * answer_image_url, 정답 공개용 이미지 url
          */
-        //Initial 할 때 이미 처리됨 target_question_data[''answer_image_url'];
-
+        //Initial 할 때 이미 처리됨 target_question_data['answer_image_url'];
+        
         /**
          * answer_text, 정답 공개용 텍스트
          */
         //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
     }
 
-    async prepareOmakase(target_question)
+     /** audio_url_row: 오디오 url, audio_start_point: 오디오 시작 지점(sec), audio_end_point: 오디오 끝 지점(sec), audio_play_time_point: 재생 시간(sec)*/
+    async generateAudioResourceFromWeb(audio_url, audio_start_point=undefined, audio_end_point=undefined,  max_play_time=undefined) 
     {
-        this.prepareCustom(target_question);
-    }
+        if(audio_url == undefined)
+        {
+            return [undefined, undefined, undefined];
+        }
 
-
-    /** audio_url_row: 오디오 url, audio_start_row: 오디오 시작 지점(sec), audio_end_row: 오디오 끝 지점(sec), audio_play_time_row: 재생 시간(sec)*/
-    async getAudioResourceFromWeb(audio_url_row, audio_play_time_row=undefined, audio_start_row=undefined, audio_end_row=undefined, type='question', ip_info=[]) 
-    {
         let error_message;
 
-        if(ytdl.validateURL(audio_url_row) == false)
+        const video_id = utility.extractYoutubeVideoID(audio_url);
+        if(video_id == undefined)
         {
-            logger.warn(`${audio_url_row} is not validateURL`);
-            error_message = `${audio_url_row} is not validateURL`;
+            logger.warn(`${audio_url} has no video id`);
+            error_message = `${audio_url} has no video id`;
             return [undefined, undefined, error_message];
         }
 
-        const option_data = this.quiz_session.option_data;
-
-        const max_play_time_sec = (type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time); //question->60s, answer->12s
-
-        let audio_resource; //최종 audio_resource
-        let audio_length_ms; //최종 audio_length
-
-        //오디오 정보 가져오기
-        const [ipv4, ipv6] = ip_info;
-
-        const try_info_list = [];
-        if(ipv6 != undefined) //처음엔 ipv6로 시도
+        //캐시 체크 및 다운로드
+        const cache_file_name = `${video_id}.webm`;
+        let cache_file_path = audio_cache_manager.getAudioCache(video_id);
+        if(cache_file_path == undefined) //no cache file
         {
-            try_info_list.push([ipv6, 6]);
-        }
-
-        if(ipv4 != undefined) //그 다음엔 ipv4로 시도
-        {
-            try_info_list.push([ipv4, 4]);
-        }
-
-        try_info_list.push([undefined, undefined]); //다 안되면 마지막엔 그냥 해보기
-        logger.debug(`ytdl get info scenario is ${try_info_list.length}`);
-
-        let youtube_info = undefined;
-        let available_address;
-        let available_family;
-
-        for(let i = 0; i < try_info_list.length; ++i)
-        {
-            const [ip, family] = try_info_list[i];
-
-            try
+            const cache_info = audio_cache_manager.getAudioCacheInfo(video_id);
+            if(cache_info?.cache_result.need_retry == false) //이 경우 어차피 재시도해도 캐싱 안되는건 똑같은거임
             {
-                if(ip == undefined || family == undefined)
-                {
-                    youtube_info = await ytdl.getInfo(audio_url_row);
-                }
-                else
-                {
-                    youtube_info = await ytdl.getInfo(audio_url_row, {
-                        requestOptions:
-                        {
-                            localAddress: ip,
-                            family: family
-                        }
-                    });
-                }
-
-                if(youtube_info != undefined)
-                {
-                    available_address = ip,
-                    available_family = family;
-
-                    if(i != 0) //첫 시나리오에서 성공한게 아니면 failover가 잘 동작했으니 로그 하나 찍어주자
-                    {
-                        logger.warn(`Succeed Failover Scenario${i} of ytdl.getInfo! Available ipv${available_family}...${available_address}`);
-                    }
-
-                    break; //성공했다면
-                }
+                logger.info(`Skip downloading cache reason: ${cache_info.cache_result.causation_message}`);
+                return [undefined, undefined, cache_info.cache_result.causation_message];
             }
-            catch(err)
+
+            logger.info(`No cache file of ${video_id}. downloading cache`);
+
+            const ip_info = {
+                ipv4: this.quiz_session.ipv4,    
+                ipv6: this.quiz_session.ipv6,
+            }
+            const result = await audio_cache_manager.downloadAudioCache(audio_url, video_id, ip_info);
+
+            if(result.success == false) //캐시 다운로드 실패...ㅜㅜ
             {
-                logger.warn(`Failed ytdl.getInfo... Using ipv${family}...${ip} err_message: ${err.message}, url: ${audio_url_row}`);
-
-                if(i == try_info_list.length - 1) //마지막 시도였다면
-                {
-                    logger.error(`Failed ytdl.getInfo... for all scenario throwing...`);
-                    throw err;
-                }
-            }  
-        }
-
-        const audio_format = ytdl.chooseFormat(youtube_info.formats, { 
-            filter: 'audioonly', 
-            quality: 'lowestaudio' 
-        }); //connReset 에러가 빈번히 발생하여 우선 구글링한 해법을 적용해본다. https://blog.huzy.net/308 -> 24.02.02 해결책은 아니었다.
-
-        if(audio_format == undefined) 
-        {
-            logger.error(`cannot found audio format from ${youtube_info}`);
-            error_message = `cannot found audio format from ${youtube_info}`;
-            return [undefined, undefined, error_message];
-        }
-
-        const audio_duration_ms = audio_format.approxDurationMs;
-        const audio_duration_sec = Math.floor((audio_duration_ms ?? 0) / 1000);
-        const audio_size = audio_format.contentLength;
-        const audio_bitrate = audio_format.averageBitrate;
-        const audio_byterate = audio_bitrate / 8;
-
-        if(audio_duration_sec > SYSTEM_CONFIG.custom_audio_ytdl_max_length) //영상 최대 길이 제한, 영상이 너무 길고 seek 지점이 영상 중후반일 경우 로드하는데 너무 오래 걸림
-        {
-            logger.warn(`${audio_url_row}'s duration[${audio_duration_sec}] is over then ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`);
-            error_message = `${audio_url_row}'s 오디오 길이(${audio_duration_sec}초)가 ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}를 초과합니다.`;
-            return [undefined, undefined, error_message];
-        }
-
-        //최종 재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
-        let audio_length_sec = (audio_play_time_row ?? 0) <= 0 ? Math.floor(option_data.quiz.audio_play_time / 1000) : audio_play_time_row; //얼만큼 재생할지
-
-        if(audio_start_row == undefined || audio_start_row >= audio_duration_sec) //시작 요청 값 없거나, 시작 요청 구간이 오디오 범위 넘어서면
-        {
-            audio_start_row = undefined; //구간 요청값 무시
-            audio_end_row = undefined;
+                logger.info(`Failed to downloading cache reason: ${result.causation_message}`);
+                return [undefined, undefined, result.causation_message];
+            }
+            else
+            {
+                cache_file_path = audio_cache_manager.getAudioCache(video_id);
+            }
         }
         else
         {
-            if(audio_end_row == undefined || audio_end_row > audio_duration_sec) //끝 요청 값 없거나, 오디오 길이 초과화면 자동으로 최대치
-            {
-                audio_end_row = audio_duration_sec;
-            }
+            logger.debug(`Found cache file of ${video_id}.`);
+        }
+        
+        //캐시 다운로드 성공 또는 이미 캐시 존재!
+        
+        //재생 길이 구하기, 구간 지정했으면 그래도 재생할 수 있는 최대치는 재생해줄거임
+        const audio_info = audio_cache_manager.getAudioCacheInfo(video_id);
+        const audio_duration_sec = audio_info.duration ?? 0;
 
-            audio_length_sec = audio_end_row - audio_start_row; //우선 딱 구간만큼만 재생
+        if(audio_duration_sec == undefined)
+        {
+            logger.warn(`no audio duration by getAudioCacheDuration. ${cache_file_name}`);
+            const audio_info =  await utility.getAudioInfoFromPath(question);
+            audio_duration_sec = parseInt(audio_info.format.duration);
         }
 
-        if(audio_length_sec > audio_duration_sec) 
+        const option_data = this.quiz_session.option_data;
+        let audio_length_sec = Math.floor(option_data.quiz.audio_play_time / 1000); //우선 서버 설정값
+
+        if(audio_start_point == undefined || audio_start_point >= audio_duration_sec) //시작 요청 값 없거나, 시작 요청 구간이 오디오 범위 넘어서면
+        {
+            audio_start_point = 0; //구간 요청값 무시
+            audio_end_point = audio_duration_sec;
+        }
+        else //커스텀 구간이 잘 있다?
+        {
+            if(audio_end_point == undefined || audio_end_point > audio_duration_sec) //끝 요청 값 없거나, 오디오 길이 초과화면 자동으로 최대치
+            {
+                audio_end_point = audio_duration_sec;
+            }
+
+            audio_length_sec = audio_end_point - audio_start_point; //우선 딱 구간만큼만 재생
+        }
+
+        if(audio_length_sec > audio_duration_sec)
         {
             audio_length_sec = audio_duration_sec; //오디오 길이보다 더 재생할 순 없다.
         }
 
-        if(audio_length_sec > max_play_time_sec) 
+        if(audio_length_sec > max_play_time) 
         {
-            audio_length_sec = max_play_time_sec; //최대치를 넘어설 순 없다
+            audio_length_sec = max_play_time; //최대치를 넘어설 순 없다
         }
-
-        audio_length_ms = audio_length_sec * 1000;
-
 
         //오디오 시작 지점이 될 수 있는 포인트 범위
-        const audio_min_start_point_sec = audio_start_row ?? 0;
-        const audio_max_start_point_sec = (audio_end_row ?? Math.floor(audio_duration_ms/1000)) - audio_length_sec;
-
-        let audio_final_min_start_point_sec = audio_min_start_point_sec;
-        let audio_final_max_start_point_sec = audio_max_start_point_sec;
-
-        let audio_start_point = audio_min_start_point_sec;
+        const audio_min_start_point = audio_start_point;
+        const audio_max_start_point = audio_end_point - audio_length_sec;
+        const use_improved_audio_cut = (option_data.quiz.improved_audio_cut === OPTION_TYPE.ENABLED);
 
         //오디오 자르기 기능
-        if(audio_max_start_point_sec - audio_min_start_point_sec > audio_length_sec) //충분히 재생할 수 있는 구간이 지정돼 있어서 오디오 랜덤 구간 재생이 필요하다면
-        {
-            if(option_data.quiz.improved_audio_cut == OPTION_TYPE.ENABLED) //옵션 켜져있다면 최대한 중간 범위로 좁힌다.
-            {
-                const audio_mid_point_sec = Math.floor(audio_min_start_point_sec + (audio_max_start_point_sec - audio_min_start_point_sec) / 2); //두 지점의 중앙 포인트
+        audio_start_point = this.getRandomAudioStartPoint(audio_min_start_point, audio_max_start_point, audio_length_sec, use_improved_audio_cut);
+        logger.debug(`cut audio: ${audio_url}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
 
-                //중앙 포인트 부터 audio_length_sec 의 절반씩
-                const audio_guess_min_start_point_sec = audio_mid_point_sec - Math.floor(audio_length_sec/2) + 1; //1s는 패딩
-                const audio_guess_max_start_point_sec = audio_mid_point_sec + Math.floor(audio_length_sec/2) + 1;
-
-                if(audio_min_start_point_sec <= audio_guess_min_start_point_sec && audio_guess_max_start_point_sec <= audio_max_start_point_sec) //좁히기 성공이면
-                {
-                    audio_final_min_start_point_sec = audio_guess_min_start_point_sec;
-                    audio_final_max_start_point_sec = audio_guess_max_start_point_sec;
-                    logger.debug(`Refined audio point, question: ${audio_url_row} min: ${audio_min_start_point_sec} -> ${audio_final_min_start_point_sec}, max: ${audio_max_start_point_sec} -> ${audio_final_max_start_point_sec}`);
-                }
-            }
-
-            audio_start_point = utility.getRandom(audio_final_min_start_point_sec, audio_final_max_start_point_sec)  //second
-        }
+        const [audio_stream, inputType] = this.generateAudioFileStream(cache_file_path, audio_duration_sec, audio_start_point, audio_length_sec);
+        const resource = this.generateAudioResource(audio_stream, inputType);
         
-        //이건 왜 안쓰지? 아놔 진짜 기억 안나네 아마 ffmpeg 프로세스 실행돼서 그럴듯
-        // audio_stream = ytdl.downloadFromInfo(youtube_info, { format: audio_format, range: {start: audio_start_point, end: audio_end_point} }); 
-        
-        logger.debug(`cut audio, ${type}: ${audio_url_row}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
-
-        const download_option = {
-            format: audio_format ,
-            opusEncoded: true,
-            // encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', `-to ${audio_end_point}`, `-fs ${10 * 1024 * 1024}`],
-
-            //10초 패딩 줬다, 패딩 안주면 재생할 시간보다 Stream이 짧아지면 EPIPE 에러 뜰 수 있음, -t 옵션은 duration임 (sec)
-            //패딩 주는 이유? ytdl core는 ffmpeg로 동작하는데 stream 데이터 읽어서 ffmpeg로 오디오 처리하고 pipe로 전달한다. 근데 pipe에서 read하는 ffmpeg 먼저 끝나면 읽지를 못해서 에러나지
-            encoderArgs: ['-af', 'bass=g=10,dynaudnorm=f=200', '-t', `${audio_length_sec + 10}`], 
-            seek: audio_start_point, 
-
-            dlChunkSize: 0, //disabling chunking is recommended in discord bot
-            bitrate: 128, //max bitrate for discord bot, (부스트 없는 서버 기준),
-            highWaterMark: AUDIO_BUFFER_SIZE //오디오 버퍼 사이즈(이게 connReset의 원인일까...?)
-        };
-
-        if(available_address != undefined && available_family != undefined) //잘 되는 ip 정보가 있다면
-        {
-            download_option['requestOptions'] = {
-                localAddress: available_address,
-                family: available_family
-            };
-
-            logger.debug(`found available address info!!! ${available_family}, ${available_address}`);
-        };
-
-        let audio_stream = ytdl(audio_url_row, download_option);
-
-         /** 
-        23.11.08 확인 결과 
-        -to 옵션이 안먹는다...
-        -> (`-to ${audio_length}`) 에서 ('-t', `${audio_length}`) 로 하니깐 된다.
-
-        23.11.15 
-        ytdl-core 를 업데이트했더니 getInfo가 안된다.
-        ytdl-core 를 원래 쓰던 버전인 4.9.1로 롤백했다(이후 버전은 버그가 많음)
-
-        23.11.16
-        ytdl-core 4.9.1 버전은 youtube 데이터 다운로드가 매우매우 느린 문제가 있다.
-        따라서 다시 최신 버전으로 업데이트 후, 아래의 이슈 확인하여 sig.js를 패치하였다.
-        https://github.com/fent/node-ytdl-core/issues/1250#issuecomment-1712550800 
-
-        getInfo 정상 동작 및 4.9.1 보다 youtube 데이터 다운로드 속도도 빠른걸 확인함
-        **/
-
-        /**
-         * 시도해 볼만한 방법들
-         * 1. MP3는 잘라도 재생이 잘 된다. MP3는 Discord에서 어떻게 변환하는지 확인하고 Webm과 차이점을 확인
-         * 2. 오디오를 전부 받고, Create Resource를 해준다. 그 다음 start_point를 지정한다.
-         * ㄴ start_point를 지정할 수 있는지도 불확실하고 성능면에서 비효율적이다.
-         * 3. 이미 Webm/opus 타입이다. inline 볼륨 꺼보고 해보자
-         * 4. discord-ytdl-core 라는게 있다. 좀 옛날거라 지금은 안될텐데 참고는 해보자
-         * 5. 정상적으로 돌아갈 때랑 잘렸을 때 edge 상태 확인
-         * 6. https://www.npmjs.com/package/discord-ytdl-core?activeTab=explore, 이건 discord-ytdl-core 의 소스코드다
-         * 확인해보면 ytdl 로 받은걸 ffmpeg 를 직접 만들고 실행하는걸 볼 수 있다. 이 중 seek 옵션이 있는데, 이게 시작 위치(second)이고 -t 옵션으로 duration, -to 옵션으로 ~~까지를 설정할 수 있다
-         * https://github.com/skdhg/discord-ytdl-core/issues/17
-         * 이게 되면 veryvery thank u T.T, => 6번으로 해결했다!!!!
-         */
-
-        audio_resource = createAudioResource(audio_stream, { //Opus로 실행해주면 된다.
-            inputType: StreamType.Opus,
-            inlineVolume: SYSTEM_CONFIG.use_inline_volume,
-        });
-
-        if(SYSTEM_CONFIG.use_inline_volume)
-        {
-            // resource.volume.setVolume(0);
-        }
-        
-        return [audio_resource, audio_length_ms, undefined];
+        return [resource, audio_length_sec * 1000, undefined];
     }
 }
-
-
 
 //#endregion
 
@@ -2556,7 +2396,7 @@ class Question extends QuizLifeCycleWithUtility
             {
                 this.next_cycle = CYCLE_TYPE.CLEARING; 
                 logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
-                this.quiz_session.channel.send({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
+                this.quiz_session.sendMessage({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
 
                 const memoryUsage = process.memoryUsage();
                 logger.error('Memory Usage:', {
@@ -3100,7 +2940,7 @@ class Question extends QuizLifeCycleWithUtility
                 return;
             }
             const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_hint}` +'```'
-            this.quiz_session.channel.send({content: reject_message});
+            this.quiz_session.sendMessage({content: reject_message});
         }
         else if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.VOTE)
         {
@@ -3113,7 +2953,7 @@ class Question extends QuizLifeCycleWithUtility
             hint_vote_message = hint_vote_message.replace("${who_voted}", member.displayName);
             hint_vote_message = hint_vote_message.replace("${current_vote_count}", current_question['hint_vote_count'] );
             hint_vote_message = hint_vote_message.replace("${vote_criteria}", vote_criteria);
-            this.quiz_session.channel.send({content: hint_vote_message});
+            this.quiz_session.sendMessage({content: hint_vote_message});
             if(current_question['hint_vote_count']  >= vote_criteria)
             {
                 this.showHint(current_question);
@@ -3147,7 +2987,7 @@ class Question extends QuizLifeCycleWithUtility
                 return;
             }
             const reject_message = '```' + `${text_contents.quiz_play_ui.only_owner_can_use_skip}` +'```'
-            this.quiz_session.channel.send({content: reject_message});
+            this.quiz_session.sendMessage({content: reject_message});
         }
         else if(option_data.quiz.skip_type == OPTION_TYPE.SKIP_TYPE.VOTE)
         {
@@ -3160,7 +3000,7 @@ class Question extends QuizLifeCycleWithUtility
             skip_vote_message = skip_vote_message.replace("${who_voted}", member.displayName);
             skip_vote_message = skip_vote_message.replace("${current_vote_count}", current_question['skip_vote_count']);
             skip_vote_message = skip_vote_message.replace("${vote_criteria}", vote_criteria);
-            this.quiz_session.channel.send({content: skip_vote_message});
+            this.quiz_session.sendMessage({content: skip_vote_message});
 
             if(current_question['skip_vote_count'] >= vote_criteria)
             {
@@ -3604,7 +3444,7 @@ class QuestionCustom extends Question
                 [{ 
                     color: 0x05f1f1, 
                     title: `**${quiz_data['title']}**`,
-                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                    description:  "퀴즈를 재밌게 플레이하고 계신가요? 😀\n진행 중인 퀴즈가 마음에 드신다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세/멀티플레이] 퀴즈에서 사용됩니다.`"
                 }], 
                 components: [ feedback_manager.quiz_feedback_comp ]
             });
@@ -3631,32 +3471,51 @@ class QuestionCustom extends Question
 
         let fade_in_end_time = undefined; 
 
-        if(audio_play_time != 0) //오디오 재생해야하면
+        let audio_error_occurred = false;
+        if(this.progress_bar_fixed_text?.includes('AUDIO_ERROR'))
+        {
+            audio_error_occurred = true;
+        }
+
+        if(audio_error_occurred == false && audio_play_time != 0) //오디오 재생해야하면
         {
             this.is_playing_bgm = false;
-            this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result)
-            .catch((err) => 
+
+            try
             {
-                if(this.progress_bar_fixed_text == undefined)
-                {
-                    this.progress_bar_fixed_text = "";
-                }
-                else if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == true) //이미 AUDIO_ERROR 메시지가 있다면
-                {
-                    return;
-                }
-                
-                this.progress_bar_fixed_text += "\n\nAUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n";
-            }); //비동기로 오디오 재생 시켜주고
-            this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+                const result = await this.startAudio(audio_player, resource);
+                fade_in_end_time = result;
+            }
+            catch(err)
+            {
+                audio_play_time = 0; //오디오 재생 시간 0초로 변경 -> 브금 재생
+                audio_error_occurred = true;
+            }
+
+            if(audio_error_occurred == false)
+            {
+                this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+            }
         }
-        else //오디오 없으면 10초 타이머로 대체
+        
+        if(audio_error_occurred == true) //에러 발생 시, 음악만 바꾼다. (오디오 용도가 그냥 브금이었을 수도 있으니깐)
+        {
+            logger.warn("Audio error occurred on Custom Quiz! Play failover bgm.");
+
+            this.progress_bar_fixed_text += `\n😭 오디오 추출에 실패하여 임시 BGM을 대신 재생합니다.`;
+
+            this.is_playing_bgm = true;
+            audio_play_time = 11000; //오디오 재생 시간 11초로 변경
+            utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
+        }
+
+        if(audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
         {
             this.is_playing_bgm = true;
             audio_play_time = 10000; //오디오 재생 시간 10초로 변경
             utility.playBGM(audio_player, BGM_TYPE.COUNTDOWN_10); //10초 카운트다운 브금
         }
+
         this.startProgressBar(audio_play_time); //진행 bar 시작
 
         let timeover_time = audio_play_time;
@@ -3737,7 +3596,7 @@ class QuestionOmakase extends Question
 
         const question_num = game_data['question_num'];
         const quiz_size = quiz_data['quiz_size'];
-        logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id}`);
+        logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id ?? current_question['question']}`);
 
         //이미지 표시
         const image_resource = current_question['image_resource'];
@@ -3745,7 +3604,7 @@ class QuestionOmakase extends Question
         quiz_ui.setImage(image_resource);
 
         //오마카세 퀴즈 전용
-        quiz_ui.setTitle(`[ ${quiz_data['icon']} ${current_question['qtitle']} ]`);
+        quiz_ui.setTitle(`[ ${quiz_data['icon']} ${current_question['question_title']} ]`);
         
 
         if(image_resource != undefined)
@@ -3764,32 +3623,57 @@ class QuestionOmakase extends Question
 
         let fade_in_end_time = undefined; 
 
-        if(audio_play_time != 0) //오디오 재생해야하면
+        let audio_error_occurred = false;
+        if(this.progress_bar_fixed_text?.includes('AUDIO_ERROR'))
+        {
+            audio_error_occurred = true;
+        }
+
+        if(audio_error_occurred == false && audio_play_time != 0) //오디오 재생해야하면
         {
             this.is_playing_bgm = false;
-            this.startAudio(audio_player, resource)
-            .then((result) => fade_in_end_time = result)
-            .catch((err) => 
+
+            try
             {
-                if(this.progress_bar_fixed_text == undefined)
-                {
-                    this.progress_bar_fixed_text = "";
-                }
-                else if(this.progress_bar_fixed_text.includes('AUDIO_ERROR') == true) //이미 AUDIO_ERROR 메시지가 있다면
-                {
-                    return;
-                }
-                
-                this.progress_bar_fixed_text += "\n\nAUDIO_ERROR: 오디오 다운로드에 실패했습니다.\n해당 문제가 오래 지속될 경우 개발자에게 문의 바랍니다.\n";
-            }); //비동기로 오디오 재생 시켜주고
-            this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+                const result = await this.startAudio(audio_player, resource);
+                fade_in_end_time = result;
+            }
+            catch(err)
+            {
+                audio_error_occurred = true;
+            }
+
+            if(audio_error_occurred == false)
+            {
+                this.autoFadeOut(audio_player, resource, audio_play_time); //audio_play_time으로 자동 페이드 아웃 체크
+            }
+        } 
+
+        if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
+        {
+            logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.");
+            this.next_cycle = CYCLE_TYPE.QUESTIONING;
+            game_data['question_num'] -= 1;
+            utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
+            await utility.sleep(11000); //Failover 브금 11초임 
+
+            let error_message = '```';
+            error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
+            error_message += this.progress_bar_fixed_text?.trim();
+            error_message += '```';
+
+            this.quiz_session.sendMessage({content: error_message});
+            
+            return;
         }
-        else //오디오 없으면 10초 타이머로 대체
+
+        if(audio_play_time == 0) //오디오 없으면 10초 타이머로 대체
         {
             this.is_playing_bgm = true;
             audio_play_time = 10000; //오디오 재생 시간 10초로 변경
             utility.playBGM(audio_player, BGM_TYPE.COUNTDOWN_10); //10초 카운트다운 브금
         }
+
         this.startProgressBar(audio_play_time); //진행 bar 시작
 
         let timeover_time = audio_play_time;
@@ -4160,7 +4044,7 @@ class Ending extends QuizLifeCycleWithUtility
             [{ 
                 color: 0x05f1f1, 
                 title: `**${quiz_data['title']}**`,
-                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 멀티플레이에서 사용됩니다.`"
+                description:  "퀴즈를 재밌게 플레이하셨나요? 😀\n방금 플레이하신 퀴즈가 마음에 드셨다면 **[추천하기]**를 눌러주세요!\n\n`일정 수 이상의 추천을 받은 퀴즈는 [오마카세/멀티플레이] 퀴즈에서 사용됩니다.`"
             }], 
             components: [ feedback_manager.quiz_feedback_comp ]});
         }

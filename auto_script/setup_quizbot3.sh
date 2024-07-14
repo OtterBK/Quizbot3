@@ -157,7 +157,7 @@ if [ "$REGISTER_CRON" = true ]; then
 	(crontab -l 2>/dev/null; echo "1 9,21 * * * sudo sh $SCRIPT_PATH/server_script/quizbot_start.sh") | crontab -
 
 	(crontab -l 2>/dev/null; echo "0 0 * * 1 sudo sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | crontab -
-	(crontab -l 2>/dev/null; echo "0 8 * * * sudo sh $SCRIPT_PATH/db_script/backup_script.sh") | crontab -
+	(crontab -l 2>/dev/null; echo "0 8,20 * * * sudo sh $SCRIPT_PATH/db_script/backup_script.sh") | crontab -
  	(crontab -l 2>/dev/null; echo "0 */3 * * * sudo sync && echo 3 > /proc/sys/vm/drop_caches") | crontab -
 fi
 
