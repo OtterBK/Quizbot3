@@ -254,24 +254,23 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   }
 
   //그 외의 명령어
-  let already_deferred = false;
+  if((interaction.isButton() || interaction.isStringSelectMenu())
+    && interaction.customId.startsWith('request_modal') == false //modal 요청 interaction은 defer하면 안됨
+    && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
+  {
+    try
+    {
+      await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
+    }
+    catch(err)
+    {
+      return; //이 경우에는 아마 unknown interaction 에러임
+    }
+  } 
+
   const quiz_session = (interaction.guild == undefined ? undefined : quiz_system.getQuizSession(interaction.guild.id));
   if(quiz_session != undefined)
   {
-    if(already_deferred == false 
-      && interaction.isButton() //퀴즈 진행 중 버튼 클릭(힌트, 스킵 등)
-      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
-    {
-      already_deferred = true;
-      try
-      {
-        await interaction.deferUpdate(); //우선 응답 좀 보내고 처리함
-      }
-      catch(err)
-      {
-        return; //이 경우에는 아마 unknown interaction 에러임
-      }
-    } 
     quiz_session.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
   }
 
@@ -280,15 +279,6 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   const uiHolder = quizbot_ui.getUIHolder(holder_id);
   if(uiHolder != undefined)
   {
-    if((already_deferred == false)
-      && (interaction.isButton() || interaction.isStringSelectMenu())
-      && interaction.customId.startsWith('request_modal') == false //modal 요청 interaction은 defer하면 안됨
-      && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)) 
-    {
-      already_deferred = true;
-      await interaction.deferUpdate(); 
-    } 
-
     uiHolder.on(CUSTOM_EVENT_TYPE.interactionCreate, interaction);
   }
 
