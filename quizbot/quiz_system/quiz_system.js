@@ -2212,7 +2212,7 @@ class Prepare extends QuizLifecycle
         let error_message;
 
         const video_id = utility.extractYoutubeVideoID(audio_url);
-        if(video_id == undefined)
+        if(video_id == undefined || video_id == '')
         {
             logger.warn(`${audio_url} has no video id`);
             error_message = `${audio_url} has no video id`;
