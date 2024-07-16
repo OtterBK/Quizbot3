@@ -361,7 +361,10 @@ const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
 
         result_type = getExpectedErrorType(stderr);
 
-        logger.error(`its unknown type error: ${err}`);
+        if(result_type == DOWNLOAD_RESULT_TYPE.ERROR)
+        {
+            logger.error(`its unknown type error: ${err}`);
+        }
     }
 
     return {
