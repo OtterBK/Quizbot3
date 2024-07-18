@@ -164,10 +164,10 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
         format: 'bestaudio[ext=webm]/bestaudio', //정렬된 포맷 중 webm 확장자인것. 없으면 젤 작은 audio -> 즉 webm이면서 파일 크기가 가장 작은거
         maxFilesize: SYSTEM_CONFIG.custom_audio_max_file_size, //최대 파일 크기
         matchFilter: `duration <= ${SYSTEM_CONFIG.custom_audio_ytdl_max_length}`, //최대 길이
+        noPlaylist: true,
         writeInfoJson: true, //비디오 정보 json으로 저장
         noCheckCertificates: true, //ssl 체크 안함
-        noWarnings: true, //경로 미출력
-        preferFreeFormats: true,
+        noWarnings: true, //경고 미출력
         addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
     }
 
@@ -322,6 +322,10 @@ const downloadAudioCache = async (audio_url, video_id, ip_info={ipv4: undefined,
 
 const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
 {
+    /** 24.07.16 root 권한으로 yt-dlp 실행하면 webm 포맷이 안뜬다.
+     * 아마 환경변수 때문인 것 같음.
+     * 따라서 quizbot은 root가 아닌 일반 계정으로 실행할 것!!!
+     */
     const subprocess = youtubedl.exec(
         audio_url, 
         yt_dlp_option,
@@ -357,7 +361,10 @@ const executeDownloadProcess = async (audio_url, yt_dlp_option) =>
 
         result_type = getExpectedErrorType(stderr);
 
-        logger.error(`its unknown type error: ${err}`);
+        if(result_type == DOWNLOAD_RESULT_TYPE.ERROR)
+        {
+            logger.error(`its unknown type error: ${err}`);
+        }
     }
 
     return {
@@ -496,7 +503,7 @@ const convertToWebm = (video_id) =>
     const converted_file_name = path.basename(cache_file_path, path.extname(cache_file_path)) + '.webm';
     const converted_file_path = path.resolve(path.dirname(cache_file_path), converted_file_name);
 
-    logger.info(`converting file ${video_id}.${ext} to webm`);
+    logger.warn(`converting file ${video_id}.${ext} to webm`);
 
     let ffmpeg_handler = new ffmpeg(cache_file_path);
     ffmpeg_handler.format('webm');
@@ -508,7 +515,7 @@ const convertToWebm = (video_id) =>
         {
             resolve();
             
-            logger.info(`converted to ${converted_file_path}`);
+            logger.warn(`converted to ${converted_file_path}`);
 
             fs.unlink(cache_file_path, err => 
             {
@@ -520,6 +527,8 @@ const convertToWebm = (video_id) =>
         })
         .on('error', function(err) 
         {
+            resolve();
+            
             logger.error(`converting error occurred!: ${converted_file_path}, ${err.message}`);
             resolve();
         });

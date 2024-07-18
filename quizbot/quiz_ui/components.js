@@ -162,7 +162,7 @@ const main_ui_component = new ActionRowBuilder()
   .setStyle(ButtonStyle.Link),
   new ButtonBuilder()
   .setLabel('봇 공유')
-  .setURL('https://discord.com/application-directory/788060831660114012')
+  .setURL('https://koreanbots.dev/bots/788060831660114012')
   .setStyle(ButtonStyle.Link),
 );
 

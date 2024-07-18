@@ -1585,7 +1585,7 @@ class InitializeOmakaseQuiz extends Initialize
         const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
         const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
         const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
-        const selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
+        let selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
         
         const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
 
@@ -2158,11 +2158,14 @@ class Prepare extends QuizLifecycle
          * answer_audio_end
          * answer_audio_play_time
          */
-        const answer_audio_url = target_question_data['answer_audio_url'];
+        setTimeout(async () => { //정답 오디오 준비는 비동기로 실행한다.
+            const before_question_num = this.quiz_session.game_data['question_num'];
+            
+            const answer_audio_url = target_question_data['answer_audio_url'];
 
-        const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
-    
-        const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
+            const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
+
+            const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
             await this.generateAudioResourceFromWeb(
                 answer_audio_url, 
                 answer_audio_start, 
@@ -2170,13 +2173,22 @@ class Prepare extends QuizLifecycle
                 SYSTEM_CONFIG.max_answer_audio_play_time, 
                 [ipv4, ipv6]
             );
+
+            const after_question_num = this.quiz_session.game_data['question_num'];
+
+            if(before_question_num != after_question_num)
+            {
+                return; 
+            }
     
-        target_question['answer_audio_resource'] = answer_audio_resource;
-        target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
-    
-        if (answer_error_message) {
-            target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
-        }
+            target_question['answer_audio_resource'] = answer_audio_resource;
+            target_question['answer_audio_play_time'] = answer_audio_play_time_ms;
+        
+            if (answer_error_message) 
+            {
+                target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
+            }
+          }, 0);        
         
         /**
          * answer_image_url, 정답 공개용 이미지 url
@@ -2200,7 +2212,7 @@ class Prepare extends QuizLifecycle
         let error_message;
 
         const video_id = utility.extractYoutubeVideoID(audio_url);
-        if(video_id == undefined)
+        if(video_id == undefined || video_id == '')
         {
             logger.warn(`${audio_url} has no video id`);
             error_message = `${audio_url} has no video id`;
@@ -2220,6 +2232,8 @@ class Prepare extends QuizLifecycle
             }
 
             logger.info(`No cache file of ${video_id}. downloading cache`);
+            
+            this.quiz_session.sendMessage({content: '`현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥`'});
 
             const ip_info = {
                 ipv4: this.quiz_session.ipv4,    
@@ -2399,12 +2413,12 @@ class Question extends QuizLifeCycleWithUtility
                 this.quiz_session.sendMessage({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
 
                 const memoryUsage = process.memoryUsage();
-                logger.error('Memory Usage:', {
+                logger.error('Memory Usage:', JSON.stringify({
                     'Heap Used': `${memoryUsage.heapUsed / 1024 / 1024} MB`,
                     'Heap Total': `${memoryUsage.heapTotal / 1024 / 1024} MB`,
                     'RSS': `${memoryUsage.rss / 1024 / 1024} MB`,
                     'External': `${memoryUsage.external / 1024 / 1024} MB`,
-                });
+                }));
 
                 return false;
             }
