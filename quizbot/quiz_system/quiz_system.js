@@ -1585,7 +1585,7 @@ class InitializeOmakaseQuiz extends Initialize
         const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
         const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
         const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
-        const selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
+        let selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
         
         const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
 
