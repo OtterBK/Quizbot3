@@ -23,6 +23,7 @@ exports.IPC_MESSAGE_TYPE = {
     CHECK_STATUS: 0,
     SYNC_STATUS: 1,
     SYNC_ADMIN: 2,
+    MULTIPLAY_MESSAGE: 3,
 }
 
 exports.sync_objects = sync_objects;

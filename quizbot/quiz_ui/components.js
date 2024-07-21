@@ -202,6 +202,8 @@ const option_value_components = {
   score_type:  createOptionValueComponents('score_type'),
   improved_audio_cut:  createOptionValueComponents('improved_audio_cut'),
   use_message_intent:  createOptionValueComponents('use_message_intent'),
+  score_show_max:  createOptionValueComponents('score_show_max'),
+  max_chance:  createOptionValueComponents('max_chance'),
   
 }
 

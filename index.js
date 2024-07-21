@@ -49,6 +49,11 @@ manager.on('clusterCreate', cluster =>
             manager.broadcast(message);
             return;
         }
+
+        if(message.ipc_message_type === IPC_MESSAGE_TYPE.MULTIPLAY_MESSAGE)
+        {
+            manager.broadcast(message);
+        }
     });
 
     logger.info(`Launched Cluster ${cluster.id}`);

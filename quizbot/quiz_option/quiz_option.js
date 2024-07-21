@@ -26,6 +26,7 @@ const OPTION_TYPE = {
     },
     ENABLED: 'true',
     DISABLED: 'false',
+    UNLIMITED: -1,
 }
 
 //#region exports 정의
@@ -79,7 +80,8 @@ class OptionStorage
                 score_type: OPTION_TYPE.SCORE_TYPE.POINT,
                 improved_audio_cut: OPTION_TYPE.ENABLED,
                 use_message_intent: OPTION_TYPE.ENABLED,
-                score_show_max: -1,
+                score_show_max: OPTION_TYPE.UNLIMITED,
+                max_chance: OPTION_TYPE.UNLIMITED,
             }
         }
     }
