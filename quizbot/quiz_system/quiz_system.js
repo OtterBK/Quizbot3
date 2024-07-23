@@ -199,11 +199,11 @@ class QuizPlayUI
     this.ox_quiz_comp = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId('choice_o')
+        .setCustomId('choice_O')
         .setEmoji(`${text_contents.icon.ICON_O}`) 
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('choice_x')
+        .setCustomId('choice_X')
         .setEmoji(`${text_contents.icon.ICON_X}`)
         .setStyle(ButtonStyle.Secondary),
     )
@@ -1304,6 +1304,9 @@ class Initialize extends QuizLifecycle
 
         //정답 공개용 텍스트
         question['author'] = [ question_data['answer_text'] ];
+
+        //문제 유형(답변 유형)
+        question['answer_type'] = question_data['answer_type'] ?? ANSWER_TYPE.SHORT_ANSWER; //지정된 값 있으면 그대로
 
         return question;
     }
@@ -3033,7 +3036,7 @@ class Question extends QuizLifeCycleWithUtility
         if(interaction.customId.startsWith("choice_")) //버튼형 정답 입력일 경우
         {
             const selected_value = interaction.customId;
-            const selected_choice = selected_value.substring(7); // "choice_"의 길이는 7
+            const selected_choice = selected_value.substring(7).toLowerCase(); // "choice_"의 길이는 7
 
             const member = interaction.member
 
@@ -3042,9 +3045,25 @@ class Question extends QuizLifeCycleWithUtility
                 this.selected_choice_map = new Map();
             }
 
-            this.selected_choice_map.set(member, selected_value);
+            this.selected_choice_map.set(member, selected_choice);
 
-            interaction.reply({ content: `\`선택한 정답: [${selected_choice}]\``, ephemeral: true })
+            interaction.reply({ content: `\`선택한 정답: ${this.choiceAsIcon(selected_choice)}\``, ephemeral: true })
+        }
+    }
+
+    choiceAsIcon(choice)
+    {
+        switch(choice)
+        {
+            case 'o': return '⭕';
+            case 'x': return '❌';
+            case '1': return '1️⃣';
+            case '2': return '2️⃣';
+            case '3': return '3️⃣';
+            case '4': return '4️⃣';
+            case '5': return '5️⃣';
+
+            default: return choice;
         }
     }
 
@@ -3679,22 +3698,56 @@ class QuestionCustom extends Question
             return; //바로 return
         }
 
-        if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
+        if(this.selected_choice_map != undefined) //혹시나 객관식 선택형 답안 제출자가 있다...?
         {
-            if(this.current_question['answer_members'] != undefined) //정답자가 있다?
+            const selected_choice_map = this.selected_choice_map;
+            const iter = selected_choice_map.entries();
+            let scoreboard = this.quiz_session.scoreboard;
+            const score = 1; //객관식은 1점 고정
+
+            for(let i = 0; i < selected_choice_map.size; ++i)
             {
-                this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+                const [member, selected_value] = iter.next().value;
+                
+                if(this.answers.includes(selected_value) == false)
+                {
+                    continue;
+                }
+
+                scoreboard.set(member, (scoreboard.get(member) ?? 0) + score);
+
+                const answer_members = this.current_question['answer_members']; //정답자 목록에 넣어주자
+                if(answer_members == undefined)
+                {
+                    this.current_question['answer_members'] = [ member ];
+                }
+                else
+                {
+                    answer_members.push(member);
+                }
             }
-            else if(this.current_question['skip_used'] == true) //스킵이다?
-            {
-                this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
-            }
+        }
+
+        if(this.current_question['answer_members'] != undefined) //뭐라도 정답자가 있다?
+        {
+            this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+        }
+        else if(this.current_question['skip_used'] == true) //정답자도 없고 스킵이다?
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
+        }
+        else //그냥 타임오버다?
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //그래도 타임오버로~
+        }
+
+        if(this.is_timeover == false) //타임오버로 끝난게 아니다?
+        {
             this.gracefulAudioExit(audio_player, resource, fade_in_end_time); //타이머가 제 시간에 끝난게 아니라 오디오 재생이 남아있으니 부드러운 오디오 종료 진행
         }
-        else //타임오버거나 정답자 없다면
+        else //타임오버로 끝났다?
         {
-            this.is_playing_bgm = true;
-            this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+            this.is_playing_bgm = true; //브금 틀어버려
         }
 
         if(this.is_playing_bgm) //브금 재생 중이었다면
