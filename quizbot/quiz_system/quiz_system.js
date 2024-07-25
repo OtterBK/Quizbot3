@@ -2937,7 +2937,7 @@ class Question extends QuizLifeCycleWithUtility
             return;
         }
 
-        const is_request_message = this.handleSimpleRequest(message_content);
+        const is_request_message = this.handleSimpleRequest(member, message_content);
         const remain_chance = is_request_message ? 10000 : this.processChance(member);
 
         if(remain_chance < 0) //no more chance
@@ -2974,7 +2974,7 @@ class Question extends QuizLifeCycleWithUtility
                 return;
             }
 
-            const is_request_message = this.handleSimpleRequest(message_content);
+            const is_request_message = this.handleSimpleRequest(member, message_content);
             const remain_chance = is_request_message ? 10000 : this.processChance(member);
     
             if(remain_chance < 0) //no more chance
