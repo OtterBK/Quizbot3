@@ -349,7 +349,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
     if(question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
     {
-      this.components[1].components[0].setDisabled(true); //이게 새로운 문제 만들기 버튼임
+      this.components[2].components[0].setDisabled(true); //이게 새로운 문제 만들기 버튼임
     }
 
     const answer_type = question_info.data.answer_type ?? ANSWER_TYPE.SHORT_ANSWER;

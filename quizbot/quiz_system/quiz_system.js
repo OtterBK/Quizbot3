@@ -1128,7 +1128,14 @@ class Initialize extends QuizLifecycle
         base_answer = base_answer.trim();
 
         let hint = undefined;
-        const hintLen = Math.ceil(base_answer.replace(/ /g, "").length / SYSTEM_CONFIG.hint_percentage); //표시할 힌트 글자 수
+        const letter_len = base_answer.replace(/ /g, "").length;
+
+        if(letter_len == 1) //? 정답이 1글자?
+        {
+            return '◼'; //그럼 그냥 1글자 가려서 줘
+        }
+
+        const hintLen = Math.ceil(letter_len / SYSTEM_CONFIG.hint_percentage); //표시할 힌트 글자 수
         let hint_index = [];
         let success_count = 0;
         for(let i = 0; i < SYSTEM_CONFIG.hint_max_try; ++i)
