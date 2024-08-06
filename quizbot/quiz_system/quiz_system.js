@@ -4067,7 +4067,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
 
             answer_members.forEach(member => 
             {
-                answer_members_nickname =  `[ ${member.displayName} ]\n`;
+                answer_members_nickname +=  `[ ${member.displayName} ]\n`;
             });
         }
 
