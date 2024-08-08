@@ -4057,7 +4057,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
         const game_data = this.quiz_session.game_data;
         const processing_question = game_data['processing_question'];
         const answer_members = processing_question['answer_members'] ?? [];
-        let answer_members_nickname = "???";
+        let answer_members_nickname = "";
         if(answer_members != undefined)
         {
             if(answer_members.length > 1)
