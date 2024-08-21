@@ -2016,7 +2016,7 @@ class Prepare extends QuizLifecycle
                 undefined,
                 {
                     file: true,
-                    seek: parseInt(audio_start_point),
+                    seek: parseInt(audio_start_point) + 1,
                 }
             );
 
