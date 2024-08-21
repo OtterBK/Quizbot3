@@ -11,7 +11,7 @@ process.env.FFMPEG_PATH = pathToFfmpeg;
 //#endregion
 
 //#region 로컬 모듈 로드
-const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE } = require('../../config/system_setting.js');
+const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, EXPLAIN_TYPE, BGM_TYPE, QUIZ_MAKER_TYPE, ANSWER_TYPE } = require('../../config/system_setting.js');
 const option_system = require("../quiz_option/quiz_option.js");
 const OPTION_TYPE = option_system.OPTION_TYPE;
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
@@ -188,26 +188,50 @@ class QuizPlayUI
         .setCustomId('skip')
         .setLabel('스킵')
         // .setEmoji(`${text_contents.icon.ICON_SKIP}`)
-        .setStyle(ButtonStyle.Secondary),
+        .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('force_stop')
         .setLabel('그만하기')
         // .setEmoji(`${text_contents.icon.ICON_STOP}`)
         .setStyle(ButtonStyle.Danger),
     )
-
-    
+ 
     this.ox_quiz_comp = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId('o')
+        .setCustomId('choice_O')
         .setEmoji(`${text_contents.icon.ICON_O}`) 
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('x')
+        .setCustomId('choice_X')
         .setEmoji(`${text_contents.icon.ICON_X}`)
         .setStyle(ButtonStyle.Secondary),
     )
+
+    this.multiple_quiz_comp = new ActionRowBuilder()
+    .addComponents(
+    new ButtonBuilder()
+        .setCustomId('choice_1')
+        .setLabel('1')
+        .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+        .setCustomId('choice_2')
+        .setLabel('2')
+        .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+        .setCustomId('choice_3')
+        .setLabel('3')
+        .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+        .setCustomId('choice_4')
+        .setLabel('4')
+        .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+        .setCustomId('choice_5')
+        .setLabel('5')
+        .setStyle(ButtonStyle.Secondary),
+    )
+
 
     this.components = [ ];
   }
@@ -808,7 +832,7 @@ class QuizLifeCycleWithUtility extends QuizLifecycle //여러 기능을 포함�
                 // },
             )
 
-            const show_count = option_data.quiz.score_show_max == -1 ? scoreboard.size : option_data.quiz.score_show_max;
+            const show_count = option_data.quiz.score_show_max == OPTION_TYPE.UNLIMITED ? scoreboard.size : option_data.quiz.score_show_max;
 
             const iter = scoreboard.entries();
             for(let i = 0; i < show_count; ++i)
@@ -1104,7 +1128,14 @@ class Initialize extends QuizLifecycle
         base_answer = base_answer.trim();
 
         let hint = undefined;
-        const hintLen = Math.ceil(base_answer.replace(/ /g, "").length / SYSTEM_CONFIG.hint_percentage); //표시할 힌트 글자 수
+        const letter_len = base_answer.replace(/ /g, "").length;
+
+        if(letter_len == 1) //? 정답이 1글자?
+        {
+            return '◼'; //그럼 그냥 1글자 가려서 줘
+        }
+
+        const hintLen = Math.ceil(letter_len / SYSTEM_CONFIG.hint_percentage); //표시할 힌트 글자 수
         let hint_index = [];
         let success_count = 0;
         for(let i = 0; i < SYSTEM_CONFIG.hint_max_try; ++i)
@@ -1280,6 +1311,9 @@ class Initialize extends QuizLifecycle
 
         //정답 공개용 텍스트
         question['author'] = [ question_data['answer_text'] ];
+
+        //문제 유형(답변 유형)
+        question['answer_type'] = question_data['answer_type'] ?? ANSWER_TYPE.SHORT_ANSWER; //지정된 값 있으면 그대로
 
         return question;
     }
@@ -1457,6 +1491,13 @@ class InitializeDevQuiz extends Initialize
                 question_list.push(question);
             }
         });
+
+        if(question_list?.length != 0 && (question_type == QUIZ_TYPE.OX || question_type == QUIZ_TYPE.OX_LONG))
+        {
+            question_list.forEach((question) => {
+                question['answer_type'] = ANSWER_TYPE.OX;
+            })
+        }
 
         question_list.sort(() => Math.random() - 0.5); //퀴즈 목록 무작위로 섞기
         quiz_data['question_list'] = question_list;
@@ -1975,7 +2016,7 @@ class Prepare extends QuizLifecycle
                 undefined,
                 {
                     file: true,
-                    seek: parseInt(audio_start_point),
+                    seek: parseInt(audio_start_point) + 1,
                 }
             );
 
@@ -2343,11 +2384,12 @@ class Question extends QuizLifeCycleWithUtility
         this.timeover_wait = undefined; //타임오버 대기 시간
         this.timeover_timer_created = undefined; //타임오버 타이머 시작 시간
 
-        this.is_select_question = false; //객관식 퀴즈 여부
-        this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
+        this.answer_type = ANSWER_TYPE.SHORT_ANSWER; //문제 유형
+        this.selected_choice_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
 
         this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
         this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
+        this.used_chance_map = {}; //정답 제출 몇 번 시도했는지
     }
 
     async enter()
@@ -2375,11 +2417,12 @@ class Question extends QuizLifeCycleWithUtility
         this.timeover_wait = undefined;
         this.timeover_timer_created = undefined;
 
-        this.is_select_question = false; //객관식 퀴즈 여부
-        this.selected_answer_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
+        this.answer_type = ANSWER_TYPE.SHORT_ANSWER; //문제 유형
+        this.selected_choice_map = undefined; //객관식 퀴즈에서 각자 선택한 답안
 
-        this.hint_voted_user_list = []; //힌트 투표 이미했는지 확인
-        this.skip_voted_user_list = []; //스킵 투표 이미했는지 확인
+        this.hint_voted_user_list.length = 0; //힌트 투표 이미했는지 확인
+        this.skip_voted_user_list.length = 0; //스킵 투표 이미했는지 확인
+        this.used_chance_map = {}; //정답 제출 몇 번 시도했는지
 
         if(game_data['question_num'] >= quiz_data['quiz_size']) //모든 퀴즈 제출됐음
         {
@@ -2428,6 +2471,9 @@ class Question extends QuizLifeCycleWithUtility
         }
         
         this.current_question = game_data.prepared_question_queue.shift(); //하나 꺼내오자
+
+        this.answer_type = this.current_question['answer_type'] ?? ANSWER_TYPE.SHORT_ANSWER;
+        this.applyAnswerTypeToUI(); //answer_type 대로 컴포넌트 설정
         
 
         //이제 문제 준비가 끝났다. 마지막으로 최소 텀 지키고 ㄱㄱ
@@ -2473,6 +2519,21 @@ class Question extends QuizLifeCycleWithUtility
         }
     }
 
+    applyAnswerTypeToUI()
+    {
+        const answer_type = this.answer_type;
+        const quiz_ui = this.quiz_session.quiz_ui;
+
+        if(answer_type == ANSWER_TYPE.OX)
+        {
+            quiz_ui.components.push(quiz_ui.ox_quiz_comp);
+        }
+        else if(answer_type == ANSWER_TYPE.MULTIPLE_CHOICE)
+        {
+            quiz_ui.components.push(quiz_ui.multiple_quiz_comp);
+        }
+    }
+
     //UI관련
     async createQuestionUI()
     {
@@ -2500,11 +2561,7 @@ class Question extends QuizLifeCycleWithUtility
         description_message = description_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
         quiz_ui.embed.description = description_message;
 
-        let components = [quiz_ui.quiz_play_comp];
-        if(quiz_type == QUIZ_TYPE.OX || quiz_type == QUIZ_TYPE.OX_LONG) //ox 퀴즈면
-        {
-            components.push(quiz_ui.ox_quiz_comp);
-        }
+        let components = [quiz_ui.quiz_play_comp]; //기본 comp
         quiz_ui.components = components;
 
         quiz_ui.embed.fields = [];
@@ -2817,6 +2874,47 @@ class Question extends QuizLifeCycleWithUtility
         }
     }
 
+    checkAnswerHit(message_content)
+    {
+        const submit_answer = message_content.trim().replace(/ /g, '').toLowerCase();
+
+        return this.answers.includes(submit_answer);
+    }
+
+    handleSimpleRequest(member, message_content)
+    {
+        if(message_content === 'ㅎ')
+        {
+            this.requestHint(member);
+            return true;
+        }
+
+        if(message_content === 'ㅅ')
+        {
+            this.requestSkip(member);
+            return true;
+        }
+
+        return false;
+    }
+
+    processChance(member)
+    {
+        const option_data = this.quiz_session.option_data;
+        const max_chance = option_data.quiz.max_chance;
+
+        if(max_chance == OPTION_TYPE.UNLIMITED)
+        {
+            return 10000;
+        }
+
+        const member_id = member.id;
+        let used_chance = this.used_chance_map[member_id] || 0;
+        this.used_chance_map[member_id] = (++used_chance);
+
+        return max_chance - used_chance;
+    }
+
     onMessageCreate(message)
     {
         const option_data = this.quiz_session.option_data;
@@ -2829,32 +2927,35 @@ class Question extends QuizLifeCycleWithUtility
 
         if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
 
-        if(this.is_select_question == true) return; //객관식 퀴즈면 pass
+        if(this.answer_type != ANSWER_TYPE.SHORT_ANSWER) return; //단답형 아니면 PASS
 
-        let submit_answer = message.content ?? '';
-        if(submit_answer == '') return;
-        submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
-        
-        if(this.answers.includes(submit_answer))
+        const message_content = message.content ?? '';
+        const member = message.member;
+
+        if(message_content == '') 
         {
-            this.submittedCorrectAnswer(message.member);
-            // let result_message = "```" + `${message.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
-            // message.reply({content: result_message})
-            // .catch(err => {
-            //     logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
-            // });
             return;
         }
 
-        if(submit_answer === 'ㅎ')
+        const is_request_message = this.handleSimpleRequest(member, message_content);
+        const remain_chance = is_request_message ? 10000 : this.processChance(member);
+
+        if(remain_chance < 0) //no more chance
         {
-            this.requestHint(message.author);
+            return;
         }
 
-        if(submit_answer === 'ㅅ')
+        if(this.checkAnswerHit(message_content) == false) //오답
         {
-            this.requestSkip(message.author);
+            if(remain_chance == 0) //라스트 찬스였으면
+            {
+                message.reply({content: `땡! 이번 문제의 정답 제출 기회를 모두 사용했어요.`, ephemeral: true});
+            }
+
+            return;
         }
+
+        this.submittedCorrectAnswer(member);
     }
 
     async handleChatInputCommand(interaction)
@@ -2863,31 +2964,60 @@ class Question extends QuizLifeCycleWithUtility
 
             if(this.timeover_timer_created == undefined) return; //아직 timeover 시작도 안했다면 return
 
-            if(this.is_select_question == true) return; // 객관식 퀴즈면 pass 
+            if(this.answer_type != ANSWER_TYPE.SHORT_ANSWER) return; // 단답형 아니면 pass
     
-            let submit_answer = interaction.options.getString('답안') ?? '';
-            if(submit_answer == '') return;
-            submit_answer = submit_answer.trim().replace(/ /g, '').toLowerCase();
-            
-            if(this.answers.includes(submit_answer))
+            const message_content = interaction.options.getString('답안') ?? '';
+            const member = interaction.member;
+    
+            if(message_content == '') 
             {
-                this.submittedCorrectAnswer(interaction.member);
-                let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 정답입니다!` + "```"
-                interaction.reply({content: message})
-                .catch(err => {
-                    logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
-                });
+                return;
             }
-            else
+
+            const is_request_message = this.handleSimpleRequest(member, message_content);
+            const remain_chance = is_request_message ? 10000 : this.processChance(member);
+    
+            if(remain_chance < 0) //no more chance
             {
-                let message = "```" + `${interaction.member.displayName}: [ ${submit_answer} ]... 오답입니다!` + "```"
-                interaction.reply({content: message})
-                .catch(error => {
+                const reply_message = `이번 문제의 정답 제출 기회를 모두 사용했어요.`;
+                interaction.reply({content: reply_message, ephemeral: true})
+                .catch(err => {
                     logger.error(`Failed to replay to wrong submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
                 });;
+                return;
             }
-        
-            return;
+    
+            if(this.checkAnswerHit(message_content) == false) //오답
+            {
+                let reply_message = "```";
+                reply_message += `${member.displayName}: [ ${message_content} ]... 오답입니다!`;
+
+                if(remain_chance == 0) //라스트 찬스였음
+                {
+                    reply_message += `\n이번 문제의 정답 제출 기회를 모두 사용했어요.`;
+                }
+                else if(remain_chance > 0)
+                {
+                    reply_message += `\n기회가 ${remain_chance}번 남았어요.`;
+                }
+
+                reply_message += "```";
+                
+                interaction.reply({content: reply_message, ephemeral: true})
+                .catch(err => {
+                    logger.error(`Failed to replay to wrong submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
+                });;
+    
+                return;
+            }
+            
+            this.submittedCorrectAnswer(member);
+
+            let message = "```" + `${member.displayName}: [ ${message_content} ]... 정답입니다!` + "```"
+            interaction.reply({content: message})
+            .catch(err => {
+                logger.error(`Failed to replay to correct submit, guild_id:${this.quiz_session.guild_id}, err: ${err.stack}`);
+            });
         }
     }
 
@@ -2910,16 +3040,37 @@ class Question extends QuizLifeCycleWithUtility
             return;
         }
 
-        if(this.is_select_question == true) //객관식 퀴즈일 경우
+        if(interaction.customId.startsWith("choice_")) //버튼형 정답 입력일 경우
         {
             const selected_value = interaction.customId;
+            const selected_choice = selected_value.substring(7).toLowerCase(); // "choice_"의 길이는 7
+
             const member = interaction.member
 
-            if(this.selected_answer_map == undefined) 
+            if(this.selected_choice_map == undefined) 
             {
-                this.selected_answer_map = new Map();
+                this.selected_choice_map = new Map();
             }
-            this.selected_answer_map.set(member, selected_value);
+
+            this.selected_choice_map.set(member, selected_choice);
+
+            interaction.reply({ content: `\`선택한 정답: ${this.choiceAsIcon(selected_choice)}\``, ephemeral: true })
+        }
+    }
+
+    choiceAsIcon(choice)
+    {
+        switch(choice)
+        {
+            case 'o': return '⭕';
+            case 'x': return '❌';
+            case '1': return '1️⃣';
+            case '2': return '2️⃣';
+            case '3': return '3️⃣';
+            case '4': return '4️⃣';
+            case '5': return '5️⃣';
+
+            default: return choice;
         }
     }
 
@@ -2945,6 +3096,7 @@ class Question extends QuizLifeCycleWithUtility
         }
 
         this.hint_voted_user_list.push(member_id);
+
 
         if(option_data.quiz.hint_type == OPTION_TYPE.HINT_TYPE.OWNER) //주최자만 hint 사용 가능하면
         {
@@ -3343,8 +3495,6 @@ class QuestionOX extends Question
 
         game_data['processing_question'] = this.current_question; //현재 제출 중인 퀴즈
 
-        this.is_select_question = true; //객관식 퀴즈라고 알림
-
         this.answers = current_question['answers'];
         const question = current_question['question'];
 
@@ -3384,14 +3534,14 @@ class QuestionOX extends Question
         {
             this.next_cycle = CYCLE_TYPE.TIMEOVER; //우선 타임오버로
             
-            const selected_answer_map = this.selected_answer_map;
-            if(selected_answer_map != undefined)
+            const selected_choice_map = this.selected_choice_map;
+            if(selected_choice_map != undefined)
             {
-                const iter = selected_answer_map.entries();
+                const iter = selected_choice_map.entries();
                 let scoreboard = this.quiz_session.scoreboard;
                 const score = 1; //객관식은 1점 고정
     
-                for(let i = 0; i < selected_answer_map.size; ++i)
+                for(let i = 0; i < selected_choice_map.size; ++i)
                 {
                     const [member, selected_value] = iter.next().value;
                     
@@ -3555,22 +3705,56 @@ class QuestionCustom extends Question
             return; //바로 return
         }
 
-        if(this.is_timeover == false) //그런데 타임오버로 끝난게 아니다.
+        if(this.selected_choice_map != undefined) //혹시나 객관식 선택형 답안 제출자가 있다...?
         {
-            if(this.current_question['answer_members'] != undefined) //정답자가 있다?
+            const selected_choice_map = this.selected_choice_map;
+            const iter = selected_choice_map.entries();
+            let scoreboard = this.quiz_session.scoreboard;
+            const score = 1; //객관식은 1점 고정
+
+            for(let i = 0; i < selected_choice_map.size; ++i)
             {
-                this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+                const [member, selected_value] = iter.next().value;
+                
+                if(this.answers.includes(selected_value) == false)
+                {
+                    continue;
+                }
+
+                scoreboard.set(member, (scoreboard.get(member) ?? 0) + score);
+
+                const answer_members = this.current_question['answer_members']; //정답자 목록에 넣어주자
+                if(answer_members == undefined)
+                {
+                    this.current_question['answer_members'] = [ member ];
+                }
+                else
+                {
+                    answer_members.push(member);
+                }
             }
-            else if(this.current_question['skip_used'] == true) //스킵이다?
-            {
-                this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
-            }
+        }
+
+        if(this.current_question['answer_members'] != undefined) //뭐라도 정답자가 있다?
+        {
+            this.next_cycle = CYCLE_TYPE.CORRECTANSWER; //그럼 정답으로~
+        }
+        else if(this.current_question['skip_used'] == true) //정답자도 없고 스킵이다?
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //그럼 타임오버로~
+        }
+        else //그냥 타임오버다?
+        {
+            this.next_cycle = CYCLE_TYPE.TIMEOVER; //그래도 타임오버로~
+        }
+
+        if(this.is_timeover == false) //타임오버로 끝난게 아니다?
+        {
             this.gracefulAudioExit(audio_player, resource, fade_in_end_time); //타이머가 제 시간에 끝난게 아니라 오디오 재생이 남아있으니 부드러운 오디오 종료 진행
         }
-        else //타임오버거나 정답자 없다면
+        else //타임오버로 끝났다?
         {
-            this.is_playing_bgm = true;
-            this.next_cycle = CYCLE_TYPE.TIMEOVER; //타임오버로
+            this.is_playing_bgm = true; //브금 틀어버려
         }
 
         if(this.is_playing_bgm) //브금 재생 중이었다면
@@ -3873,7 +4057,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
         const game_data = this.quiz_session.game_data;
         const processing_question = game_data['processing_question'];
         const answer_members = processing_question['answer_members'] ?? [];
-        let answer_members_nickname = "???";
+        let answer_members_nickname = "";
         if(answer_members != undefined)
         {
             if(answer_members.length > 1)
@@ -3883,7 +4067,7 @@ class CorrectAnswer extends QuizLifeCycleWithUtility
 
             answer_members.forEach(member => 
             {
-                answer_members_nickname =  `[ ${member.displayName} ]\n`;
+                answer_members_nickname +=  `[ ${member.displayName} ]\n`;
             });
         }
 

@@ -5,7 +5,7 @@ const cloneDeep = require("lodash/cloneDeep.js");
 //#endregion
 
 //#region 로컬 modules
-const { SYSTEM_CONFIG, QUIZ_TYPE, QUIZ_MAKER_TYPE } = require('../../config/system_setting.js');
+const { SYSTEM_CONFIG, QUIZ_TYPE, QUIZ_MAKER_TYPE, ANSWER_TYPE } = require('../../config/system_setting.js');
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
 const quiz_system = require('../quiz_system/quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('../../utility/utility.js');
@@ -169,7 +169,7 @@ class UserQuizInfoUI extends QuizInfoUI {
           }
   
           const question_info = question_list[i];
-          const option = { label: `${i+1}번째 문제`, description: `${question_info.data.answers}`, value: `${i}` };
+          const option = { label: `${i+1}번째 문제(${this.answerTypeToString(question_info.data.answer_type)})`, description: `${question_info.data.answers}`, value: `${i}` };
           temp_question_select_menu.addOptions(option);
         }
   
@@ -177,6 +177,24 @@ class UserQuizInfoUI extends QuizInfoUI {
       }
   
       this.embed.description = description;
+    }
+
+    answerTypeToString(answer_type) 
+    {
+      if(answer_type == ANSWER_TYPE.SHORT_ANSWER)
+      {
+        return "주관식";
+      }
+      else if(answer_type == ANSWER_TYPE.OX)
+      {
+        return "O/X";
+      }
+      else if(answer_type == ANSWER_TYPE.MULTIPLE_CHOICE)
+      {
+        return "객관식";
+      }
+
+      return "주관식";
     }
     
     doQuizPlayEvent(interaction)

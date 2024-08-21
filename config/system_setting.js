@@ -117,6 +117,12 @@ exports.QUIZ_MAKER_TYPE = {
     UNKNOWN: '알 수 없음',
 }
 
+exports.ANSWER_TYPE = {
+    SHORT_ANSWER: 1,
+    OX: 2,
+    MULTIPLE_CHOICE: 3,
+}
+
 exports.QUIZ_TAG = { //태그는 16비트로 하자
     '음악 퀴즈':     0b0000000000000001,
     '그림 퀴즈':     0b0000000000000010,

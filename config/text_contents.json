@@ -248,7 +248,7 @@
         {
             "title": "⚙ 서버 옵션 설정",
             "pre_description": " \n \n옵션 정보를 불러오는 중입니다... \n \n",
-            "description": " \n \n🎧 노래 재생 시간 : **${audio_play_time}초**\n \n💡 힌트 요청 방식 : **${hint_type}**\n \n⏭ 스킵 요청 방식 : **${skip_type}**\n \n📋 유사 정답 사용 여부 : **${use_similar_answer}**\n \n📊 점수 채점 방식 : **${score_type}**\n \n✂ 정밀 오디오 자르기 : **${improved_audio_cut}**\n \n⌨ 메시지 입력 감지 : **${use_message_intent}**\n \n \n",
+            "description": " \n \n🎧 노래 재생 시간 : **${audio_play_time}초**\n \n💡 힌트 요청 방식 : **${hint_type}**\n \n⏭ 스킵 요청 방식 : **${skip_type}**\n \n📋 유사 정답 사용 여부 : **${use_similar_answer}**\n \n📊 점수 채점 방식 : **${score_type}**\n \n✂ 정밀 오디오 자르기 : **${improved_audio_cut}**\n \n⌨ 메시지 입력 감지 : **${use_message_intent}**\n \n🥇 점수판 표시 인원 : **${score_show_max}**\n \n✏ 정답 제출 기회 : **${max_chance}**\n \n \n",
 
             "select_menu": {
                 "title": "어떤 옵션을 설정할까요?",
@@ -259,11 +259,14 @@
                     { "label": "유사 정답 생성 여부", "description": "유사 정답(크레이지 아케이드 -> 크아) 자동 생성 여부를 설정합니다.", "value": "use_similar_answer" },
                     { "label": "점수 채점 방식", "description": "정답자가 얻는 점수 채점 방식을 지정합니다.", "value": "score_type" },
                     { "label": "정밀 오디오 자르기", "description": "하이트라이트 부분을 추측하여 노래를 재생합니다.", "value": "improved_audio_cut" },
-                    { "label": "메시지 입력 감지", "description": "채팅 메시지를 답안으로 인식합니다.", "value": "use_message_intent" }
+                    { "label": "메시지 입력 감지", "description": "채팅 메시지를 답안으로 인식합니다.", "value": "use_message_intent" },
+                    { "label": "점수판 표시 인원", "description": "점수판에 표시할 최대 인원을 설정합니다.", "value": "score_show_max" },
+                    { "label": "정답 제출 기회", "description": "각 문제 당 정답 제출 기회를 제한합니다.", "value": "max_chance" }
                 ],
                 "option_values": {
                     "title": "어떤 값으로 설정할까요?",
                     "audio_play_time": [
+                        { "label": "5초", "description": " ", "value": "5000" },
                         { "label": "10초", "description": " ", "value": "10000" },
                         { "label": "15초", "description": " ", "value": "15000" },
                         { "label": "20초", "description": " ", "value": "20000" },
@@ -300,6 +303,41 @@
                     "use_message_intent": [
                         { "label": "사용", "description": "채널에 입력하는 메시지를 답안으로 인식합니다.", "value": "true" },
                         { "label": "사용 안함", "description": "[/답] 명령어로만 답안 제출이 가능합니다.", "value": "false" }
+                    ],
+                    "score_show_max": [
+                        { "label": "모두 표시", "description": "진행 중인 모든 유저의 점수를 표시합니다.", "value": "-1" },
+                        { "label": "1명", "description": " ", "value": "1" },
+                        { "label": "2명", "description": " ", "value": "2" },
+                        { "label": "3명", "description": " ", "value": "3" },
+                        { "label": "4명", "description": " ", "value": "4" },
+                        { "label": "5명", "description": " ", "value": "5" },
+                        { "label": "6명", "description": " ", "value": "6" },
+                        { "label": "7명", "description": " ", "value": "7" },
+                        { "label": "8명", "description": " ", "value": "8" },
+                        { "label": "9명", "description": " ", "value": "9" },
+                        { "label": "10명", "description": " ", "value": "10" }
+                    ],
+                    "max_chance": [
+                        { "label": "무제한", "description": "무제한으로 정답 제출이 가능합니다.", "value": "-1" },
+                        { "label": "1번", "description": "단 1번만 정답 제출이 가능합니다.", "value": "1" },
+                        { "label": "2번", "description": " ", "value": "2" },
+                        { "label": "3번", "description": " ", "value": "3" },
+                        { "label": "4번", "description": " ", "value": "4" },
+                        { "label": "5번", "description": " ", "value": "5" },
+                        { "label": "6번", "description": " ", "value": "6" },
+                        { "label": "7번", "description": " ", "value": "7" },
+                        { "label": "8번", "description": " ", "value": "8" },
+                        { "label": "9번", "description": " ", "value": "9" },
+                        { "label": "10번", "description": " ", "value": "10" },
+                        { "label": "15번", "description": " ", "value": "15" },
+                        { "label": "20번", "description": " ", "value": "20" },
+                        { "label": "25번", "description": " ", "value": "25" },
+                        { "label": "30번", "description": " ", "value": "30" },
+                        { "label": "35번", "description": " ", "value": "35" },
+                        { "label": "40번", "description": " ", "value": "40" },
+                        { "label": "45번", "description": " ", "value": "45" },
+                        { "label": "50번", "description": " ", "value": "50" },
+                        { "label": "100번", "description": " ", "value": "100" }
                     ]
                 }
             },
@@ -307,7 +345,8 @@
             "save_fail": "🛑 옵션 저장에 실패했습니다.",
             "use": "사용",
             "not_use": "사용 안함",
-            "score_infinity": "모두 표시"
+            "score_infinity": "모두 표시",
+            "chance_infinity": "무제한"
         },
         "notes_select_ui":
         {

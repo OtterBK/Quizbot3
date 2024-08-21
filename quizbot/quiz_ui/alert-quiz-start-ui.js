@@ -37,7 +37,7 @@ class AlertQuizStartUI extends QuizbotUI
 
     let description = text_contents.alert_quiz_start_ui.description;
     description = description.replace('${quiz_name}', `${quiz_info['title']}`);
-    description = description.replace('${quiz_size}', `${quiz_info['quiz_size']}`);
+    description = description.replace('${quiz_size}', ` ${quiz_info['selected_question_count'] ?? quiz_info['quiz_size']}`);
     description = description.replace('${quiz_owner}', `${owner.displayName}`);
 
     this.embed.description = description;

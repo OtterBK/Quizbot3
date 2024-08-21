@@ -202,6 +202,8 @@ const option_value_components = {
   score_type:  createOptionValueComponents('score_type'),
   improved_audio_cut:  createOptionValueComponents('improved_audio_cut'),
   use_message_intent:  createOptionValueComponents('use_message_intent'),
+  score_show_max:  createOptionValueComponents('score_show_max'),
+  max_chance:  createOptionValueComponents('max_chance'),
   
 }
 
@@ -459,7 +461,7 @@ const modal_question_info = new ModalBuilder()
     .addComponents(
       new TextInputBuilder()
         .setCustomId('txt_input_question_answers')
-        .setLabel('문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
+        .setLabel('주관식 문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setMaxLength(100)
@@ -651,6 +653,30 @@ const question_edit_comp2 = new ActionRowBuilder()
   .setStyle(ButtonStyle.Danger),
 )
 
+const question_answer_type_select_menu = new ActionRowBuilder()
+.addComponents(
+  new StringSelectMenuBuilder().
+  setCustomId('question_answer_type_select_menu').
+  setPlaceholder('문제 유형 선택')
+  .addOptions(
+    new StringSelectMenuOptionBuilder()
+    .setLabel('주관식')
+    .setDescription('플레이어는 메세지로 정답을 입력하는 방식입니다.')
+    .setDefault(true)
+    .setValue('answer_type_short_answer'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('O/X 선택')
+    .setDescription('플레이어는 O 또는 X 만 선택할 수 있습니다.')
+    .setValue('answer_type_ox'),
+
+    new StringSelectMenuOptionBuilder()
+    .setLabel('객관식')
+    .setDescription('플레이어는 1,2,3,4,5 중 하나를 선택해야합니다.')
+    .setValue('answer_type_multiple_choice'),
+  )
+);
+
 const question_control_btn_component = new ActionRowBuilder()
 .addComponents(
   new ButtonBuilder()
@@ -792,6 +818,7 @@ module.exports = {
     modal_question_answering_info,
     question_edit_comp,
     question_edit_comp2,
+    question_answer_type_select_menu,
     question_control_btn_component,
     btn_search,
     modal_quiz_setting,

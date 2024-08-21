@@ -256,7 +256,8 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
   //그 외의 명령어
   if((interaction.isButton() || interaction.isStringSelectMenu())
     && interaction.customId.startsWith('request_modal') == false //modal 요청 interaction은 defer하면 안됨
-    && interaction.customId != 'like') //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
+    && interaction.customId != 'like' //추천하기 버튼은 예외다...(이렇게 커스텀이 늘어간다...ㅜㅜ)
+    && interaction.customId.startsWith('choice') == false) //객관식 버튼 선택도 예외다...
   {
     try
     {
@@ -286,6 +287,11 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async interaction => {
 
 //메시지 이벤트
 client.on(CUSTOM_EVENT_TYPE.messageCreate, async message => {
+
+  if(message.author == client.user)
+  {
+    return;
+  }
 
   let guildID = message.guild.id;
 
