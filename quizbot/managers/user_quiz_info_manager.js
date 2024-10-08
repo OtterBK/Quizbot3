@@ -4,37 +4,37 @@
 //로컬 modules
 const db_manager = require('./db_manager.js');
 const logger = require('../../utility/logger.js')('UserQuizInfoManager');
-const feedback_manager = require('./feedback_manager.js')
+const feedback_manager = require('./feedback_manager.js');
 
 //만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
 const QuizInfoColumn = 
 [
-    "creator_id",
-    "creator_name",
-    "creator_icon_url",
-    "quiz_title",
-    "thumbnail",
-    "simple_description",
-    "description",
-    "winner_nickname",
-    "birthtime",
-    "modified_time",
-    "played_count",
-    "is_private",
-    "played_count_of_week",
-    "tags_value",
-    "certified",
-    "like_count",
+  "creator_id",
+  "creator_name",
+  "creator_icon_url",
+  "quiz_title",
+  "thumbnail",
+  "simple_description",
+  "description",
+  "winner_nickname",
+  "birthtime",
+  "modified_time",
+  "played_count",
+  "is_private",
+  "played_count_of_week",
+  "tags_value",
+  "certified",
+  "like_count",
 ];
 
 let quiz_info_key_fields = '';
 QuizInfoColumn.forEach((field) =>
 {
-    if(quiz_info_key_fields != '')
-    {
-        quiz_info_key_fields += ', ';
-    }
-    quiz_info_key_fields += `${field}`;
+  if(quiz_info_key_fields != '')
+  {
+    quiz_info_key_fields += ', ';
+  }
+  quiz_info_key_fields += `${field}`;
 });
 
 //만약 fields 추가 및 수정되면 여기에 그냥 넣으면 된다
@@ -65,11 +65,11 @@ const QuestionInfoColumn =
 let question_info_key_fields = '';
 QuestionInfoColumn.forEach((field) =>
 {
-    if(question_info_key_fields != '')
-    {
-        question_info_key_fields += ', ';
-    }
-    question_info_key_fields += `${field}`;
+  if(question_info_key_fields != '')
+  {
+    question_info_key_fields += ', ';
+  }
+  question_info_key_fields += `${field}`;
 });
 
 
@@ -103,7 +103,7 @@ class UserQuizInfo //유저 제작 퀴즈 정보
     }
     else
     {
-      result = await db_manager.updateQuizInfo(quiz_info_key_fields, quiz_info_value_fields, this.quiz_id)
+      result = await db_manager.updateQuizInfo(quiz_info_key_fields, quiz_info_value_fields, this.quiz_id);
     }
 
     if(result != undefined && result.rows.length != 0)
@@ -128,22 +128,22 @@ class UserQuizInfo //유저 제작 퀴즈 정보
 
     for(const result_row of result.rows)
     {
-        let user_question_info = new UserQuestionInfo();
+      let user_question_info = new UserQuestionInfo();
 
-        user_question_info.question_id = result_row.question_id;
+      user_question_info.question_id = result_row.question_id;
 
-        if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
-        {
-            logger.error(`User Question Info ID is undefined... pass this`);
-            continue;
-        }
+      if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
+      {
+        logger.error(`User Question Info ID is undefined... pass this`);
+        continue;
+      }
 
-        for(const column of QuestionInfoColumn)
-        {
-          user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
-        }
+      for(const column of QuestionInfoColumn)
+      {
+        user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+      }
 
-        question_list.push(user_question_info);
+      question_list.push(user_question_info);
     }
 
     this.question_list = question_list;
@@ -152,7 +152,7 @@ class UserQuizInfo //유저 제작 퀴즈 정보
   async saveQuestionToDB()
   {
     //quiz question 전체 db에 저장
-    for(const question of question_list)
+    for(const question of this.question_list)
     {
       question.saveDataToDB();
     }
@@ -202,7 +202,7 @@ class UserQuestionInfo //유저 제작 문제 정보
     }
     else
     {
-      result = await db_manager.updateQuestionInfo(question_info_key_fields, question_info_value_fields, this.question_id)
+      result = await db_manager.updateQuestionInfo(question_info_key_fields, question_info_value_fields, this.question_id);
     }
 
     if(result != undefined && result.rows.length != 0)
@@ -220,50 +220,52 @@ class UserQuestionInfo //유저 제작 문제 정보
   }
 }
 
-const loadUserQuizListFromDB = async (creator_id) => { //creator_id 기준으로 quiz 목록 로드, creator_id가 undefined면 전체 조회
+const loadUserQuizListFromDB = async (creator_id) => 
+{ //creator_id 기준으로 quiz 목록 로드, creator_id가 undefined면 전체 조회
 
-    let user_quiz_list = [];
+  let user_quiz_list = [];
 
-    let result;
+  let result;
 
-    if(creator_id == undefined)
+  if(creator_id == undefined)
+  {
+    result = await db_manager.selectAllQuizInfo();
+  }
+  else
+  {
+    result = await db_manager.selectQuizInfo(creator_id);
+  }
+
+  if(result == undefined) 
+  {
+    return [];
+  }
+
+  for(const result_row of result.rows)
+  {
+    let user_quiz_info = new UserQuizInfo();
+
+    user_quiz_info.quiz_id = result_row.quiz_id;
+
+    if(user_quiz_info.quiz_id == undefined) // quiz id는 없을 수 없다.
     {
-      result = await db_manager.selectAllQuizInfo();
-    }
-    else
-    {
-      result = await db_manager.selectQuizInfo(creator_id);
-    }
-
-    if(result == undefined) 
-    {
-      return [];
-    }
-
-    for(const result_row of result.rows)
-    {
-      let user_quiz_info = new UserQuizInfo();
-
-      user_quiz_info.quiz_id = result_row.quiz_id;
-
-      if(user_quiz_info.quiz_id == undefined) // quiz id는 없을 수 없다.
-      {
-          logger.error(`User Quiz Info ID is undefined... pass this`);
-          continue;
-      }
-
-      for(const column of QuizInfoColumn)
-      {
-        user_quiz_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
-      }
-
-      user_quiz_list.push(user_quiz_info);
+      logger.error(`User Quiz Info ID is undefined... pass this`);
+      continue;
     }
 
-    return user_quiz_list;
-}
+    for(const column of QuizInfoColumn)
+    {
+      user_quiz_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+    }
 
-const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, limit) => { //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
+    user_quiz_list.push(user_quiz_info);
+  }
+
+  return user_quiz_list;
+};
+
+const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, limit) => 
+{ //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
 
   if(quiz_type_tags_value == 0) //퀴즈 유형을 선택하지 않았다면
   {
@@ -289,8 +291,8 @@ const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, lim
 
     if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
     {
-        logger.error(`User Question Info ID is undefined... pass this`);
-        continue;
+      logger.error(`User Question Info ID is undefined... pass this`);
+      continue;
     }
 
     for(const column of QuestionInfoColumn)
@@ -313,6 +315,6 @@ const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, lim
   }
 
   return [total_question_count, question_list];
-}
+};
 
 module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags };

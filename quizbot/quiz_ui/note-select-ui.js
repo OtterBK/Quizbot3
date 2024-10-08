@@ -27,6 +27,15 @@ class NotesSelectUI extends QuizBotControlComponentUI
   {
     super();
 
+    this.initializeEmbed();
+    this.initializeContents();
+    this.initializeNoteSelectUIEventHandler();
+  }
+
+  initializeEmbed() 
+  {
+    
+
     this.embed = {
       color: 0x87CEEB,
       title: text_contents.notes_select_ui.title,
@@ -36,18 +45,29 @@ class NotesSelectUI extends QuizBotControlComponentUI
     this.cur_contents = undefined; //현재 표시할 컨텐츠
     this.notice_contents = undefined; //공지용
     this.patch_note_contents = undefined; //패치노트용
+  }
 
+  initializeContents()
+  {
     this.main_description = text_contents.notes_select_ui.description;
 
     this.loadNoteContents(SYSTEM_CONFIG.notices_path)
-    .then(content_list =>
-    {
-      this.notice_contents = content_list;
-      this.cur_contents = this.notice_contents;
-      this.displayContents(0);
-      this.update();
-    });
+      .then(content_list =>
+      {
+        this.notice_contents = content_list;
+        this.cur_contents = this.notice_contents;
+        this.displayContents(0);
+        this.update();
+      });
+  }
 
+  initializeNoteSelectUIEventHandler()
+  {
+    this.note_select_ui_handler = 
+    {
+      'notice': this.handleNoticeSelect.bind(this),
+      'patch_note': this.handlePatchNoteSelect.bind(this),
+    };
   }
 
   async loadNoteContents(notes_folder_path) 
@@ -64,60 +84,85 @@ class NotesSelectUI extends QuizBotControlComponentUI
   
     //파일명으로 정렬
     const content_list_sorted_by_name = fs.readdirSync(notes_folder_path)
-    .sort((a, b) => {
-      return b.localeCompare(a, 'ko');
-    })
-    .map(function(v) { 
-      return { name:v.replace('.txt', ""),
-              mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
-              note_path: `${notes_folder_path}/${v}`
-            }; 
-    });
+      .sort((a, b) => 
+      {
+        return b.localeCompare(a, 'ko');
+      })
+      .map(function(v) 
+      { 
+        return { name:v.replace('.txt', ""),
+          mtime:fs.statSync(`${notes_folder_path}/${v}`).mtime,
+          note_path: `${notes_folder_path}/${v}`
+        }; 
+      });
 
     return content_list_sorted_by_name;
   }
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
-
-    const is_page_move = this.checkPageMove(interaction);
-    if(is_page_move == undefined) return;
-    if(is_page_move == true) return this;
-
-    if(interaction.customId == 'notice') //공지사항 버튼 클릭 시
-    {
-      this.cur_contents = this.notice_contents;
-      this.cur_page = 0;
-      this.displayContents(this.cur_page);
-      return;
-    }
-
-    if(interaction.customId == 'patch_note') //패치노트 버튼 클릭 시
-    {
-      this.cur_contents = this.patch_note_contents;
-      this.cur_page = 0;
-      this.displayContents(this.cur_page);
-      return;
-    }
-
-    const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
-
-    // 그냥 페이지 계산해서 content 가져오자
-    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
-
-    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    if(this.isUnsupportedInteraction(interaction))  
     {
       return;
     }
 
-    const note_info = this.cur_contents[index];
-    if(note_info['note_path'] != undefined) //Note를 클릭했을 경우
+    if(this.isPageMoveEvent(interaction))
+    {
+      return this.handlePageMoveEvent(interaction);
+    }
+
+    if(this.isNoteSelectUIEvent(interaction))
+    {
+      return this.handleNoteSelectUIEvent(interaction);
+    }
+
+    if(this.isSelectedIndexEvent(interaction))
+    {
+      return this.handleSelectedIndexEvent(interaction);
+    }
+    
+  }
+
+  isNoteSelectUIEvent(interaction)
+  {
+    this.note_select_ui_handler[interaction.customId] !== undefined;
+  }
+
+  handleNoteSelectUIEvent(interaction)
+  {
+    const handler = this.note_select_ui_handler[interaction.customId];
+    return handler(interaction);
+  }
+
+  handleNoticeSelect(interaction)
+  {
+    this.cur_contents = this.notice_contents;
+    this.pageMove(0);
+    return this;
+  }
+
+  handlePatchNoteSelect(interaction)
+  {
+    this.cur_contents = this.patch_note_contents;
+    this.pageMove(0);
+    return this;
+  }
+
+  handleSelectedIndexEvent(interaction)
+  {
+    const selected_index = this.convertToSelectedIndex(interaction.customId);
+
+    const note_index = (this.count_per_page * this.cur_page) + selected_index - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+    if(note_index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    {
+      return;
+    }
+
+    const note_info = this.cur_contents[note_index];
+    if(note_info['note_path'] !== undefined) //Note를 클릭했을 경우
     {
       return new NoteUI(note_info);
     }
-    
   }
 }
 

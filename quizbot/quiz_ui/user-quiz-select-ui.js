@@ -32,10 +32,16 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     this.all_user_quiz_contents = undefined;
     this.selected_tags_value = 0;
     this.selected_keyword_value = undefined;
-
     this.selected_sort_by_value = 'modified_time';
-    this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
-    this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함
+    
+    this.initializeEmbed();
+    this.initializeComponents();
+    this.initializeUserQuizSelectUIEventHandler();
+  }
+
+  initializeEmbed() 
+  {
+    
 
     this.embed = {
       color: 0x05f1f1,
@@ -43,91 +49,33 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       url: text_contents.user_select_category.url,
       description: '퀴즈 목록을 불러오는 중...\n잠시만 기다려주세요.🙂',
     };
+  }
+
+  initializeComponents() 
+  {
+    
+
+    this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
+    this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함
 
     this.components[2].components[2] = btn_search; //점프 버튼을 검색 버튼으로 대체, this.components는 clonedeep이라 그냥 바꿔도 된다.
     this.components.push(this.sort_by_select_menu);
     this.components.push(this.search_tag_select_menu);
   }
 
+  initializeUserQuizSelectUIEventHandler()
+  {
+    this.user_quiz_select_ui_handler = 
+    {
+      'sort_by_select': this.handleRequestSort.bind(this),
+      'quiz_search_tags_select_menu': this.handleRequestTagSearch.bind(this),
+      'request_modal_complex_page_jump': this.handleRequestModalComplexPageJump.bind(this),
+    };
+  }
+
   onReady() //ui 등록 됐을 때
   {
     this.loadAllUserQuizList(undefined); //여기서 ui 업데이트함
-  }
-
-  onInteractionCreate(interaction)
-  {
-    if(this.cur_contents == undefined)
-    {
-      return undefined;
-    }
-
-    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
-
-    if(interaction.customId == "sort_by_select") //정렬 방식 선택한 경우
-    {
-      this.reorderQuizInfoList(interaction.values[0]); //재정렬 ㄱㄱ
-      this.displayContents(this.cur_page);
-      return this;
-    }
-
-    if(interaction.customId == 'quiz_search_tags_select_menu')
-    {
-      const selected_tags_value = interaction.values[0];
-      this.filterByTag(selected_tags_value);
-
-      this.cur_page = 0;
-      this.displayContents(this.cur_page);
-      return this;
-    }
-
-    //점프 버튼 눌렀을 때임
-    if(interaction.customId == 'request_modal_complex_page_jump')
-    {
-      interaction.showModal(modal_complex_page_jump); //페이지 점프 입력 모달 전달
-      return undefined;
-    }
-
-    let force_refresh = false;
-    if(interaction.customId == 'modal_complex_page_jump') //키워드 검색을 먼저 본다.
-    {
-      const input_keyword_value = interaction.fields.getTextInputValue('txt_input_keyword');
-
-      this.filterByKeyword(input_keyword_value);
-
-      this.cur_page = 0;
-      this.displayContents(this.cur_page); 
-
-      if(input_keyword_value == undefined || input_keyword_value == '')
-      {
-        interaction.channel.send({content: `>>> 모든 퀴즈를 표시합니다.`});
-      }
-      else
-      {
-        interaction.channel.send({content: `>>> **${input_keyword_value}** 에 대한 검색 결과입니다.`});
-      }
-
-      force_refresh = true;
-    }
-    
-    const is_page_move = this.checkPageMove(interaction);
-    if(is_page_move == undefined && force_refresh == false) return;
-    if(is_page_move == true || force_refresh == true) return this;
-
-    const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
-
-    // 그냥 페이지 계산해서 content 가져오자
-    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
-
-    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
-    {
-      return;
-    }
-
-    const user_quiz_info = this.cur_contents[index]; //퀴즈를 선택했을 경우
-
-    return new UserQuizInfoUI(user_quiz_info, true); //readonly true로 넘겨야함
-    
   }
 
   async loadAllUserQuizList()
@@ -147,9 +95,91 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     this.update();
   }
 
+  onInteractionCreate(interaction)
+  {
+    if(this.isUnsupportedInteraction(interaction))  
+    {
+      return;
+    }
+
+    if(this.isUserQuizSelectUIEvent(interaction))
+    {
+      return this.handleUserQuizSelectUIEvent(interaction);
+    }
+    
+    if(this.isPageMoveEvent(interaction))
+    {
+      if(interaction.customId === 'modal_complex_page_jump') //키워드 검색을 먼저 본다.
+      {
+        this.handleRequestKeywordSearch(interaction); //이것만은 어쩔 수 없는 예외
+      }
+
+      return this.handlePageMoveEvent(interaction);
+    }
+
+    if(this.isSelectedIndexEvent(interaction))
+    {
+      return this.handleSelectedIndexEvent(interaction);
+    }
+  }
+
+  isUserQuizSelectUIEvent(interaction)
+  {
+    return this.user_quiz_select_ui_handler[interaction.customId] !== undefined;
+  }
+
+  handleUserQuizSelectUIEvent(interaction)
+  {
+    const handler = this.user_quiz_select_ui_handler[interaction.customId];
+    return handler(interaction);
+  }
+
+  handleRequestSort(interaction)
+  {
+    this.reorderQuizInfoList(interaction.values[0]); //재정렬 ㄱㄱ
+    this.displayContents(this.cur_page);
+    return this;
+  }
+
+  handleRequestTagSearch(interaction)
+  {
+    const selected_tags_value = interaction.values[0];
+    this.filterByTag(selected_tags_value);
+
+    this.cur_page = 0;
+    this.displayContents(this.cur_page);
+    return this;
+  }
+
+  handleRequestModalComplexPageJump(interaction)
+  {
+    interaction.explicit_replied = true;
+    interaction.showModal(modal_complex_page_jump); //페이지 점프 입력 모달 전달
+    return undefined;
+  }
+
+  handleRequestKeywordSearch(interaction)
+  {
+    const input_keyword_value = interaction.fields.getTextInputValue('txt_input_keyword');
+
+    this.filterByKeyword(input_keyword_value);
+
+    this.cur_page = 0;
+    this.displayContents(this.cur_page); 
+
+    if(input_keyword_value === undefined || input_keyword_value === '')
+    {
+      interaction.channel.send({content: `>>> 모든 퀴즈를 표시합니다.`});
+    }
+    else
+    {
+      interaction.channel.send({content: `>>> **${input_keyword_value}** 에 대한 검색 결과입니다.`});
+    }
+  }
+
   reorderQuizInfoList(selected_sort_by_value)
   {
-    if(this.selected_sort_by_value == selected_sort_by_value) return; //바뀐게 없다면 return
+    if(this.selected_sort_by_value === selected_sort_by_value) return; //바뀐게 없다면 return
     
     this.selected_sort_by_value = selected_sort_by_value;
 
@@ -170,7 +200,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   filterByTag(selected_tags_value) //태그로
   {
-    if(this.selected_tags_value == selected_tags_value) //같으면 패스
+    if(this.selected_tags_value === selected_tags_value) //같으면 패스
     {
       return;
     }
@@ -197,12 +227,12 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   filterByKeyword(selected_keyword_value) //검색어로
   {
-    if(this.selected_keyword_value == selected_keyword_value) //같으면 패스
+    if(this.selected_keyword_value === selected_keyword_value) //같으면 패스
     {
       return;
     }
 
-    if(selected_keyword_value == undefined || selected_keyword_value == "") //아무것도 입력 안 입력했다면 전체로 설정하고 패스
+    if(selected_keyword_value === undefined || selected_keyword_value === "") //아무것도 입력 안 입력했다면 전체로 설정하고 패스
     {
       this.cur_contents = this.all_user_quiz_contents;
     }
@@ -217,7 +247,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
         || quiz_info.data.simple_description?.includes(selected_keyword_value)
         || quiz_info.data.description?.includes(selected_keyword_value)
         || quiz_info.data.creator_name?.includes(selected_keyword_value)
-        ) 
+      ) 
       {
         filtered_contents.push(quiz_info);
         continue;
@@ -225,6 +255,23 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     }
 
     this.cur_contents = filtered_contents;
+  }
+
+  handleSelectedIndexEvent(interaction)
+  {
+    const select_index = this.convertToSelectedIndex(interaction.customId);
+
+    // 그냥 페이지 계산해서 content 가져오자
+    const index = (this.count_per_page * this.cur_page) + select_index - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    {
+      return;
+    }
+
+    const user_quiz_info = this.cur_contents[index]; //퀴즈를 선택했을 경우
+
+    return new UserQuizInfoUI(user_quiz_info, true); //readonly true로 넘겨야함
+    
   }
 }
 

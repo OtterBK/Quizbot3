@@ -34,73 +34,54 @@ class UserQuizListUI extends QuizBotControlComponentUI
     this.creator = creator;
     this.creator_id = creator.id;
 
+    this.initializeEmbed();
+    this.initializeComponents();
+    this.initializeUserQuizListHandler();
+  }
+
+  initializeEmbed() 
+  {
     this.embed = {
       color: 0x05f1f1,
       title: `📑 보유한 퀴즈 목록`,
       url: text_contents.dev_select_category.url,
-      description: `🛠 **${creator.displayName}**님이 제작하신 퀴즈 목록입니다!\n \n \n`,
+      description: `🛠 **${this.creator.displayName}**님이 제작하신 퀴즈 목록입니다!\n \n \n`,
 
       footer: {
-        text: creator.displayName, 
-        icon_url: creator.avatarURL(),
+        text: this.creator.displayName, 
+        icon_url: this.creator.avatarURL(),
       },
     };
 
     this.main_description = this.embed.description;
+  }
 
+  initializeComponents() 
+  {
     this.components.push(my_quiz_control_comp);
+  }
 
+  initializeUserQuizListHandler()
+  {
+    this.user_quiz_list_handler = {
+      'request_modal_quiz_create': this.handleRequestModalQuizCreate.bind(this), 
+      'modal_quiz_info': this.addQuiz.bind(this), 
+    };
   }
 
   onReady()
   {
     //조회 속도가 빠르면 메시지 생성되기 전에 updateUI 해버려서 그냥 조회 후 ui 전송되게함
     this.loadUserQuiz()
-    .then(() => 
-    { 
-      this.update();
-      this.sendQuizPlayedInfo(); //제작한 퀴즈 플레이 정보 요약
-    })
-    .catch(err => 
-    {
-      logger.error(`Undefined Current Contents on UserQuizListUI, creator_id:${this.creator_id}, err: ${err.stack}`);
-    });
-  }
-
-  onInteractionCreate(interaction)
-  {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
-
-    if(interaction.customId == 'modal_quiz_info')
-    {
-      this.addQuiz(interaction)
-      return;
-    }
-
-    if(interaction.customId == 'request_modal_quiz_create') //퀴즈 만들기 클릭 시
-    {
-      interaction.showModal(modal_quiz_info); //퀴즈 생성 모달 전달
-      return;
-    }
-
-    const is_page_move = this.checkPageMove(interaction);
-    if(is_page_move == undefined) return;
-    if(is_page_move == true) return this;
-
-    const select_num = parseInt(interaction.customId);
-    if(isNaN(select_num) || select_num < 0 || select_num > 10) return; //1~10번 사이 눌렀을 경우만
-
-    // 그냥 페이지 계산해서 content 가져오자
-    const index = (this.count_per_page * this.cur_page) + select_num - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
-
-    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
-    {
-      return;
-    }
-
-    const user = interaction.user;
-    const user_quiz_info = this.cur_contents[index];
-    return this.showEditor(user, user_quiz_info);
+      .then(() => 
+      { 
+        this.update();
+        this.sendQuizPlayedInfo(); //제작한 퀴즈 플레이 정보 요약
+      })
+      .catch(err => 
+      {
+        logger.error(`Undefined Current Contents on UserQuizListUI, creator_id:${this.creator_id}, err: ${err.stack}`);
+      });
   }
 
   onAwaked() //ui 재활성화 됐을 때
@@ -115,7 +96,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     const user_quiz_list = await loadUserQuizListFromDB(creator_id);
 
-    if(user_quiz_list.length == 0)
+    if(user_quiz_list.length === 0)
     {
       this.embed.description += `아직 제작하신 퀴즈가 없어요.\n새로운 퀴즈를 만들어 보시겠어요?😀`;
       return;
@@ -129,33 +110,61 @@ class UserQuizListUI extends QuizBotControlComponentUI
     }
 
     //어드민일 경우
-    if(PRIVATE_CONFIG?.ADMIN_ID != undefined && PRIVATE_CONFIG.ADMIN_ID == creator_id) 
+    if(PRIVATE_CONFIG?.ADMIN_ID !== undefined && PRIVATE_CONFIG.ADMIN_ID === creator_id) 
     {
       logger.warn(`Matched to Admin ID ${creator_id}, Loading User Quiz List as Undefined`);
       const all_quiz_list = await loadUserQuizListFromDB(undefined); //전체 조회
       for(const quiz_info of all_quiz_list)
-        {
-          quiz_info.name = quiz_info.data.quiz_title;
-          this.cur_contents.push(quiz_info);
-        }
+      {
+        quiz_info.name = quiz_info.data.quiz_title;
+        this.cur_contents.push(quiz_info);
+      }
     }
 
-    this.displayContents(0);
+    this.displayContents();
   }
 
-  showEditor(user, user_quiz_info)
+  onInteractionCreate(interaction)
   {
-    if(user.id != user_quiz_info.data.creator_id && user.id != PRIVATE_CONFIG?.ADMIN_ID) //어드민이면 다 수정 할 수 있음
+    if(this.isUnsupportedInteraction(interaction)) 
     {
-      user.send({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
       return;
     }
 
-    const user_quiz_info_ui = new UserQuizInfoUI(user_quiz_info, false);
-    this.sendDelayedUI(user_quiz_info_ui, true); //ui 업데이트 요청, 메시지 resend를 위해서
+    if(this.isQuizListEvent(interaction))
+    {
+      return this.handleQuizListEvent(interaction);
+    }
+
+    if(this.isPageMoveEvent(interaction))
+    {
+      return this.handlePageMoveEvent(interaction);
+    }
+
+    if(this.isSelectedIndexEvent(interaction))
+    {
+      return this.handleSelectedIndexEvent(interaction);
+    }
   }
 
-  async addQuiz(modal_interaction) //제출된 modal interaction에서 정보 가져다 씀
+  isQuizListEvent(interaction)
+  {
+    return this.user_quiz_list_handler[interaction.customId] !== undefined;
+  }
+
+  handleQuizListEvent(interaction)
+  {
+    const handler = this.user_quiz_list_handler[interaction.customId];
+    return handler(interaction);
+  }
+
+  handleRequestModalQuizCreate(interaction)
+  {
+    interaction.explicit_replied = true;
+    interaction.showModal(modal_quiz_info); //퀴즈 생성 모달 전달
+  }
+
+  addQuiz(modal_interaction) //제출된 modal interaction에서 정보 가져다 씀
   {
     
     let user_quiz_info = new UserQuizInfo();
@@ -165,6 +174,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     const quiz_simple_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_simple_description');
     const quiz_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_description');
 
+    modal_interaction.explicit_replied = true;
     modal_interaction.reply({content: `>>> ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.`, ephemeral: true});
 
     //이건 어쩔 수 없음 직접 하드코딩으로 데이터 넣어야함
@@ -182,23 +192,53 @@ class UserQuizListUI extends QuizBotControlComponentUI
     user_quiz_info.data.is_private = true;
     user_quiz_info.data.played_count_of_week = 0;
 
-    const created_quiz_id = await user_quiz_info.saveDataToDB();
+    user_quiz_info.saveDataToDB()
+      .then(created_quiz_id => 
+      {
+        if(created_quiz_id === undefined) //저장 실패
+        {
+          modal_interaction.user.send({content: `>>> ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM(제육보끔#1916)으로 문의 바랍니다.`, ephemeral: true});
+          return;
+        }
+    
+        logger.info(`Created New Quiz... quiz_id: ${user_quiz_info.quiz_id}, title: ${user_quiz_info.data.quiz_title}`);
+    
+        const user = modal_interaction.user;
+        return this.showEditor(user, user_quiz_info);
+      });
+  }
 
-    if(created_quiz_id == undefined) //저장 실패
+  handleSelectedIndexEvent(interaction)
+  {
+    const selected_index = this.convertToSelectedIndex(interaction.customId);
+
+    // 그냥 페이지 계산해서 content 가져오자
+    const index = (this.count_per_page * this.cur_page) + selected_index - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
+    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
     {
-      modal_interaction.user.send({content: `>>> ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM(제육보끔#1916)으로 문의 바랍니다.`, ephemeral: true});
       return;
     }
 
-    logger.info(`Created New Quiz... quiz_id: ${user_quiz_info.quiz_id}, title: ${user_quiz_info.data.quiz_title}`);
-
-    const user = modal_interaction.user;
+    const user = interaction.user;
+    const user_quiz_info = this.cur_contents[index];
     return this.showEditor(user, user_quiz_info);
+  }
+
+  showEditor(user, user_quiz_info)
+  {
+    if(user.id !== user_quiz_info.data.creator_id && user.id !== PRIVATE_CONFIG?.ADMIN_ID) //어드민이면 다 수정 할 수 있음
+    {
+      user.send({content: `>>> 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}`, ephemeral: true});
+      return;
+    }
+
+    const user_quiz_info_ui = new UserQuizInfoUI(user_quiz_info, false);
+    this.sendDelayedUI(user_quiz_info_ui, true); //ui 업데이트 요청, 메시지 resend를 위해서
   }
 
   sendQuizPlayedInfo()
   {
-    if(this.creator == undefined)
+    if(this.creator === undefined)
     {
       return;
     }
@@ -209,27 +249,27 @@ class UserQuizListUI extends QuizBotControlComponentUI
     let best_quiz = undefined;
     let best_quiz_of_week = undefined;
 
-    if(this.cur_contents == undefined || this.cur_contents.length == 0)
+    if(this.cur_contents === undefined || this.cur_contents.length === 0)
     {
       return;
     }
 
     for(const quiz_info of this.cur_contents)
     {
-      if(quiz_info == undefined)
+      if(quiz_info === undefined)
       {
         continue;
       }
 
       total_played_count += quiz_info.data.played_count;
 
-      if(best_quiz == undefined
+      if(best_quiz === undefined
           || best_quiz.data.played_count < quiz_info.data.played_count)
       {
         best_quiz = quiz_info;
       }
 
-      if(best_quiz_of_week == undefined
+      if(best_quiz_of_week === undefined
         || best_quiz_of_week.data.played_count < quiz_info.data.played_count)
       {
         best_quiz_of_week = quiz_info;
@@ -242,4 +282,4 @@ class UserQuizListUI extends QuizBotControlComponentUI
   }
 }
 
-module.exports = { UserQuizListUI }
+module.exports = { UserQuizListUI };

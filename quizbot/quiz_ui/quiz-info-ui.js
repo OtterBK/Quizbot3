@@ -7,6 +7,7 @@
 //#region 로컬 modules
 const { SYSTEM_CONFIG } = require('../../config/system_setting.js');
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
+const utility = require('../../utility/utility.js');
 const quiz_system = require('../quiz_system/quiz_system.js'); //퀴즈봇 메인 시스템
 const {
   quiz_info_comp,
@@ -31,130 +32,209 @@ class QuizInfoUI extends QuizbotUI
     super();
 
     this.quiz_info = quiz_info;
+    this.max_quiz_count = 100;
+    this.need_tags = false;
+    this.custom_quiz_warned = false; //커스텀 퀴즈 설정 시 주의 사항 안내했는지 여부
+    this.readonly = false;
 
     this.embed = {
       color: 0x87CEEB,
-      title: `${quiz_info['icon'] ?? ''} ${quiz_info['title'] ?? ''}`,
+      title: `${this.quiz_info['icon'] ?? ''} ${this.quiz_info['title'] ?? ''}`,
       description: undefined,
       thumbnail: { //퀴즈 섬네일 표시
-        url: quiz_info['thumbnail'] ?? '',
+        url: this.quiz_info['thumbnail'] ?? '',
       },
       footer: { //퀴즈 제작자 표시
-        text: quiz_info['author'] ?? '',
-        icon_url: quiz_info['author_icon'] ?? '',
+        text: this.quiz_info['author'] ?? '',
+        icon_url: this.quiz_info['author_icon'] ?? '',
       },
     };
 
     this.components = [quiz_info_comp]; //여기서는 component를 바꿔서 해주자
+
+    this.initializeQuizInfoUIEventHandler();
+
+  }
+
+  initializeQuizInfoUIEventHandler()
+  {
+    this.quiz_info_ui_handler =
+    {
+      'start': this.handleStartQuiz.bind(this),
+      'scoreboard': this.handleRequestScoreboard.bind(this), 
+      'settings': this.handleRequestSettingUI.bind(this), 
+      'request_modal_quiz_setting': this.handleRequestModalQuizSetting.bind(this), 
+      'modal_quiz_setting': this.handleSubmitModalQuizSetting.bind(this),
+    };
   }
 
   refreshUI()
   {
-    const quiz_info = this.quiz_info;
-
-    let description = text_contents.quiz_info_ui.description;
-    description = description.replace('${quiz_type_name}', `${quiz_info['type_name']}`);
-    description = description.replace('${quiz_size}', `[ ${quiz_info['selected_question_count'] ?? quiz_info['quiz_size']} / ${quiz_info['quiz_size']} ]`);
-    description = description.replace('${quiz_description}', `${quiz_info['description']}`);
+    let description = this.getDescription();
 
     this.embed.description = description;
   }
 
+  getDescription()
+  {
+    let description = text_contents.quiz_info_ui.description;
+  
+    return description
+      .replace('${quiz_size}', `[ ${this.quiz_info['selected_question_count'] ?? this.quiz_info['quiz_size']} / ${this.max_quiz_count} ]`)
+      .replace('${quiz_type_name}', `${this.quiz_info['type_name']}`)
+      .replace('${quiz_description}', `${this.quiz_info['description']}`);
+  }
+  
+
+  getTagInfoText() 
+  {
+    let tag_info_text = "\n";
+  
+    tag_info_text += `📕 **공식 퀴즈 설정**\n`;
+    const dev_quiz_tags = this.quiz_info['dev_quiz_tags'];
+    let dev_quiz_tags_string = utility.convertTagsValueToString(dev_quiz_tags, SYSTEM_CONFIG.DEV_QUIZ_TAG);
+    dev_quiz_tags_string = dev_quiz_tags_string === '' ? '선택 안함' : dev_quiz_tags_string;
+  
+    tag_info_text += `🔸 퀴즈 유형: '음악 퀴즈'\n`;
+    tag_info_text += `🔹 퀴즈 장르: '${dev_quiz_tags_string}'\n\n`;
+  
+    tag_info_text += `📘 **유저 퀴즈 설정(베타)**\n`;
+    const custom_quiz_type_tags = this.quiz_info['custom_quiz_type_tags'];
+    let custom_quiz_type_tags_string = utility.convertTagsValueToString(custom_quiz_type_tags, SYSTEM_CONFIG.QUIZ_TAG);
+    custom_quiz_type_tags_string = custom_quiz_type_tags_string === '' ? '선택 안함' : custom_quiz_type_tags_string;
+  
+    const custom_quiz_tags = this.quiz_info['custom_quiz_tags'];
+    let custom_quiz_tags_string = utility.convertTagsValueToString(custom_quiz_tags, SYSTEM_CONFIG.QUIZ_TAG);
+  
+    if (custom_quiz_type_tags !== 0 && custom_quiz_tags === 0) 
+    {
+      custom_quiz_tags_string = '모든 장르(분류되지 않은 퀴즈 포함)';
+    } 
+    else if (custom_quiz_tags_string === '') 
+    {
+      custom_quiz_tags_string = '선택 안함';
+    }
+  
+    tag_info_text += `🔸 퀴즈 유형: '${custom_quiz_type_tags_string}'\n`;
+    tag_info_text += `🔹 퀴즈 장르: '${custom_quiz_tags_string}'\n\n`;
+  
+    return tag_info_text;
+  }
+
   onInteractionCreate(interaction) 
   {
-    if(!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
-
-    if(interaction.customId == 'start') //시작 버튼 눌렀을 때
+    if(this.isUnsupportedInteraction(interaction)) 
     {
-      const quiz_info = this.quiz_info;
-
-      const guild = interaction.guild;
-      const owner = interaction.member; //주최자
-      const channel = interaction.channel;
-
-      const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
-      if(check_ready == undefined || check_ready.result == false)
-      {
-        const reason = check_ready.reason;
-        let reason_message = text_contents.quiz_info_ui.failed_start;
-        reason_message = reason_message.replace("${reason}", reason);
-        interaction.channel.send({content: reason_message});
-        return;
-      }
-      
-      quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
-
-      return new AlertQuizStartUI(quiz_info, owner); 
-    }
-
-    if(interaction.customId == 'scoreboard') //순위표 버튼 눌렀을 때
-    {
-      //TODO 순위표 만들기
-    }
-
-    if(interaction.customId == 'settings') //설정 버튼 눌렀을 때
-    {
-      return new ServerSettingUI(interaction.guild.id);
-    }
-
-    if(interaction.customId == 'request_modal_quiz_setting') //퀴즈 설정 버튼 눌렀을 때
-    {
-      const quiz_info = this.quiz_info;
-      const modal_current_quiz_setting = cloneDeep(modal_quiz_setting);
-      
-      modal_current_quiz_setting.components[0].components[0].setLabel(`몇 개의 문제를 제출할까요? (최대 ${quiz_info['quiz_size'] ?? 100})`);
-      
-      interaction.showModal(modal_current_quiz_setting); //퀴즈 설정 모달 전달
       return;
     }
 
-    if(interaction.customId == 'modal_quiz_setting') //퀴즈 설정 값 제출 시,
+    if(this.isQuizInfoUIEvent(interaction))
     {
-      return this.applyQuizSettings(interaction);
+      return this.handleQuizInfoUIEvent(interaction);
     }
   }
 
-  applyQuizSettings(interaction)
+  isQuizInfoUIEvent(interaction)
+  {
+    return this.quiz_info_ui_handler[interaction.customId] !== undefined;
+  }
+
+  handleQuizInfoUIEvent(interaction)
+  {
+    const handler = this.quiz_info_ui_handler[interaction.customId];
+    return handler(interaction);
+  }
+
+  handleStartQuiz(interaction)
   {
     const quiz_info = this.quiz_info;
-    const room_owner = quiz_info['room_owner'];
 
-    // if(room_owner.id != interaction.member.id)
-    // {
-    //   interaction.reply({content: `>>> 방장인 ${room_owner.displayName} 님만 설정이 가능합니다.`, ephemeral: true});
-    //   return undefined;
-    // }
-
-    let need_refresh = false;
-
-    need_refresh |= this.applySelectedQuestionCount(interaction);
-
-    if(need_refresh == false)
+    if(this.checkTagSelected() === false)
     {
-      return undefined;
+      interaction.explicit_replied = true;
+      interaction.reply({content: `\`시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\``, ephemeral: true});
+      return;
+    }
+
+    const guild = interaction.guild;
+    const owner = interaction.member; //주최자
+    const channel = interaction.channel;
+
+    const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
+    if(check_ready === undefined || check_ready.result === false)
+    {
+      const reason = check_ready.reason;
+      const reason_message = text_contents.quiz_info_ui.failed_start.replace("${reason}", reason);
+
+      interaction.explicit_replied = true;
+      interaction.reply({content: `\`${reason_message}\``, ephemeral: true});
+      return;
+    }
+    
+    quiz_system.startQuiz(guild, owner, channel, quiz_info); //퀴즈 시작
+
+    return new AlertQuizStartUI(quiz_info, owner.displayName); 
+  }
+
+  handleRequestScoreboard(interaction)
+  {
+    //TODO 순위표 만들기
+  }
+
+  handleRequestSettingUI(interaction)
+  {
+    return new ServerSettingUI(interaction.guild.id);
+  }
+
+  handleRequestModalQuizSetting(interaction)
+  {
+    const quiz_info = this.quiz_info;
+    const modal_current_quiz_setting = cloneDeep(modal_quiz_setting);
+    
+    modal_current_quiz_setting.components[0].components[0].setLabel(`몇 개의 문제를 제출할까요? (최대 ${quiz_info['quiz_size'] ?? this.max_quiz_count})`);
+    
+    interaction.explicit_replied = true;
+    interaction.showModal(modal_current_quiz_setting); //퀴즈 설정 모달 전달
+  }
+
+  handleSubmitModalQuizSetting(interaction)
+  {
+    const need_refresh = this.applyQuizSettings(interaction);
+
+    if(need_refresh === false)
+    {
+      return;
     }
 
     this.refreshUI();
     return this;
-    
+  }
+
+  applyQuizSettings(interaction)
+  {
+    let need_refresh = false;
+
+    need_refresh |= this.applySelectedQuestionCount(interaction);    
+
+    return need_refresh;
   }
 
   applySelectedQuestionCount(interaction)
   {
     const input_selected_question_count = interaction.fields.getTextInputValue('txt_input_selected_question_count');
 
-    if(input_selected_question_count == undefined || input_selected_question_count == '')
+    if(input_selected_question_count === undefined || input_selected_question_count === '')
     {
-      interaction.deferUpdate(); //defer은 해준다.
       return false;
     }
 
     const quiz_info = this.quiz_info;
-    const all_question_count = quiz_info['quiz_size'] ?? 100;
+    const all_question_count = quiz_info['quiz_size'] ?? this.max_quiz_count;
 
     let selected_question_count = parseInt(input_selected_question_count.trim());
     if(isNaN(selected_question_count) || selected_question_count <= 0) //입력 값 잘못된거 처리
     {
+      interaction.explicit_replied = true;
       interaction.reply({content: `>>> 문제 수 설정에 입력된 ${input_selected_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.`, ephemeral: true});
       return false;
     }
@@ -164,11 +244,67 @@ class QuizInfoUI extends QuizbotUI
       selected_question_count = all_question_count;
     }
     
+    interaction.explicit_replied = true;
     interaction.reply({content: `>>> 제출할 문제 수를 ${selected_question_count}개로 설정했습니다.`, ephemeral: true});
     quiz_info['selected_question_count'] = selected_question_count;
 
     return true;
   }
+
+  applyQuizTagsSetting(interaction)
+  {
+    const quiz_info = this.quiz_info;
+    const tags_value = utility.calcTagsValue(interaction.values);
+
+    let tags_value_type = '';
+    if(interaction.customId === 'dev_quiz_tags_select_menu') //공식 퀴즈 장르 설정 시
+    {
+      tags_value_type = 'dev_quiz_tags';
+    }
+    else if(interaction.customId === 'custom_quiz_type_tags_select_menu') //유저 퀴즈 유형 설정 시
+    {
+      tags_value_type = 'custom_quiz_type_tags';
+      this.sendCustomQuizWarning(interaction.channel);
+    }
+    else if(interaction.customId === 'custom_quiz_tags_select_menu') //유저 퀴즈 장르 설정 시
+    {
+      tags_value_type = 'custom_quiz_tags';
+      this.sendCustomQuizWarning(interaction.channel);
+    }
+    
+    if(tags_value_type === '')
+    {
+      return false;
+    }
+
+    const previous_tags_value = quiz_info[tags_value_type];
+    if(previous_tags_value === tags_value) //같으면 할 게 없다
+    {
+      return false; 
+    } 
+
+    quiz_info[tags_value_type] = tags_value;
+    
+    return true;
+  }
+
+  sendCustomQuizWarning(channel)
+  {
+    if(this.custom_quiz_warned === true)
+    {
+      return;
+    }
+
+    this.custom_quiz_warned = true;
+    const warn_message = "```⚠ 주의! 퀴즈 유형에 유저 퀴즈를 설정하셨습니다.\n공식 퀴즈와 달리 유저 퀴즈는 장르 구분이 정확하지 않을 수 있습니다.\n또한 유저 퀴즈는 플레이 중 오류가 발생할 수 있으니 주의 바랍니다.```";
+    channel.send({content: warn_message});
+  }
+
+  checkTagSelected()
+  {
+    return this.need_tags == false || this.quiz_info['dev_quiz_tags'] !== 0 || this.quiz_info['custom_quiz_type_tags'] !== 0;
+  }
+
 }
 
 module.exports = { QuizInfoUI };

@@ -21,6 +21,7 @@ const { NotesSelectUI } = require("./note-select-ui.js");
 const { QuizToolGuideUI } = require("./quiz-tool-guide-ui.js");
 const { SelectQuizTypeUI } = require("./select-quiz-type-ui.js");
 const { ServerSettingUI } = require("./server-setting-ui.js");
+const { MultiplayerQuizSelectUI } = require("./multiplayer-quiz-select-ui.js");
 
 //#endregion
 
@@ -32,14 +33,22 @@ class MainUI extends QuizbotUI
   {
     super();
 
+    this.initializeEmbed();
+    this.initializeComponents();
+  }
+
+  initializeEmbed() 
+  {
+    
+
     this.embed = {
       color: 0x87CEEB,
       title: text_contents.main_menu.title,
       // url: text_contents.main_menu.url,
       author: {
-      //   name: '📗 메인메뉴',
-      //   icon_url: 'https://i.imgur.com/AfFp7pu.png',
-      //   url: 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg',
+        //   name: '📗 메인메뉴',
+        //   icon_url: 'https://i.imgur.com/AfFp7pu.png',
+        //   url: 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg',
       },
       description: text_contents.main_menu.description,
       thumbnail: {
@@ -81,36 +90,56 @@ class MainUI extends QuizbotUI
       },
     };
 
+    this.loadVersionInfo();    
+  }
+
+  loadVersionInfo()
+  {
     if(fs.existsSync(SYSTEM_CONFIG.version_info_path)) //TODO 음... 패치 일자 실시간으로 가져오기에는 좀 부담스러운데, 나중에 Manager를 하나 두자
     {
       const version_info = fs.readFileSync(SYSTEM_CONFIG.version_info_path, {encoding: 'utf8', flag:'r'});
-      this.embed.footer.text = `${text_contents.main_menu.footer} ${version_info}`
+      this.embed.footer.text = `${text_contents.main_menu.footer} ${version_info}`;
       this.embed.footer.icon_url = undefined;
     }
+  }
+
+  initializeComponents() 
+  {
+    
 
     this.components = [select_btn_component, main_ui_component]; //MAIN UI에서는 control component는 필요없다.
   }
 
   onInteractionCreate(interaction)
   {
-    if(!interaction.isButton()) return;
+    if(!interaction.isButton()) 
+    {
+      return;
+    }
 
-    if(interaction.customId == '1') //로컬플레이 눌렀을 때
+    const guild_id = interaction.guild.id;
+
+    if(interaction.customId === '1') //로컬플레이 눌렀을 때
     {
       return new SelectQuizTypeUI();
     }
 
-    if(interaction.customId == '3') //퀴즈만들기 눌렀을 때
+    if(interaction.customId === '2') //멀티플레이 눌렀을 때
+    {
+      return new MultiplayerQuizSelectUI(guild_id);
+    }
+
+    if(interaction.customId === '3') //퀴즈만들기 눌렀을 때
     {
       return new QuizToolGuideUI(); //퀴즈만들기 방법 안내
     }
 
-    if(interaction.customId == '4') //서버 설정 눌렀을 때
+    if(interaction.customId === '4') //서버 설정 눌렀을 때
     {
-      return new ServerSettingUI(interaction.guild.id);
+      return new ServerSettingUI(guild_id);
     }
 
-    if(interaction.customId == '5') //공지/패치노트 눌렀을 때
+    if(interaction.customId === '5') //공지/패치노트 눌렀을 때
     {
       return new NotesSelectUI();
     }

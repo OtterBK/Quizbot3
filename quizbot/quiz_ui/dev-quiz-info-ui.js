@@ -14,12 +14,12 @@ const { QuizInfoUI } = require('./quiz-info-ui.js');
 /** 단순히 래핑 클래스임 */
 class DevQuizInfoUI extends QuizInfoUI
 {
-    constructor(quiz_info)
-    {
-      super(quiz_info);
+  constructor(quiz_info)
+  {
+    super(quiz_info);
 
-      this.refreshUI();
-    }
+    this.refreshUI();
+  }
 }  
 
 module.exports = { DevQuizInfoUI };

@@ -19,87 +19,97 @@ const logger = require('./utility/logger.js')('ShardManager');
 const { SYSTEM_CONFIG } = require('./config/system_setting.js');
 const { IPC_MESSAGE_TYPE } = require('./quizbot/managers/ipc_manager.js');
 // const web_manager = require('./web/web_manager.js'); //고정 html 표시로 바꿔서 웹서버 열 필요 없음
+const multiplayer_manager = require('./quizbot/managers/multiplayer_manager.js');
 
 const manager = new ClusterManager(`${__dirname}/quizbot/bot.js`, {
-    totalShards: 'auto', // or 'auto'
-    shardsPerClusters: 2,
-    totalClusters: 1,
-    token: PRIVATE_CONFIG.BOT.TOKEN,
-    restarts: { //최대 자동 재시작 횟수
-        max: 5, // Maximum amount of restarts per cluster
-        interval: 60000 * 60, // Interval to reset restarts
-    },
+  totalShards: 'auto', // or 'auto'
+  shardsPerClusters: 2,
+  totalClusters: 1,
+  token: PRIVATE_CONFIG.BOT.TOKEN,
+  restarts: { //최대 자동 재시작 횟수
+    max: 5, // Maximum amount of restarts per cluster
+    interval: 60000 * 60, // Interval to reset restarts
+  },
 });
 
+multiplayer_manager.initialize(manager);
+
 manager.extend( 
-    //신호가 최대 miss에 달하면 알아서 재시작함
-    new HeartbeatManager({
-        interval: 10000, // Interval to send a heartbeat
-        maxMissedHeartbeats: 10, // Maximum amount of missed Heartbeats until Cluster will get respawn
-    })
-)
+  //신호가 최대 miss에 달하면 알아서 재시작함
+  new HeartbeatManager({
+    interval: 10000, // Interval to send a heartbeat
+    maxMissedHeartbeats: 10, // Maximum amount of missed Heartbeats until Cluster will get respawn
+  })
+);
 
 manager.on('clusterCreate', cluster =>
 {
-    cluster.on('message', message => 
+  cluster.on('message', message => 
+  {
+    if(message.ipc_message_type === IPC_MESSAGE_TYPE.SYNC_ADMIN) //그대로 뿌려줌
     {
-        if(message.ipc_message_type === IPC_MESSAGE_TYPE.SYNC_ADMIN) //그대로 뿌려줌
-        {
-            logger.info("Broadcasting SYNC ADMIN message")
-            manager.broadcast(message);
-            return;
-        }
+      logger.info("Broadcasting SYNC ADMIN message");
+      manager.broadcast(message);
+      return;
+    }
 
-        if(message.ipc_message_type === IPC_MESSAGE_TYPE.MULTIPLAY_MESSAGE)
-        {
-            manager.broadcast(message);
-        }
-    });
+    if(message.ipc_message_type === IPC_MESSAGE_TYPE.MULTIPLAYER_SIGNAL) //클러스터로부터 멀티플레이 관련 메시지 수싲
+    {
+      const reply_signal = multiplayer_manager.onSignalReceived(message.signal); //그대로 중앙 매니저한테 전달
 
-    logger.info(`Launched Cluster ${cluster.id}`);
+      if(reply_signal !== undefined)
+      {
+        message.reply(reply_signal);
+      }
+    }
+  });
+
+  logger.info(`Launched Cluster ${cluster.id}`);
 });
 
 /**
  * Sync
  */
-setInterval(async () => { //플레이 현황 체크용
+setInterval(async () => 
+{ //플레이 현황 체크용
 
-    const message = { 
-        ipc_message_type: IPC_MESSAGE_TYPE.CHECK_STATUS, 
-    };
+  const message = { 
+    ipc_message_type: IPC_MESSAGE_TYPE.CHECK_STATUS, 
+  };
 
-    let results = [];
-    for (const cluster of Array.from(manager.clusters.values())) 
+  let results = [];
+  for (const cluster of Array.from(manager.clusters.values())) 
+  {
+    try
     {
-        try
-        {
-            const reply = await cluster.request(message);
-            if(reply != undefined)
-                results.push(reply);
-        }
-        catch(err)
-        {
-            
-        }
-
+      const reply = await cluster.request(message);
+      if(reply != undefined)
+        results.push(reply);
+    }
+    catch(err)
+    {
+      return;
     }
 
-    let status = {
-        guild_count: 0,
-        local_play_count: 0,
-        multi_play_count: 0,
-    }
+  }
 
-    results.forEach(result => {
-        status.guild_count += result.guild_count;
-        status.local_play_count += result.local_play_count;
-        status.multi_play_count += result.multi_play_count;
-    });
+  let status = {
+    guild_count: 0,
+    local_play_count: 0,
+    multi_play_count: 0,
+  };
 
-    manager.broadcast( {
-        ipc_message_type: IPC_MESSAGE_TYPE.SYNC_STATUS,
-        status: status,
-    });
+  results.forEach(result => 
+  {
+    status.guild_count += result.guild_count;
+    status.local_play_count += result.local_play_count;
+    status.multi_play_count += result.multi_play_count;
+  });
+
+  manager.broadcast( {
+    ipc_message_type: IPC_MESSAGE_TYPE.SYNC_STATUS,
+    status: status,
+  });
 
 
 }, SYSTEM_CONFIG.guilds_count_manager_interval * 1000);
@@ -108,8 +118,9 @@ setInterval(async () => { //플레이 현황 체크용
 // web_manager.strat_web();
 
 //전역 에러 처리
-process.on('uncaughtException', (err) => {
-    logger.error(`Uncaught exception error!!! err: ${err.stack}`);
-  });
+process.on('uncaughtException', (err) => 
+{
+  logger.error(`Uncaught exception error!!! err: ${err.stack}`);
+});
 
 manager.spawn({ timeout: -1 });
