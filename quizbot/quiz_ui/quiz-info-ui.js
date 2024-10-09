@@ -85,42 +85,55 @@ class QuizInfoUI extends QuizbotUI
       .replace('${quiz_description}', `${this.quiz_info['description']}`);
   }
   
-
   getTagInfoText() 
   {
     let tag_info_text = "\n";
-  
+    
+    // 공식 퀴즈 설정
     tag_info_text += `📕 **공식 퀴즈 설정**\n`;
     const dev_quiz_tags = this.quiz_info['dev_quiz_tags'];
-    let dev_quiz_tags_string = utility.convertTagsValueToString(dev_quiz_tags, SYSTEM_CONFIG.DEV_QUIZ_TAG);
-    dev_quiz_tags_string = dev_quiz_tags_string === '' ? '선택 안함' : dev_quiz_tags_string;
-  
-    tag_info_text += `🔸 퀴즈 유형: '음악 퀴즈'\n`;
-    tag_info_text += `🔹 퀴즈 장르: '${dev_quiz_tags_string}'\n\n`;
-  
+    const dev_quiz_tags_string = this.formatTagsString(dev_quiz_tags, SYSTEM_CONFIG.DEV_QUIZ_TAG, '음악 퀴즈');
+    tag_info_text += `🔸 퀴즈 유형: \`음악 퀴즈\`\n`;
+    tag_info_text += `🔹 퀴즈 장르: \`${dev_quiz_tags_string}\`\n\n`;
+    
+    // 유저 퀴즈 설정
     tag_info_text += `📘 **유저 퀴즈 설정(베타)**\n`;
     const custom_quiz_type_tags = this.quiz_info['custom_quiz_type_tags'];
-    let custom_quiz_type_tags_string = utility.convertTagsValueToString(custom_quiz_type_tags, SYSTEM_CONFIG.QUIZ_TAG);
-    custom_quiz_type_tags_string = custom_quiz_type_tags_string === '' ? '선택 안함' : custom_quiz_type_tags_string;
-  
     const custom_quiz_tags = this.quiz_info['custom_quiz_tags'];
-    let custom_quiz_tags_string = utility.convertTagsValueToString(custom_quiz_tags, SYSTEM_CONFIG.QUIZ_TAG);
-  
-    if (custom_quiz_type_tags !== 0 && custom_quiz_tags === 0) 
-    {
-      custom_quiz_tags_string = '모든 장르(분류되지 않은 퀴즈 포함)';
-    } 
-    else if (custom_quiz_tags_string === '') 
-    {
-      custom_quiz_tags_string = '선택 안함';
-    }
-  
-    tag_info_text += `🔸 퀴즈 유형: '${custom_quiz_type_tags_string}'\n`;
-    tag_info_text += `🔹 퀴즈 장르: '${custom_quiz_tags_string}'\n\n`;
-  
+    
+    const custom_quiz_type_tags_string = this.getCustomQuizTypeString(custom_quiz_type_tags, custom_quiz_tags);
+    const custom_quiz_tags_string = this.getCustomQuizTagsString(custom_quiz_tags, custom_quiz_type_tags);
+    
+    tag_info_text += `🔸 퀴즈 유형: \`${custom_quiz_type_tags_string}\`\n`;
+    tag_info_text += `🔹 퀴즈 장르: \`${custom_quiz_tags_string}\`\n\n`;
+    
     return tag_info_text;
   }
-
+  
+  formatTagsString(tags) 
+  {
+    const tagsString = utility.convertTagsValueToString(tags, SYSTEM_CONFIG.DEV_QUIZ_TAG);
+    return tagsString === '' ? '선택 안함' : tagsString;
+  }
+  
+  getCustomQuizTypeString(typeTags, quizTags) 
+  {
+    if (typeTags === 0) 
+    {
+      return '선택 안함';
+    }
+    return utility.convertTagsValueToString(typeTags, SYSTEM_CONFIG.QUIZ_TAG);
+  }
+  
+  getCustomQuizTagsString(quizTags, typeTags) 
+  {
+    if (quizTags === 0) 
+    {
+      return typeTags !== 0 ? '모든 장르(분류되지 않은 퀴즈 포함)' : '선택 안함';
+    }
+    return utility.convertTagsValueToString(quizTags, SYSTEM_CONFIG.QUIZ_TAG);
+  }
+  
   onInteractionCreate(interaction) 
   {
     if(this.isUnsupportedInteraction(interaction)) 
@@ -281,7 +294,7 @@ class QuizInfoUI extends QuizbotUI
     if(previous_tags_value === tags_value) //같으면 할 게 없다
     {
       return false; 
-    } 
+    }
 
     quiz_info[tags_value_type] = tags_value;
     

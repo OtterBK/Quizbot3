@@ -155,7 +155,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
   {
     this.loadMultiplayerLobbyList();
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`목록을 다시 불러왔습니다..\``, ephemeral: true});
+    interaction.reply({content: `\`목록을 다시 불러왔습니다.\``, ephemeral: true});
     return undefined;
   }
 

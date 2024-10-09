@@ -215,8 +215,6 @@ const start_quiz_handler = async (interaction) =>
     return;
   }
 
-  const uiHolder = quizbot_ui.createMainUIHolder(interaction); //메인 메뉴 전송
-
   if (
     interaction.guild.members.me
       .permissionsIn(interaction.channel.id)
@@ -232,7 +230,7 @@ const start_quiz_handler = async (interaction) =>
     return;
   }
 
-  //임시로 잠시 해둠
+  //임시로 잠시 해둠 -> 실시간 공지 보내기
   if (fs.existsSync(SYSTEM_CONFIG.current_notice_path)) 
   {
     const current_notice = fs.readFileSync(SYSTEM_CONFIG.current_notice_path, {
@@ -241,6 +239,8 @@ const start_quiz_handler = async (interaction) =>
     });
     interaction.channel.send({ content: '```' + current_notice + '```' });
   }
+
+  const uiHolder = quizbot_ui.createMainUIHolder(interaction); //메인 메뉴 전송
 };
 
 const create_quiz_tool_btn_component = new ActionRowBuilder().addComponents(

@@ -8,6 +8,7 @@ const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, createAudioRe
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, RESTJSONErrorCodes, TeamMemberMembershipState } = require('discord.js');
 const pathToFfmpeg = require('ffmpeg-static');
 process.env.FFMPEG_PATH = pathToFfmpeg;
+const cloneDeep = require("lodash/cloneDeep.js");
 //#endregion
 
 //#region 로컬 모듈 로드
@@ -25,6 +26,7 @@ const feedback_manager = require('../managers/feedback_manager.js');
 const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
 const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('../managers/audio_cache_manager.js');
+const { sign } = require('crypto');
 
 //#endregion
 
@@ -42,7 +44,19 @@ const CYCLE_TYPE =
   ENDING: 'ENDING', //점수 발표
   FINISH: 'FINISH', //세션 정상 종료. 삭제 대기 중
   FORCEFINISH: 'FORCEFINISH', //세션 강제 종료. 삭제 대기 중
+  HOLD: 'HOLD', //그냥 아무것도 안하고 홀딩
 };
+
+const QUIZ_SESSION_TYPE = 
+{
+  NORMAL: 'NORMAL', //
+  DUMMY: 'DUMMY', //
+  MULTIPLAYER_LOBBY: 'MULTIPLAYER_LOBBY', //
+  MULTIPLAYER: 'MULTIPLAYER', //  
+};
+
+exports.QUIZ_SESSION_TYPE = QUIZ_SESSION_TYPE;
+
 //#endregion
 
 //#region global 변수 정의
@@ -99,7 +113,7 @@ exports.getQuizSession = (guild_id) =>
   return quiz_session_map[guild_id];
 };
 
-exports.startQuiz = (guild, owner, channel, quiz_info, is_multiplayer_lobby) =>
+exports.startQuiz = (guild, owner, channel, quiz_info, quiz_session_type=QUIZ_SESSION_TYPE.NORMAL) =>
 {
   const guild_id = guild.id;
   if(quiz_session_map.hasOwnProperty(guild_id))
@@ -109,13 +123,21 @@ exports.startQuiz = (guild, owner, channel, quiz_info, is_multiplayer_lobby) =>
   }
 
   let quiz_session = undefined;
-  if(is_multiplayer_lobby)
+  if(quiz_session_type === QUIZ_SESSION_TYPE.DUMMY)
+  {
+    quiz_session = new DummyQuizSession(guild, owner, channel, quiz_info);
+  }
+  else if(quiz_session_type === QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY)
   {
     quiz_session = new MultiplayerLobbySession(guild, owner, channel, quiz_info);
   }
-  else
+  else if(quiz_session_type === QUIZ_SESSION_TYPE.MULTIPLAYER)
   {
-    quiz_session = new QuizSession(guild, owner, channel, quiz_info);
+    quiz_session = new MultiplayerQuizSession(guild, owner, channel, quiz_info);
+  }
+  else if(quiz_session_type === QUIZ_SESSION_TYPE.NORMAL)
+  {
+    quiz_session = new NormalQuizSession(guild, owner, channel, quiz_info);
   }
 
   quiz_session_map[guild_id] = quiz_session;
@@ -449,9 +471,9 @@ class QuizPlayUI
 //#region 퀴즈 게임용 세션
 class QuizSession
 {
-  constructor(guild, owner, channel, quiz_info, is_fake_session = false)
+  constructor(guild, owner, channel, quiz_info, quiz_session_type)
   {
-    logger.info(`Creating ${is_fake_session ? 'Fake' : '' }Quiz Session, guild_id: ${guild.id}`);
+    logger.info(`Creating ${quiz_session_type} Quiz Session, guild_id: ${guild.id}`);
 
     this.guild = guild;
     this.owner = owner;
@@ -481,26 +503,7 @@ class QuizSession
 
     this.already_liked = true; //이미 like 버튼 눌렀는지 여부. 기본 true 깔고 initializeCustom에서만 false 또는 true 다시 정함
 
-    this.multiplayer = quiz_info['multiplayer'] ?? false; //멀티플레이 세션 여부
-
-    //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
-    //기본 LifeCycle 동작은 다음과 같다
-    //Initialize ->
-    //EXPLAIN ->
-    //Prepare -> if quiz_finish Ending else -> Question
-    //Question ->
-    //(CorrectAnswer 또는 Timeover) -> Question
-
-    if(is_fake_session) //fake 세션은 실제로 아무것도 할 필요가 없다.
-    {
-      this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this)); //이거 정도는 넣어주자
-      return; 
-    }
-
-    this.createCycle();
-        
-
-    this.cycleLoop();
+    this.quiz_session_type = quiz_session_type;
   }
 
   free() //자원 해제
@@ -625,6 +628,8 @@ class QuizSession
     this.inputLifeCycle(CYCLE_TYPE.ENDING, new Ending(this));
     this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this));
 
+    this.inputLifeCycle(CYCLE_TYPE.HOLD, new HOLD(this));
+
     logger.info(`Created Cycle of Quiz Session, guild_id: ${this.guild_id}, Cycle: ${this.cycle_info}`);
   }
 
@@ -646,6 +651,17 @@ class QuizSession
       return undefined;
     }
     return this.lifecycle_map[cycle_type];
+  }
+
+  getCurrentCycle()
+  {
+    const cycle = this.lifecycle_map[this.current_cycle_type];
+    if(cycle === undefined)
+    {
+      logger.error(`get current cycle is undefined!. cycle_type: ${this.current_cycle_type}}`);
+    }
+
+    return cycle;
   }
 
   goToCycle(cycle_type)
@@ -766,23 +782,50 @@ class QuizSession
     this.voice_connection = voice_connection;
     this.audio_player = audio_player;
   }
+
+  isMultiplayerSession()
+  {
+    return this.quiz_session_type === QUIZ_SESSION_TYPE.MULTIPLAYER;
+  }
 }
 
-class FakeQuizSession extends QuizSession
+class NormalQuizSession extends QuizSession
 {
   constructor(guild, owner, channel, quiz_info)
   {
-    super(guild, owner, channel, quiz_info, true); //fake 세션으로 생성
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.NORMAL);
+
+    //퀴즈 타입에 따라 cycle을 다른걸 넣어주면된다.
+    //기본 LifeCycle 동작은 다음과 같다
+    //Initialize ->
+    //EXPLAIN ->
+    //Prepare -> if quiz_finish Ending else -> Question
+    //Question ->
+    //(CorrectAnswer 또는 Timeover) -> Question
+
+    this.createCycle(); //Normal 은 바로 시작
+    this.cycleLoop();
   } 
 }
 
-class MultiplayerLobbySession extends FakeQuizSession //멀티플레이 로비임
+class DummyQuizSession extends QuizSession
 {
   constructor(guild, owner, channel, quiz_info)
   {
-    super(guild, owner, channel, quiz_info);
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.DUMMY); //dummy 세션으로 생성
+
+    this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this)); //DUMMY도 이 정도는 넣어주자
+  } 
+}
+
+class MultiplayerLobbySession extends DummyQuizSession //멀티플레이 로비임
+{
+  constructor(guild, owner, channel, quiz_info)
+  {
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY);
 
     this.createVoiceConnection(); //음성 채널 참가까지는 진행한다.
+    
   }
 
   on(event_name, signal)
@@ -803,22 +846,300 @@ class MultiplayerLobbySession extends FakeQuizSession //멀티플레이 로비�
 
   onReceivedStatedLobby(signal)
   {
-    const finalized_quiz_info = signal.lobby_info?.quiz_info;
-    const participant_guilds_info = signal.lobby_info?.participant_guilds_info;
-
-    if(finalized_quiz_info === undefined)
+    const session_id = signal.session_id;
+    const lobby_info = signal.lobby_info;
+    if(lobby_info.quiz_info === undefined)
     {
       logger.error(`Cannot transit to active quiz session from multiplayer session. finalized quiz info is undefined. guild_id: ${this.guild_id}`);
       return;
     }
 
-    this.transitToActiveQuizSession(finalized_quiz_info);
+    const transited_session = this.transitToActiveQuizSession(lobby_info.quiz_info);
+
+    if(!(transited_session instanceof MultiplayerQuizSession))
+    {
+      logger.error(`Transited Quiz Session is not Multiplayer Quiz Session type!!!. session_id: ${session_id} guild_id: ${this.guild_id}`);
+      return;
+    }
+
+    transited_session.setSessionId(session_id);
+    transited_session.startMultiplayer();
   }
 
   transitToActiveQuizSession(finalized_quiz_info) //Lobby에서 게임 진행할 진짜 QuizSession 으로 전환
   {
     logger.info(`transit to active quiz session from multiplayer session. guild_id: ${this.guild_id}`);
-    exports.startQuiz(this.guild, this.owner, this.channel, finalized_quiz_info); //진짜 퀴즈 세션 생성 -> 해당 함수에서 어차피 Lobby는 free됨
+    return exports.startQuiz(this.guild, this.owner, this.channel, finalized_quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER); //진짜 퀴즈 세션 생성 -> 해당 함수에서 어차피 Lobby는 free됨
+  }
+}
+
+const MULTIPLAYER_STATE =
+{
+  INITIALIZING: 'initializing',
+  WAITING_FOR_QUESTION_LIST: 'waiting_for_question_list',
+  WAITING_FOR_NEXT_QUESTION: 'waiting_for_next_question',
+  WAITING_FOR_SYNC_DONE: 'waiting_for_sync_done',
+};
+
+const MULTIPLAYER_COMMON_OPTION =
+{
+  quiz: {
+    audio_play_time: 35000,
+    hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
+    skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
+    use_similar_answer: OPTION_TYPE.ENABLED,
+    score_type: OPTION_TYPE.SCORE_TYPE.TIME,
+    improved_audio_cut: OPTION_TYPE.ENABLED,
+    use_message_intent: OPTION_TYPE.ENABLED,
+    score_show_max: OPTION_TYPE.UNLIMITED,
+    max_chance: OPTION_TYPE.UNLIMITED,
+  }
+};
+
+class MultiplayerQuizSession extends QuizSession
+{
+  constructor(guild, owner, channel, quiz_info)
+  {
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER);
+    
+    this.session_id = undefined;
+    this.participants = undefined;
+
+    this.multiplayer_state = MULTIPLAYER_STATE.INITIALIZING;
+
+    this.sync_done_sequence_num = 0;
+    this.sync_callback = undefined;
+  }
+
+  setSessionId(session_id)
+  {
+    this.session_id = session_id;
+  }
+
+  startMultiplayer()
+  {
+    //그냥 사이클만 만들어주면 끗
+    this.createCycle();
+    this.cycleLoop();
+  }
+
+  isHostSession()
+  {
+    return this.session_id === this.guild_id;
+  }
+
+  waitForQuestionList()
+  {
+    logger.info(`Waiting for question list. guild_id: ${this.guild_id}`);
+    this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_QUESTION_LIST;
+
+    this.sendMessage({content:`\`🌐 문제 목록을 동기화 하는 중\``});
+  }
+
+  waitForNextQuestionData()
+  {
+    logger.info(`Waiting for next question data. guild_id: ${this.guild_id}`);
+    this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_NEXT_QUESTION;
+    
+    this.sendMessage({content:`\`🌐 제출할 문제 데이터를 동기화 하는 중\``});
+  }
+
+  async waitForSyncDone()
+  {
+    let wait_explain_done_time = 0;
+    while(this.current_cycle_type === CYCLE_TYPE.EXPLAIN)
+    {
+      await utility.sleep(1000);
+      if(++wait_explain_done_time === 15)
+      {
+        logger.error(`Ignore Explain Cycle waiting. guild_id: ${this.guild_id}`);
+        break;
+      }
+    }
+
+    logger.info(`Waiting for sync done. guild_id: ${this.guild_id}`);
+    this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_SYNC_DONE;
+  
+    
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.SYNC_WAIT,
+      }
+    );
+
+    let wait_time_sec = 0;
+    const current_sequence = this.sync_done_sequence_num;
+    while(current_sequence == this.sync_done_sequence_num)
+    {
+      await utility.sleep(1000);
+      ++wait_time_sec;
+
+      if(wait_time_sec === 5)
+      {
+        this.sendMessage({content:`\`🌐 다른 서버와의 동기화를 기다리는 중\``});
+      }
+
+      if(wait_time_sec === 20)
+      {
+        this.sendMessage({content:`\`🌐 동기화가 지연되고 있습니다. 잠시만 기다려주세요...\``});
+        logger.error(`Multiplayer quiz session sync client delayed. guild_id: ${this.guild_id}`);
+        continue;
+      }
+
+      if(wait_time_sec == 60) //이정도면 그냥 뭔가 문제가 있음
+      {
+        this.syncFailed();
+        break;
+      }
+    }
+  }
+
+  syncFailed()
+  {
+    this.sendMessage({content:`\`🌐 멀티플레이 동기화에 실패하였습니다. (client timeout)\``});
+    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}`);
+    this.forceStop();
+  }
+
+  sendSignal(signal)
+  {
+    signal.guild_id = this.guild_id;
+    signal.session_id = this.session_id;
+
+    ipc_manager.sendMultiplayerSignal(
+      signal
+    )
+      .then(result =>
+      {
+        if(result.state === false)
+        {
+          this.sendMessage(`\`요청 전송에 실패했습니다. 멀티플레이 퀴즈를 종료합니다.\n원인: ${result.reason}\``);
+          this.forceStop();
+        }
+      });
+  }
+
+  sendQuestionListInfo()
+  {
+    //꼼수다... 가아끔 basicInitialized 끝나기도 전에 question list가 오는 경우가 잇다
+    setTimeout(() => 
+    {
+      this.sendSignal(
+        {
+          signal_type: CLIENT_SIGNAL.QUESTION_LIST_GENERATED,
+          question_list: this.quiz_data.question_list,
+          quiz_size: this.quiz_data.quiz_size,
+        }
+      );
+  
+      logger.info(`Send question list generated signal. quiz_size: ${this.quiz_data.quiz_size}/${this.quiz_data.question_list.length}, guild_id: ${this.guild_id}`);
+    }, 3000);
+  }
+
+  sendPreparedQuestion(question)
+  {
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.NEXT_QUESTION_GENERATED,
+        question: question,
+        question_num: this.game_data.question_num,
+      }
+    );
+
+    logger.info(`Send current question generated signal. guild_id: ${this.guild_id}`);
+  }
+
+  on(event_name, signal)
+  {
+    if(event_name !== CUSTOM_EVENT_TYPE.receivedMultiplayerSignal) //multiplayer signal 아니면 전부 quiz session한테 넘겨준다
+    {
+      super.on(event_name, signal);
+    }
+
+    const signal_type = signal.signal_type;
+
+    if(signal_type === SERVER_SIGNAL.HOST_CHANGED)
+    {
+      this.onReceivedHostChanged(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.APPLY_QUESTION_LIST)
+    {
+      this.onReceivedApplyQuestionList(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.APPLY_NEXT_QUESTION)
+    {
+      this.onReceivedApplyNextQuestion(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.SYNC_DONE)
+    {
+      this.onReceivedSyncDone(signal);
+    }
+  }
+
+  onReceivedHostChanged(signal)
+  {
+    const new_session_id = signal.session_id;
+    
+    logger.info(`Applying new host session id ${this.session_id} -> ${new_session_id}`);
+
+    this.session_id = new_session_id;
+  }
+
+  onReceivedApplyQuestionList(signal)
+  {
+    if(this.multiplayer_state !== MULTIPLAYER_STATE.INITIALIZING &&
+       this.multiplayer_state !== MULTIPLAYER_STATE.WAITING_FOR_QUESTION_LIST)
+    {
+      logger.error(`Received Apply Question List signal. but current state is ${this.multiplayer_state}.`);
+      return;
+    }
+
+    this.quiz_data.question_list = signal.question_list;
+    this.quiz_data.quiz_size = signal.quiz_size;
+
+    logger.info(`Applying question list signal. call Prepare Cycle quiz_size: ${signal.quiz_size}/${signal.question_list.length}, guild_id: ${this.guild_id}`);
+    
+    if(this.quiz_data.question_list.length === 0)
+    {
+      logger.error(`Received Apply Question List signal. but question list is empty.`);
+      this.sendMessage({content:`\`🌐 문제 목록 동기화에 실패했습니다. 원인: 생성된 문제가 없습니다.\``});
+      this.forceStop();
+
+      return;
+    }
+
+    this.getCurrentCycle()?.asyncCallCycle(CYCLE_TYPE.PREPARE);
+  }
+
+  onReceivedApplyNextQuestion(signal)
+  {
+    // if(this.multiplayer_state !== MULTIPLAYER_STATE.WAITING_FOR_NEXT_QUESTION)
+    // {
+    //   logger.error(`Received Apply Next Question signal. but current state is ${this.multiplayer_state}.`);
+    //   return;
+    // }
+
+    const question_num = signal.question_num;
+    const prepared_question = cloneDeep(signal.prepared_question); 
+    //!!! cloneDeep을 꼭 해줘야한다. signal 객체는 기본적으로 모든 클라이언트에 대해 공유라서 prepared_question['audio_resource'] 로 덮어씌우면 이게 공유돼서
+    //Resource is already being played by another audio player. 에러 뜬다.
+
+    Prepare.fillAudioResource(prepared_question);
+    
+    this.game_data.prepared_question_queue.push(prepared_question);
+
+    logger.info(`Applying next question signal. call wait for sync done guild_id: ${this.guild_id}`);
+
+    this.waitForSyncDone();
+  }
+
+  onReceivedSyncDone(signal)
+  {
+    this.sync_done_sequence_num = signal.sequence_num;
+
+    logger.info(`Received Sync Done signal ${this.sync_done_sequence_num}. calling Questioning Cycle.`);
+
+    this.getCurrentCycle()?.asyncCallCycle(CYCLE_TYPE.QUESTIONING);
   }
 }
 
@@ -1180,9 +1501,13 @@ class Initialize extends QuizLifecycle
       fail_message = fail_message.replace("${quiz_title}", this.quiz_session.quiz_info['title']);
       channel.send({content: fail_message});
       this.forceStop(false);
+      return false;
     }
-        
-    this.asyncCallCycle(CYCLE_TYPE.PREPARE); //미리 문제 준비
+
+    if(this.quiz_session.isMultiplayerSession() === false) //멀티면 question list 받고 할거다
+    {
+      this.asyncCallCycle(CYCLE_TYPE.PREPARE); //미리 문제 준비
+    }
   }
 
   async basicInitialize()
@@ -1195,11 +1520,19 @@ class Initialize extends QuizLifecycle
     //보이스 커넥션
     this.quiz_session.createVoiceConnection();
         
-    //옵션 로드
-    this.loadOptionData().then((option_data) => 
+    if(this.quiz_session.isMultiplayerSession()) 
     {
-      this.quiz_session.option_data = option_data;
-    });
+      //멀티는 공용 옵션
+      this.quiz_session.option_data = MULTIPLAYER_COMMON_OPTION;
+    }
+    else
+    {
+      //옵션 로드
+      this.loadOptionData().then((option_data) => 
+      {
+        this.quiz_session.option_data = option_data;
+      });
+    }
 
     //UI생성
     let quiz_ui = new QuizPlayUI(this.quiz_session.channel);
@@ -1219,6 +1552,7 @@ class Initialize extends QuizLifecycle
     quiz_data['quiz_size'] = quiz_info['quiz_size'];
     quiz_data['thumbnail'] = quiz_info['thumbnail'];
     quiz_data['winner_nickname'] = quiz_info['winner_nickname'];
+    quiz_data['question_list'] = [];
 
     const game_data = {
       'question_num': -1, //현재 내야하는 문제번호
@@ -1787,7 +2121,22 @@ class InitializeOmakaseQuiz extends Initialize
   {
     try
     {
-      await this.OmakaseQuizInitialize();
+      const is_multiplayer = this.quiz_session.isMultiplayerSession();
+
+      if (is_multiplayer) 
+      {
+        this.quiz_session.waitForQuestionList();
+      
+        if(this.quiz_session.isHostSession()) // 멀티플레이어일 때만 호스트 확인
+        { 
+          await this.OmakaseQuizInitialize();
+          this.quiz_session.sendQuestionListInfo();
+        }
+      }
+      else 
+      {
+        await this.OmakaseQuizInitialize(); // 멀티플레이어가 아닐 때 초기화
+      }
     }
     catch(err)
     {
@@ -1958,6 +2307,11 @@ class Explain extends QuizLifecycle
     const explain_list = text_contents.quiz_explain[explain_type];
     for(let i = 0; i < explain_list.length; ++i)
     {
+      if(this.quiz_session?.force_stop === true)
+      {
+        return;
+      }
+
       const explain = explain_list[i];
       quiz_ui.embed.description += explain;
       utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.PLING);
@@ -1965,19 +2319,16 @@ class Explain extends QuizLifecycle
 
       await utility.sleep(SYSTEM_CONFIG.explain_wait);
     }
-
-    //k, h 관련 알림
-    const option_data = this.quiz_session.option_data;
-    if(option_data.quiz.use_message_intent == OPTION_TYPE.ENABLED) //메시지 입력 감시 옵션 on일 때만
-    {
-      const channel = quiz_ui.channel;
-      channel.send('```' + `${text_contents.quiz_explain.how_to_request_hint_and_skip}` + '```');
-      utility.playBGM(this.quiz_session.audio_player, BGM_TYPE.PLING);
-
-      await utility.sleep(SYSTEM_CONFIG.explain_wait);
-    }
-
   }
+
+  async exit()
+  {
+    if(this.quiz_session.isMultiplayerSession())
+    {
+      this.next_cycle = CYCLE_TYPE.HOLD;
+    }
+  }
+
 }
 
 //#endregion
@@ -2032,6 +2383,17 @@ class Prepare extends QuizLifecycle
 
     const question_num = game_data['question_num'];
     let target_question = quiz_data['question_list'].pop(); //어차피 앞에서부터 꺼내든, 뒤에서부터 꺼내든 랜덤인건 똑같다.
+
+    if(this.quiz_session.isMultiplayerSession()) //멀티플레이 참가자 입장이라면 prepare 할 필요 없다.
+    {
+      this.quiz_session.waitForNextQuestionData();
+    
+      if(this.quiz_session.isHostSession() === false)
+      {
+        return false;
+      }
+    }
+
     this.target_question = target_question;
 
     const question_type = target_question['type'];
@@ -2102,6 +2464,12 @@ class Prepare extends QuizLifecycle
     }
 
     this.prepared_question = target_question;
+
+    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession())
+    {
+      this.quiz_session.sendPreparedQuestion(this.prepared_question);
+      return false; //만들고 실제로 prepared queue에 넣으면 안됨.
+    }
   }
 
   async exit()
@@ -2169,7 +2537,7 @@ class Prepare extends QuizLifecycle
   }
 
   /** 오디오 파일 경로와, 오디오 파일의 전체 재싱길이, 시작 지점을 기준으로 스트림 반환 */
-  generateAudioFileStream(audio_path, audio_duration, audio_start_point, audio_length)
+  static generateAudioFileStream(audio_path, audio_duration, audio_start_point, audio_length)
   {
     let audio_stream = undefined;
     let inputType = StreamType.WebmOpus;
@@ -2219,7 +2587,7 @@ class Prepare extends QuizLifecycle
     return [audio_stream, inputType];
   }
     
-  generateAudioResource(audio_stream, inputType) 
+  static generateAudioResource(audio_stream, inputType) 
   {
     let resource = createAudioResource(audio_stream, 
       {
@@ -2233,6 +2601,39 @@ class Prepare extends QuizLifecycle
     }
     
     return resource;
+  }
+
+  /** 멀티에서나 쓰는거임. question 에서 audio_file_stream_info 값 기반으로 audio resource 생성해줌*/
+  static fillAudioResource(question)
+  {
+    const question_audio_file_stream_info = question['audio_file_stream_info'];
+    const answer_audio_file_stream_info = question['answer_audio_file_stream_info'];
+
+    if(question_audio_file_stream_info != undefined)
+    {
+      const file_path = question_audio_file_stream_info.file_path;
+      const audio_duration_sec = question_audio_file_stream_info.audio_duration_sec;
+      const audio_start_point = question_audio_file_stream_info.audio_start_point;
+      const audio_length_sec = question_audio_file_stream_info.audio_length_sec;
+
+      const [audio_stream, inputType] = Prepare.generateAudioFileStream(file_path, audio_duration_sec, audio_start_point, audio_length_sec);
+      const resource = Prepare.generateAudioResource(audio_stream, inputType);
+
+      question['audio_resource'] = resource;
+    }
+
+    if(answer_audio_file_stream_info != undefined)
+    {
+      const file_path = answer_audio_file_stream_info.file_path;
+      const audio_duration_sec = answer_audio_file_stream_info.audio_duration_sec;
+      const audio_start_point = answer_audio_file_stream_info.audio_start_point;
+      const audio_length_sec = answer_audio_file_stream_info.audio_length_sec;
+
+      const [audio_stream, inputType] = Prepare.generateAudioFileStream(file_path, audio_duration_sec, audio_start_point, audio_length_sec);
+      const resource = Prepare.generateAudioResource(audio_stream, inputType);
+
+      question['answer_audio_resource'] = resource;
+    }
   }
 
   getRandomAudioStartPoint(audio_min_start_point, audio_max_start_point, audio_length_sec, use_improved_audio_cut) 
@@ -2299,8 +2700,22 @@ class Prepare extends QuizLifecycle
       logger.debug(`cut audio, question: ${question}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
     }
         
-    const [audio_stream, inputType] = this.generateAudioFileStream(question, audio_duration_sec, audio_start_point, audio_length_sec);
-    const resource = this.generateAudioResource(audio_stream, inputType);
+    const audio_file_stream_info = { //멀티에서 쓰려고 있는거임
+      file_path: question,
+      audio_duration_sec: audio_duration_sec,
+      audio_start_point: audio_start_point,
+      audio_length_sec: audio_length_sec,
+    };
+
+    target_question['audio_file_stream_info'] = audio_file_stream_info;
+
+    if(this.quiz_session.isMultiplayerSession()) //멀티플레이라면 Prepare에서 audio_stream을 만들지 않는다.
+    {
+      return;
+    }
+
+    const [audio_stream, inputType] = Prepare.generateAudioFileStream(question, audio_duration_sec, audio_start_point, audio_length_sec);
+    const resource = Prepare.generateAudioResource(audio_stream, inputType);
         
     target_question['audio_resource'] = resource;
   }
@@ -2336,7 +2751,7 @@ class Prepare extends QuizLifecycle
         
     const { audio_play_time, audio_start, audio_end } = target_question_data;
     
-    const [question_audio_resource, question_audio_play_time_ms, question_error_message] = 
+    const [question_audio_resource, question_audio_play_time_ms, question_error_message, question_audio_file_stream_info] = 
             await this.generateAudioResourceFromWeb(
               question_audio_url, 
               audio_start, 
@@ -2351,6 +2766,10 @@ class Prepare extends QuizLifecycle
     if (question_error_message) 
     {
       target_question['question_text'] += `\n\nAUDIO_ERROR: ${question_error_message}`;
+    }
+    else
+    {
+      target_question['audio_file_stream_info'] = question_audio_file_stream_info;
     }
         
     /**
@@ -2389,7 +2808,33 @@ class Prepare extends QuizLifecycle
          * answer_audio_end
          * answer_audio_play_time
          */
-    setTimeout(async () => 
+
+    if(this.quiz_session.isMultiplayerSession()) //멀티면 동기로
+    {
+      await this.prepareCustomAnswer(target_question, target_question_data, [ipv4, ipv6]);
+    }
+    else //멀티 아니면 비동기로
+    {
+      setTimeout(() => 
+      {
+        this.prepareCustomAnswer(target_question, target_question_data, [ipv4, ipv6]);
+      }
+      , 0);    
+    }
+        
+    /**
+         * answer_image_url, 정답 공개용 이미지 url
+         */
+    //Initial 할 때 이미 처리됨 target_question_data['answer_image_url'];
+        
+    /**
+         * answer_text, 정답 공개용 텍스트
+         */
+    //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
+  }
+
+  async prepareCustomAnswer(target_question, target_question_data, ip_data)
+  {
     { //정답 오디오 준비는 비동기로 실행한다.
       const before_question_num = this.quiz_session.game_data['question_num'];
             
@@ -2397,13 +2842,13 @@ class Prepare extends QuizLifecycle
 
       const { answer_audio_play_time, answer_audio_start, answer_audio_end } = target_question_data;
 
-      const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message] = 
+      const [answer_audio_resource, answer_audio_play_time_ms, answer_error_message, answer_audio_file_stream_info] = 
             await this.generateAudioResourceFromWeb(
               answer_audio_url, 
               answer_audio_start, 
               answer_audio_end, 
               SYSTEM_CONFIG.max_answer_audio_play_time, 
-              [ipv4, ipv6]
+              ip_data
             );
 
       const after_question_num = this.quiz_session.game_data['question_num'];
@@ -2420,17 +2865,11 @@ class Prepare extends QuizLifecycle
       {
         target_question['author'].push(`\n\nAUDIO_ERROR: ${answer_error_message}`);
       }
-    }, 0);        
-        
-    /**
-         * answer_image_url, 정답 공개용 이미지 url
-         */
-    //Initial 할 때 이미 처리됨 target_question_data['answer_image_url'];
-        
-    /**
-         * answer_text, 정답 공개용 텍스트
-         */
-    //Initial 할 때 이미 처리됨 target_question_data['answer_text'];
+      else
+      {
+        target_question['answer_audio_file_stream_info'] = answer_audio_file_stream_info;
+      }
+    }
   }
 
   /** audio_url_row: 오디오 url, audio_start_point: 오디오 시작 지점(sec), audio_end_point: 오디오 끝 지점(sec), audio_play_time_point: 재생 시간(sec)*/
@@ -2538,10 +2977,22 @@ class Prepare extends QuizLifecycle
     audio_start_point = this.getRandomAudioStartPoint(audio_min_start_point, audio_max_start_point, audio_length_sec, use_improved_audio_cut);
     logger.debug(`cut audio: ${audio_url}, point: ${audio_start_point} ~ ${(audio_start_point + audio_length_sec)}`);
 
-    const [audio_stream, inputType] = this.generateAudioFileStream(cache_file_path, audio_duration_sec, audio_start_point, audio_length_sec);
-    const resource = this.generateAudioResource(audio_stream, inputType);
-        
-    return [resource, audio_length_sec * 1000, undefined];
+    const audio_file_stream_info = { //멀티에서 쓰려고 있는거임
+      file_path: cache_file_path,
+      audio_duration_sec: audio_duration_sec,
+      audio_start_point: audio_start_point,
+      audio_length_sec: audio_length_sec,
+    };
+
+    if(this.quiz_session.isMultiplayerSession()) //멀티플레이라면 Prepare에서 audio_stream을 만들지 않는다.
+    {
+      return [undefined, audio_length_sec * 1000, undefined, audio_file_stream_info];
+    }
+
+    const [audio_stream, inputType] = Prepare.generateAudioFileStream(cache_file_path, audio_duration_sec, audio_start_point, audio_length_sec);
+    const resource = Prepare.generateAudioResource(audio_stream, inputType);
+
+    return [resource, audio_length_sec * 1000, undefined, audio_file_stream_info];
   }
 }
 
@@ -2644,15 +3095,17 @@ class Question extends QuizLifeCycleWithUtility
       {
         this.next_cycle = CYCLE_TYPE.CLEARING; 
         logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
-        this.quiz_session.sendMessage({content: `예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.`});
+        this.quiz_session.sendMessage({content: `\`\`\`예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.\`\`\``});
 
         const memoryUsage = process.memoryUsage();
-        logger.error('Memory Usage:', JSON.stringify({
+        logger.error(`Memory Usage:, ${JSON.stringify({
           'Heap Used': `${memoryUsage.heapUsed / 1024 / 1024} MB`,
           'Heap Total': `${memoryUsage.heapTotal / 1024 / 1024} MB`,
           'RSS': `${memoryUsage.rss / 1024 / 1024} MB`,
           'External': `${memoryUsage.external / 1024 / 1024} MB`,
-        }));
+        })}`);
+
+        this.forceStop();
 
         return false;
       }
@@ -2665,7 +3118,7 @@ class Question extends QuizLifeCycleWithUtility
 
     this.answer_type = this.current_question['answer_type'] ?? ANSWER_TYPE.SHORT_ANSWER;
     this.applyAnswerTypeToUI(); //answer_type 대로 컴포넌트 설정
-        
+
 
     //이제 문제 준비가 끝났다. 마지막으로 최소 텀 지키고 ㄱㄱ
     const left_term = essential_term - Date.now();
@@ -4423,8 +4876,13 @@ class Clearing extends QuizLifeCycleWithUtility
       logger.info(`All Question Submitted on Clearing, guild_id:${this.quiz_session.guild_id}`);
       return; //더 이상 진행할 게 없다.
     }
-  }
 
+    if(this.quiz_session.isMultiplayerSession())
+    {
+      this.next_cycle = CYCLE_TYPE.HOLD;
+    }
+    
+  }
 }
 
 //#endregion
@@ -4592,5 +5050,23 @@ class Finish extends QuizLifecycle
 
     delete quiz_session_map[guild_id];
   }
+}
+//#endregion
+
+//#region HOLD Cycle
+/** Quiz session 종료 **/
+class HOLD extends QuizLifecycle
+{
+  static cycle_type = CYCLE_TYPE.HOLD;
+  constructor(quiz_session)
+  {
+    super(quiz_session);
+  }
+
+  async act()
+  {
+    //그냥 아무것도 안하는 CYCLE. 멀티에서 필요해서 만듦
+  }
+
 }
 //#endregion

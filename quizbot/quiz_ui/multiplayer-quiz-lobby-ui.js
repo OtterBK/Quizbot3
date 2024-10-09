@@ -207,7 +207,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     this.session_id = result.session_id; //불변
     this.applyMultiplayerLobbyInfo(result.lobby_info);      
 
-    quiz_system.startQuiz(this.guild, this.owner, this.channel, this.quiz_info, true); //Lobby용 퀴즈 세션 생성
+    quiz_system.startQuiz(this.guild, this.owner, this.channel, this.quiz_info, quiz_system.QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY); //Lobby용 퀴즈 세션 생성
 
     this.refreshTimer = setInterval(() => 
     {
@@ -303,6 +303,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       interaction.reply({content: `\`시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\``, ephemeral: true});
       return;
     }
+
+    // if(this.participant_guilds_info.length < 2)
+    // {
+    //   interaction.explicit_replied = true;
+    //   interaction.reply({content: `\`시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\``, ephemeral: true});
+    //   return;
+    // }
 
     interaction.explicit_replied = true;
     ipc_manager.sendMultiplayerSignal(
@@ -567,7 +574,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       this.onReceivedLeavedLobby(signal);
       break;
 
-    case SERVER_SIGNAL.EXPIRED_LOBBY:
+    case SERVER_SIGNAL.EXPIRED_SESSION:
       this.onReceivedExpiredLobby(signal);
       break;
 
@@ -609,7 +616,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     this.sendMessageReply({content: `\`${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\``});
   }
 
-  // EXPIRED_LOBBY 처리
+  // EXPIRED_SESSION 처리
   onReceivedExpiredLobby(signal)
   {
     this.sendMessageReply({ content: `\`해당 멀티플레이 로비의 호스트가 떠났습니다. 해당 세션은 더 이상 유효하지 않습니다.\`` });
@@ -648,6 +655,9 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
   startLobby(finalized_lobby_info, owner_name='')
   {
+    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by start lobby`);
+    clearInterval(this.refreshTimer);
+
     const alert_ui = new AlertQuizStartUI(finalized_lobby_info.quiz_info, owner_name); 
     this.sendDelayedUI(alert_ui, true);
   }
@@ -676,7 +686,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     logger.info("Disconnecting voice state by leaving lobby");
     quiz_system.forceStopSession(this.guild);
 
-    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer})`);
+    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by expire ui`);
     clearInterval(this.refreshTimer);
     
     super.onExpired();

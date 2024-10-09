@@ -228,6 +228,13 @@ class UserQuizInfoUI extends QuizInfoUI
       const guild = interaction.guild;
       const owner = interaction.member; //주최자
       const channel = interaction.channel;
+
+      if(this.user_quiz_info.question_list?.length == 0)
+      {
+        interaction.explicit_replied = true;
+        interaction.reply({content: `\`이 퀴즈는 문제가 0개여서 시작할 수 없습니다.\``, ephemeral: true});
+        return;
+      }
   
       const check_ready = quiz_system.checkReadyForStartQuiz(guild, owner); //퀴즈를 플레이할 준비가 됐는지(음성 채널 참가 확인 등)
       if(check_ready === undefined || check_ready.result === false)

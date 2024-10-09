@@ -297,7 +297,7 @@ exports.certifyQuiz = async (quiz_id, played_count_criteria) =>
 
 exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit) => 
 {
-  
+
   const query_string =
   `
   WITH matching_quizzes AS (
@@ -313,6 +313,7 @@ exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value
     COUNT(*) OVER() AS total_count
   FROM tb_question_info qu
   JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
+  WHERE qu.answer_type = 1 OR qu.answer_type IS NULL
   ORDER BY RANDOM()
   LIMIT $3;`;
   

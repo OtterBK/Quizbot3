@@ -470,13 +470,21 @@ class UIHolder
     {
       if(this.base_message !== undefined)
       {
-        this.base_message.delete();
+        this.base_message.delete()
+          .catch(err => 
+          {
+            return;
+          });
         this.base_message = undefined;
       }
       
       if(this.base_interaction !== undefined)
       {
-        this.base_interaction.deleteReply();
+        this.base_interaction.deleteReply()
+          .catch(err => 
+          {
+            return;
+          });
         this.base_interaction = undefined;
         this.public_message_mode = true;
       }

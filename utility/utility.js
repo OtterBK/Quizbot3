@@ -407,6 +407,11 @@ exports.convertTagsValueToString = (tags_value, TAG_INFO = QUIZ_TAG) =>
   let tag_string = '';
   for (const [tag_name, tag_value] of Object.entries(TAG_INFO)) 
   {
+    if(tag_value === 0)
+    {
+      continue;
+    }
+
     if ((tags_value & tag_value) != tag_value) 
     {
       continue;

@@ -775,7 +775,7 @@ const omakase_custom_quiz_tags_select_menu =  new ActionRowBuilder()
   let total_menu_count = 0;
   for(const [tag_name, tag_value] of Object.entries(QUIZ_TAG))
   {
-    if(tag_value <= 4) //4이하는 장르 태그가 아님
+    if(tag_value !== 0 && tag_value <= 4) //4이하는 장르 태그가 아님
     {
       continue;
     }
@@ -801,7 +801,7 @@ const modal_multiplayer_create_lobby = new ModalBuilder()
           .setMinLength(1)
           .setMaxLength(20)
           .setRequired(true)
-          .setPlaceholder('예시) 아무나 ㄱㄱ')
+          .setPlaceholder('예시) 즐겜할 사람~')
       )
   );
 
@@ -819,7 +819,7 @@ const modal_multiplayer_edit_lobby = new ModalBuilder()
           .setMinLength(1)
           .setMaxLength(20)
           .setRequired(true)
-          .setPlaceholder('예시) 아무나 ㄱㄱ')
+          .setPlaceholder('예시) 즐겜할 사람~')
       )
   );
 

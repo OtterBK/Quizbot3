@@ -27,7 +27,7 @@ exports.SYSTEM_CONFIG = {
   graceful_timeover_max_try: 0, //타임오버 시, 부드러운 타임 오버를 위한 최대 시도 수
   graceful_timeover_interval: 500, //부드러운 타임 오버 체크 간격 (ms)
 
-  explain_wait: 3500, //퀴즈 설명 단계에서 각 설명 텀
+  explain_wait: 3000, //퀴즈 설명 단계에서 각 설명 텀
   ending_wait: 3500, //순위 발표 단계에서 각 순위 표시 텀
 
   bgm_path: `${__dirname}/../resources/bgm`, //BGM 파일 위치
@@ -125,6 +125,7 @@ exports.ANSWER_TYPE = {
 };
 
 exports.QUIZ_TAG = { //태그는 16비트로 하자
+  '선택 안함':     0b0000000000000000,
   '음악 퀴즈':     0b0000000000000001,
   '그림 퀴즈':     0b0000000000000010,
   '텍스트 퀴즈':   0b0000000000000100,
@@ -147,6 +148,7 @@ exports.QUIZ_TAG = { //태그는 16비트로 하자
 };
 
 exports.DEV_QUIZ_TAG = { //공식 퀴즈용 태그
+  "선택 안함":     0b0000000000000000,
   // "음악 퀴즈":     0b0000000000000001,
   // "그림 퀴즈":     0b0000000000000010,
   // "텍스트 퀴즈":   0b0000000000000100,
