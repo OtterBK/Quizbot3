@@ -5,7 +5,7 @@
 //#endregion
 
 //#region 로컬 modules
-const { SYSTEM_CONFIG, QUIZ_MAKER_TYPE, QUIZ_TYPE } = require('../../config/system_setting.js');
+const { SYSTEM_CONFIG, QUIZ_MAKER_TYPE, QUIZ_TYPE, BGM_TYPE } = require('../../config/system_setting.js');
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
 const quiz_system = require('../quiz_system/quiz_system.js'); //퀴즈봇 메인 시스템
 const utility = require('../../utility/utility.js');
@@ -224,6 +224,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.tag_selected_handler = 
     {
+      'toggle_certified_quiz_filter': this.handleTagSelected.bind(this),
       'dev_quiz_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_type_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_tags_select_menu':  this.handleTagSelected.bind(this),
@@ -249,7 +250,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return;
     }
 
-    interaction.explicit_replied = true;
+
     ipc_manager.sendMultiplayerSignal(
       {
         signal_type: CLIENT_SIGNAL.EDIT_LOBBY,
@@ -262,11 +263,16 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       {
         if(result.state === true)
         {
-          interaction.deferUpdate();
+          if(!interaction.explicit_replied)
+          {
+            interaction.explicit_replied = true;
+            interaction.deferUpdate();
+          }
         // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
         }
         else
         {
+          interaction.explicit_replied = true;
           interaction.reply({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
@@ -628,7 +634,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   // EXPIRED_SESSION 처리
   onReceivedExpiredLobby(signal)
   {
-    this.sendMessageReply({ content: `\`\`\`🌐 해당 멀티플레이 로비의 호스트가 떠났습니다. 해당 세션은 더 이상 유효하지 않습니다.\`\`\`` });
+    this.sendMessageReply({ content: `\`\`\`🌐 로비의 호스트가 떠났습니다. 해당 세션은 더 이상 유효하지 않습니다.\`\`\`` });
     this.leaveLobby();
   }
 
@@ -666,6 +672,8 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by start lobby`);
     clearInterval(this.refreshTimer);
+
+    this.expired = true; //다시 onExpired 호출 안하게
 
     const alert_ui = new AlertQuizStartUI(finalized_lobby_info.quiz_info, owner_name); 
     this.sendDelayedUI(alert_ui, true);

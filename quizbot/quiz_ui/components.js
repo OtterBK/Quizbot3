@@ -881,6 +881,10 @@ const multiplayer_lobby_host_comp = new ActionRowBuilder()
       .setLabel('로비 설정')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
+      .setCustomId('toggle_certified_quiz_filter')
+      .setLabel('인증 필터')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
       .setCustomId('back')
       .setLabel('나가기')
       .setStyle(ButtonStyle.Danger),

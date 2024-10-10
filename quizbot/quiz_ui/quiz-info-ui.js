@@ -97,7 +97,7 @@ class QuizInfoUI extends QuizbotUI
     tag_info_text += `🔹 퀴즈 장르: \`${dev_quiz_tags_string}\`\n\n`;
     
     // 유저 퀴즈 설정
-    tag_info_text += `📘 **유저 퀴즈 설정(베타)**\n`;
+    tag_info_text += `📗 **유저 퀴즈 설정(베타)**\n`;
     const custom_quiz_type_tags = this.quiz_info['custom_quiz_type_tags'];
     const custom_quiz_tags = this.quiz_info['custom_quiz_tags'];
     

@@ -37,7 +37,8 @@ const sendMultiplayerChat = (interaction) =>
   const chat_message = `\`\`\`💭 [${interaction.guild.name}] ${user.displayName}: ${message}\`\`\``;
 
   quiz_session.sendRequestChat(user.id, chat_message);
-  interaction.reply({ content: `\`\`\`메시지를 전송을 요청하였습니다.\`\`\`` , ephemeral: true});
+  // interaction.reply({ content: `\`\`\`메시지 전송을 요청하였습니다.\`\`\`` , ephemeral: true});
+  interaction.deferUpdate();
 };
 
 module.exports = { sendMultiplayerChat };

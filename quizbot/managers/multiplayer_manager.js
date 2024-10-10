@@ -384,13 +384,13 @@ function handleNextQuestionGenerated(signal)
 
   if(session === undefined)
   {
-    logger.error(`${guild_id} generated question list for ${session_id}. but this session is not exists`);
+    logger.error(`${guild_id} generated next question for ${session_id}. but this session is not exists`);
     return { state: false, reason: `더 이상 존재하지 않는 멀티플레이 세션입니다.`};
   }
 
   if(signal.question === undefined)
   {
-    logger.error(`${guild_id} generated question list for ${session_id}. but this question list is undefined`);
+    logger.error(`${guild_id} generated next question for ${session_id}. but this next question is undefined`);
     return { state: false, reason: `문제가 정상적으로 생성되지 않았습니다.`};
   }
 
@@ -837,6 +837,24 @@ class MultiplayerSession
     this.free();
   }
 
+  changeHost(guild_info)
+  {
+    const previous_session_id = this.getSessionId();
+    this.session_owner_guild_id = guild_info.guild_id;
+    this.owner_guild_info = guild_info; 
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.HOST_CHANGED,
+      new_host_guild_info: guild_info.toJsonObject(),
+    };
+    this.sendSignal(signal);
+
+    delete multiplayer_sessions[previous_session_id];
+    multiplayer_sessions[this.getSessionId()];
+
+    logger.info(`The host changed to ${previous_session_id} -> ${this.getSessionId()}`);
+  }
+
   checkSyncDone()
   {
     for(const guild_info of this.participant_guilds)
@@ -962,9 +980,11 @@ class MultiplayerSession
     return Math.ceil(this.participant_guilds.length);
   }
 
-  processWinner(winner_info)
+  processWinner(guild_id)
   {
-    logger.info(`Processing winner ${winner_info.name}`);
+    const guild_info = this.getParticipant(guild_id);
+
+    logger.info(`Processing winner ${guild_info.name}`);
   }
   
   finishUp(guild_id)
@@ -992,9 +1012,9 @@ class MultiplayerSession
     {
       const [guild_id, winner_info] = sorted_scoreboard.entries().next().value;
 
-      logger.info(`${this.getSessionId()}'s winner is ${guild_id}. ${winner_info.name}/${winner_info.score}`);
+      logger.info(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
 
-      this.processWinner(winner_info);
+      this.processWinner(guild_id);
     }
   }
 
@@ -1065,7 +1085,7 @@ class MultiplayerSession
     }
   
     const leaved_guild_info = this.removeParticipant(guild_id);
-    if(leaved_guild_info === undefined)
+    if(leaved_guild_info === undefined && this.checkBanned(guild_id) === false)
     {
       logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
       return true;
@@ -1087,7 +1107,7 @@ class MultiplayerSession
       
       logger.info(`The host of ${this.getSessionId()} has been leaved from lobby. expiring this session`);
 
-      this.finishguild_id();
+      this.finish();
     }
 
     return true;
@@ -1383,21 +1403,14 @@ class MultiplayerSession
 
     if(this.session_owner_guild_id === guild_id) //어라? 나간게... 호스트?
     {
-      const previous_session_id = this.getSessionId();
-
       //호스트 변경!
-      const new_host_guild_info = this.participant_guilds[0];
-      this.session_owner_guild_id = new_host_guild_info.guild_id;
-      this.owner_guild_info = new_host_guild_info; 
-
-      const signal = {
-        signal_type: SERVER_SIGNAL.HOST_CHANGED,
-        new_host_guild_info: new_host_guild_info.toJsonObject(),
-      };
-      this.sendSignal(signal);
-
-      logger.info(`The host changed to ${previous_session_id} -> ${this.getSessionId()}`);
-
+      let new_host_guild_info = undefined;
+      if(this.getParticipantCount() > 0)
+      {
+        new_host_guild_info = this.participant_guilds[0];
+        this.changeHost(new_host_guild_info);
+      }
+      
       if(this.getParticipantCount() <= 1) //1명 이하 남앗다면
       {
         const signal = { //세션 펑
@@ -1405,10 +1418,11 @@ class MultiplayerSession
         };
   
         this.sendSignal(signal);
-        logger.info(`The host of ${this.getSessionId()} has been leaved from ingame. and only one guilds left. expiring this session`);
+        logger.info(`The host of ${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
 
-        this.finishUp(new_host_guild_info.guild_id);
-        this.finish(new_host_guild_info.guild_id);
+        const new_host_guild_id = new_host_guild_info?.guild_id;
+        this.finishUp(new_host_guild_id);
+        this.finish(new_host_guild_id);
       }
     }
 
