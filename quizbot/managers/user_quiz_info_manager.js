@@ -264,7 +264,7 @@ const loadUserQuizListFromDB = async (creator_id) =>
   return user_quiz_list;
 };
 
-const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, limit) => 
+const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, limit, certified_filter=true) => 
 { //tag로 문제 목록 가져오기. 이야 이거 비용 좀 비쌀듯
 
   if(quiz_type_tags_value == 0) //퀴즈 유형을 선택하지 않았다면
@@ -281,7 +281,7 @@ const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, lim
   ];
   const question_list = [];
 
-  const result = await db_manager.selectRandomQuestionListByTags(quiz_type_tags_value, tag_value, limit);
+  const result = await db_manager.selectRandomQuestionListByTags(quiz_type_tags_value, tag_value, limit, certified_filter);
 
   for(const result_row of result.rows)
   {

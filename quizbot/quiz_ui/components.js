@@ -724,12 +724,38 @@ const modal_quiz_setting = new ModalBuilder()
       ),
   );
 
+//오마카세 퀴즈용
+const omakase_quiz_info_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('start')
+      .setLabel('시작')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('request_modal_quiz_setting')
+      .setLabel('문제 수 설정')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('settings')
+      .setLabel('서버 설정')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('toggle_certified_quiz_filter')
+      .setLabel('인증 필터')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('back')
+      .setLabel('뒤로가기')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+
 //오마카세 퀴즈에서 공식 퀴즈 장르 지정용
 const omakase_dev_quiz_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('dev_quiz_tags_select_menu').
-      setPlaceholder('공식 퀴즈 장르 선택하기').
+      setPlaceholder('공식 퀴즈 장르 선택하기 (다중 선택 가능)').
       setMaxValues(Object.keys(DEV_QUIZ_TAG).length)
   );
 for(const [tag_name, tag_value] of Object.entries(DEV_QUIZ_TAG))
@@ -743,7 +769,7 @@ const omakase_custom_quiz_type_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('custom_quiz_type_tags_select_menu').
-      setPlaceholder('유저 퀴즈 유형 선택하기').
+      setPlaceholder('유저 퀴즈 유형 선택하기 (다중 선택 가능)').
       setMaxValues(Object.keys(QUIZ_TAG).length)
   );
 {
@@ -768,7 +794,7 @@ const omakase_custom_quiz_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('custom_quiz_tags_select_menu').
-      setPlaceholder('유저 퀴즈 장르 선택하기').
+      setPlaceholder('유저 퀴즈 장르 선택하기 (다중 선택 가능)').
       setMaxValues(Object.keys(QUIZ_TAG).length)
   );
 {
@@ -938,6 +964,7 @@ module.exports = {
   question_control_btn_component,
   btn_search,
   modal_quiz_setting,
+  omakase_quiz_info_comp,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,

@@ -9,7 +9,7 @@ const { SYSTEM_CONFIG, QUIZ_MAKER_TYPE, QUIZ_TYPE } = require('../../config/syst
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('../../utility/utility.js');
 const {
-  quiz_info_comp,
+  omakase_quiz_info_comp,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu
@@ -37,7 +37,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     omakase_quiz_info['icon'] = '🍴';
 
     omakase_quiz_info['type_name'] = "**퀴즈봇 마음대로 퀴즈!**"; 
-    omakase_quiz_info['description'] = "장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\n"; 
+    omakase_quiz_info['description'] = `\`\`\`장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\`\`\``; 
 
     omakase_quiz_info['author'] = guild.name ?? guild.id;
     omakase_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -58,6 +58,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     
     omakase_quiz_info['custom_quiz_type_tags'] = 0;
     omakase_quiz_info['custom_quiz_tags'] = 0;
+    omakase_quiz_info['certified_filter'] = true;
 
     omakase_quiz_info['selected_question_count'] = 30; //default
 
@@ -99,15 +100,14 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
   initializeComponents() 
   {
-    
-
-    this.components = [quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
+    this.components = [omakase_quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
   }
 
   initializeTagSelectedHandler()
   {
     this.tag_selected_handler = 
     {
+      'toggle_certified_quiz_filter': this.handleTagSelected.bind(this),
       'dev_quiz_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_type_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_tags_select_menu':  this.handleTagSelected.bind(this),

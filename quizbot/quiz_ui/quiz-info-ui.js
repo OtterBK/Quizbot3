@@ -105,7 +105,10 @@ class QuizInfoUI extends QuizbotUI
     const custom_quiz_tags_string = this.getCustomQuizTagsString(custom_quiz_tags, custom_quiz_type_tags);
     
     tag_info_text += `🔸 퀴즈 유형: \`${custom_quiz_type_tags_string}\`\n`;
-    tag_info_text += `🔹 퀴즈 장르: \`${custom_quiz_tags_string}\`\n\n`;
+    tag_info_text += `🔹 퀴즈 장르: \`${custom_quiz_tags_string}\`\n`;
+
+    const certified_filter = this.quiz_info['certified_filter'] ?? true;
+    tag_info_text += `🔹 인증 필터: \`${certified_filter ? '인증된 퀴즈만 출제' : '모든 퀴즈 출제' }\`\n\n`;
     
     return tag_info_text;
   }
@@ -165,7 +168,7 @@ class QuizInfoUI extends QuizbotUI
     if(this.checkTagSelected() === false)
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\`\`\``, ephemeral: true});
       return;
     }
 
@@ -180,7 +183,7 @@ class QuizInfoUI extends QuizbotUI
       const reason_message = text_contents.quiz_info_ui.failed_start.replace("${reason}", reason);
 
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`${reason_message}\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`${reason_message}\`\`\``, ephemeral: true});
       return;
     }
     
@@ -248,7 +251,7 @@ class QuizInfoUI extends QuizbotUI
     if(isNaN(selected_question_count) || selected_question_count <= 0) //입력 값 잘못된거 처리
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\` 문제 수 설정에 입력된 ${input_selected_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`문제 수 설정에 입력된 ${input_selected_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.\`\`\``, ephemeral: true});
       return false;
     }
 
@@ -258,7 +261,7 @@ class QuizInfoUI extends QuizbotUI
     }
     
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`제출할 문제 수를 ${selected_question_count}개로 설정했습니다.\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`제출할 문제 수를 ${selected_question_count}개로 설정했습니다.\`\`\``, ephemeral: true});
     quiz_info['selected_question_count'] = selected_question_count;
 
     return true;
@@ -267,8 +270,25 @@ class QuizInfoUI extends QuizbotUI
   applyQuizTagsSetting(interaction)
   {
     const quiz_info = this.quiz_info;
-    const tags_value = utility.calcTagsValue(interaction.values);
 
+    if(interaction.customId === 'toggle_certified_quiz_filter')
+    {
+      quiz_info['certified_filter'] = !quiz_info['certified_filter'];
+      interaction.explicit_replied = true;
+
+      if(quiz_info['certified_filter'] === false)
+      {
+        interaction.reply({content: `\`\`\`⚠ 주의! 인증 필터를 껐습니다.\n인증되지 않은 퀴즈를 포함한 모든 퀴즈가 출제 문제로 사용됩니다.\n출제될 문제는 다양해지지만 일반적으론 권장되지 않습니다.\`\`\``, ephemeral: true});
+      }
+      else
+      {
+        interaction.reply({content: `\`\`\`인증 필터를 켰습니다.\n인증된 퀴즈만 출제 문제로 사용됩니다.\`\`\``, ephemeral: true});
+      }
+
+      return true;
+    }
+
+    const tags_value = utility.calcTagsValue(interaction.values);
     let tags_value_type = '';
     if(interaction.customId === 'dev_quiz_tags_select_menu') //공식 퀴즈 장르 설정 시
     {

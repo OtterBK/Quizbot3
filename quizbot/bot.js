@@ -328,7 +328,7 @@ const create_quiz_handler = async (interaction) =>
 const clear_quiz_handler = (interaction) =>
 {
   interaction.explicit_replied = true; 
-  interaction.reply({ content: `\`서버에서 진행 중인 모든 세션을 정리했습니다.\n이 명령어는 봇 이용에 문제가 발생했을 때만 사용하세요.\`` });
+  interaction.reply({ content: `\`\`\`서버에서 진행 중인 모든 세션을 정리했습니다.\n이 명령어는 봇 이용에 문제가 발생했을 때만 사용하세요.\`\`\`` });
   logger.info(`Cleared quiz session of ${interaction.guild.id} by ${interaction.user.id}`);
 
   const guild = interaction.guild;
@@ -392,7 +392,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
     {
       //이제 Public UI 조작은 주인만 가능~
       interaction.reply({
-        content: `\`해당 UI를 생성한 ${uiHolder.getOwnerName()}님만이 조작할 수 있어요.\nUI를 새로 만들려면 [/퀴즈] 명령어를 다시 입력해주세요!\``,
+        content: `\`\`\`해당 UI를 생성한 ${uiHolder.getOwnerName()}님만이 조작할 수 있어요.\nUI를 새로 만들려면 [/퀴즈] 명령어를 다시 입력해주세요!\`\`\``,
         ephemeral: true,
       });
       return;

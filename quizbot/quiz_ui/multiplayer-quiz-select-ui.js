@@ -155,14 +155,14 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
   {
     this.loadMultiplayerLobbyList();
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`목록을 다시 불러왔습니다.\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`목록을 다시 불러왔습니다.\`\`\``, ephemeral: true});
     return undefined;
   }
 
   handleRequestScoreboard(interaction)
   {
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`11월에 추가될 예정입니다...😥\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`순위표는 11월에 추가될 예정입니다...😥\`\`\``, ephemeral: true});
     return undefined;
   }
 
@@ -235,7 +235,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
   {
     if(this.is_joining)
     {
-      interaction.channel.send({content: `>>> 이미 ${multiplayer_lobby_info.session_name}에 참여 시도 중입니다.\n잠시 후 다시 시도해보세요.`});
+      interaction.channel.send({content: `\`\`\`🌐 이미 ${multiplayer_lobby_info.session_name}에 참여 시도 중입니다.\n잠시 후 다시 시도해보세요.\`\`\``});
       return undefined;
     }
 

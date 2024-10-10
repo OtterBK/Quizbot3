@@ -295,7 +295,7 @@ exports.certifyQuiz = async (quiz_id, played_count_criteria) =>
 
 };
 
-exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit) => 
+exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit, certified_filter) => 
 {
 
   const query_string =
@@ -307,7 +307,7 @@ exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value
     and ($2 = 0 or (tags_value & $2) > 0)
     and is_private = false
     and is_use = true
-    and certified = true
+    ${certified_filter ? 'and certified = true' : ''}
   )
   SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value,
     COUNT(*) OVER() AS total_count

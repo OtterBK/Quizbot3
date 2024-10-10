@@ -232,7 +232,7 @@ class UserQuizInfoUI extends QuizInfoUI
       if(this.user_quiz_info.question_list?.length == 0)
       {
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\``, ephemeral: true});
+        interaction.reply({content: `\`\`\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\`\`\``, ephemeral: true});
         return;
       }
   
@@ -243,7 +243,7 @@ class UserQuizInfoUI extends QuizInfoUI
         const reason_message = text_contents.quiz_info_ui.failed_start.replace("${reason}", reason);
 
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`${reason_message}\``, ephemeral: true});
+        interaction.reply({content: `\`\`\`${reason_message}\`\`\``, ephemeral: true});
         return;
       }
         
@@ -326,7 +326,7 @@ class UserQuizInfoUI extends QuizInfoUI
   
     if(interaction.customId === 'quiz_delete') //퀴즈 삭제 버튼
     {
-      interaction.user.send({ content: `>>> **${text_contents.quiz_maker_ui.confirm_quiz_delete}**`, components: [quiz_delete_confirm_comp], ephemeral: true });
+      interaction.user.send({ content: `\`\`\`${text_contents.quiz_maker_ui.confirm_quiz_delete}\`\`\``, components: [quiz_delete_confirm_comp], ephemeral: true });
       return;
     }
   

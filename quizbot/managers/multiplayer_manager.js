@@ -975,7 +975,7 @@ class MultiplayerSession
     const sorted_mvp_scoreboard = utility.sortMapByProperty(this.mvp_scoreboard, 'score');
     if(sorted_mvp_scoreboard.size !== 0)
     {
-      const mvp_info = sorted_mvp_scoreboard.entries().next().value;
+      const [user_id, mvp_info] = sorted_mvp_scoreboard.entries().next().value;
 
       const signal = {
         signal_type: SERVER_SIGNAL.CONFIRM_MVP,
@@ -990,9 +990,9 @@ class MultiplayerSession
     const sorted_scoreboard = utility.sortMapByProperty(this.scoreboard, 'score');
     if(sorted_scoreboard.size !== 0)
     {
-      const winner_info = sorted_scoreboard.entries().next().value;
+      const [guild_id, winner_info] = sorted_scoreboard.entries().next().value;
 
-      logger.info(`${this.getSessionId()}'s winner is ${winner_info.name}/${winner_info.score}`);
+      logger.info(`${this.getSessionId()}'s winner is ${guild_id}. ${winner_info.name}/${winner_info.score}`);
 
       this.processWinner(winner_info);
     }
@@ -1273,7 +1273,7 @@ class MultiplayerSession
 
     const signal = {
       signal_type: SERVER_SIGNAL.NOTICE_MESSAGE,
-      notice: `\`🗳 ${guild_info.guild_name} 서버가 스킵 요청에 투표했습니다. ( ${skip_requested_count} / ${confirm_criteria} )\``
+      notice: `\`\`\`🗳 ${guild_info.guild_name} 서버가 스킵 요청에 투표했습니다. ( ${skip_requested_count} / ${confirm_criteria} )\`\`\``
     };
     this.sendSignal(signal);
 
@@ -1308,7 +1308,7 @@ class MultiplayerSession
       signal_type: SERVER_SIGNAL.CONFIRM_ANSWER_HIT,
       answerer_info: {
         answerer_id: guild_id,
-        answerer_name: guild_info.guild_name,
+        answerer_name: `${answerer_name} (${guild_info.guild_name})`,
         score: score,
       }
     };

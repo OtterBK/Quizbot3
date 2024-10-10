@@ -48,7 +48,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['icon'] = '🌐';
 
     multiplayer_quiz_info['type_name'] = "**멀티플레이 퀴즈**"; 
-    multiplayer_quiz_info['description'] = `장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n\`'/챗' 명령어로 전체 대화가 가능합니다.\`\n\n`; 
+    multiplayer_quiz_info['description'] = `\`\`\`🌐 장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n'/챗' 명령어로 전체 대화가 가능합니다.\n\`\`\``; 
 
     multiplayer_quiz_info['author'] = guild.name ?? guild.id;
     multiplayer_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -69,6 +69,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     
     multiplayer_quiz_info['custom_quiz_type_tags'] = 0;
     multiplayer_quiz_info['custom_quiz_tags'] = 0;
+    multiplayer_quiz_info['certified_filter'] = true;
 
     multiplayer_quiz_info['room_owner'] = interaction.member.id;
 
@@ -160,13 +161,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     {
       if(result.state === true)
       {
-        interaction.reply({ content: `\`로비에 참가하였습니다.\`` , ephemeral: true});
+        interaction.reply({ content: `\`\`\`🌐 로비에 참가하였습니다.\`\`\`` , ephemeral: true});
 
         this.handleConnectSucceed(result);
       }
       else
       {
-        interaction.reply({content: `\`참가에 실패했습니다.\n원인: ${result.reason}\``});
+        interaction.reply({content: `\`\`\`🌐 참가에 실패했습니다.\n원인: ${result.reason}\`\`\``});
 
         this.goToBack();
       }
@@ -189,13 +190,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       {
         if(result.state === true)
         {
-          interaction.reply({ content: `\`새로운 로비를 생성하였습니다.\`` , ephemeral: true});
+          interaction.reply({ content: `\`\`\`🌐 새로운 로비를 생성하였습니다.\`\`\`` , ephemeral: true});
 
           this.handleConnectSucceed(result);
         }
         else
         {
-          interaction.reply({ content: `\`로비 생성에 실패하였습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.reply({ content: `\`\`\`🌐 로비 생성에 실패하였습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
 
           this.goToBack();
         }
@@ -262,11 +263,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         if(result.state === true)
         {
           interaction.deferUpdate();
-        // interaction.reply({ content: `\`설정이 반영되었습니다.\`` , ephemeral: true});
+        // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
         }
         else
         {
-          interaction.reply({ content: `\`설정을 반영하지 못했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.reply({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
 
@@ -301,21 +302,21 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     if(this.checkTagSelected() === false)
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`🌐 시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\`\`\``, ephemeral: true});
       return;
     }
 
     if(this.quiz_info.selected_question_count === 0)
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`🌐 이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\`\`\``, ephemeral: true});
       return;
     }
 
     // if(this.participant_guilds_info.length < 2)
     // {
     //   interaction.explicit_replied = true;
-    //   interaction.reply({content: `\`시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\``, ephemeral: true});
+    //   interaction.reply({content: `\`\`\`🌐 시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\`\`\``, ephemeral: true});
     //   return;
     // }
 
@@ -333,11 +334,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         if(result.state === true)
         {
           interaction.deferUpdate();
-          // interaction.reply({ content: `\`게임을 시작합니다.\`` , ephemeral: true});
+          // interaction.reply({ content: `\`\`\`🌐 게임을 시작합니다.\`\`\`` , ephemeral: true});
         }
         else
         { 
-          interaction.reply({ content: `\`게임 시작에 실패했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.reply({ content: `\`\`\`🌐 게임 시작에 실패했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
   }
@@ -356,7 +357,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     if(selected_value > this.participant_guilds_info)
     {
       interaction.explicit_replied = true;
-      interaction.reply({ content: `\`잘못된 선택값입니다...(어라... 이럴리가 없는뎅...)\``, ephemeral: true });
+      interaction.reply({ content: `\`\`\`🌐 잘못된 선택값입니다...(어라... 이럴리가 없는뎅...)\`\`\``, ephemeral: true });
       return;
     }
 
@@ -379,11 +380,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         if(result.state === true)
         {
           interaction.deferUpdate();
-          // interaction.reply({ content: `\`${target_guild_name} 서버를 추방하였습니다.\`` , ephemeral: true});
+          // interaction.reply({ content: `\`\`\`🌐 ${target_guild_name} 서버를 추방하였습니다.\`\`\`` , ephemeral: true});
         }
         else
         {
-          interaction.reply({ content: `\`${target_guild_name} 서버 추방에 실패했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.reply({ content: `\`\`\`🌐 ${target_guild_name} 서버 추방에 실패했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
   }
@@ -411,11 +412,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         if(result.state === true)
         {
           // interaction.deferUpdate();
-          // interaction.reply({ content: `\`설정이 반영되었습니다.\`` , ephemeral: true});
+          // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
         }
         else
         {
-          interaction.followUp({ content: `\`설정을 반영하지 못했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.followUp({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
   }
@@ -443,11 +444,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         if(result.state === true)
         {
           interaction.deferUpdate();
-        // interaction.reply({ content: `\`설정이 반영되었습니다.\`` , ephemeral: true});
+        // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
         }
         else
         {
-          interaction.reply({ content: `\`설정을 반영하지 못했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.reply({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
   }
@@ -562,7 +563,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     if(this.getMessageCreatedTime() < criteria) //생성된지 15분 이상된 Message의 Interaction들은 더 이상 동작하지 않는다. 다시 보내줘야함
     {
       logger.info(`Resending lobby ui to ${this.guild_id}`);
-      this.channel.send( { content: `\`UI가 만료되어 재생성하였습니다.\`` } );
+      this.channel.send( { content: `\`\`\`🌐 UI가 만료되어 재생성하였습니다.\`\`\`` } );
       this.sendDelayedUI(this, true); //만료된거면 무조건 재생성
     }
   }
@@ -614,20 +615,20 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     }
 
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({content: `\`${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\``});
+    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\`\`\``});
   }
 
   // LEAVED_LOBBY 처리
   onReceivedLeavedLobby(signal)
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({content: `\`${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\``});
+    this.sendMessageReply({content: `\`\`\`🌐 ${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\`\`\``});
   }
 
   // EXPIRED_SESSION 처리
   onReceivedExpiredLobby(signal)
   {
-    this.sendMessageReply({ content: `\`해당 멀티플레이 로비의 호스트가 떠났습니다. 해당 세션은 더 이상 유효하지 않습니다.\`` });
+    this.sendMessageReply({ content: `\`\`\`🌐 해당 멀티플레이 로비의 호스트가 떠났습니다. 해당 세션은 더 이상 유효하지 않습니다.\`\`\`` });
     this.leaveLobby();
   }
 
@@ -635,7 +636,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   onReceivedEditedLobby(signal)
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({ content: `\`로비 정보가 변경되었습니다.\`` });
+    this.sendMessageReply({ content: `\`\`\`🌐 로비 정보가 변경되었습니다.\`\`\`` });
   }
 
   // KICKED_PARTICIPANT 처리
@@ -644,12 +645,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     const kicked_guild_info = signal.kicked_guild_info;
     if (this.guild_id === kicked_guild_info.guild_id) 
     {
-      this.sendMessageReply({ content: `\`호스트에 의해 ${this.quiz_info.title} 로비에서 추방됐습니다.\`` });
+      this.sendMessageReply({ content: `\`\`\`🌐 호스트에 의해 ${this.quiz_info.title} 로비에서 추방됐습니다.\`\`\`` });
       this.leaveLobby();
     } 
     else 
     {
-      this.sendMessageReply({ content: `\`${kicked_guild_info.guild_name} 서버가 로비에서 추방됐습니다.\`` });
+      this.sendMessageReply({ content: `\`\`\`🌐 ${kicked_guild_info.guild_name} 서버가 로비에서 추방됐습니다.\`\`\`` });
     }
   }
 
@@ -657,7 +658,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   onReceivedStartedLobby(signal)
   {
     this.startLobby(signal.lobby_info, signal.owner_name);
-    this.channel.send({content: `\`호스트가 게임을 시작하였습니다.\``});
+    this.channel.send({content: `\`\`\`🌐 호스트가 게임을 시작하였습니다.\`\`\``});
   }
 
 
@@ -699,7 +700,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     
     super.onExpired();
 
-    this.channel.send({ content: `\`로비에서 퇴장하셨습니다.\`` });
+    this.channel.send({ content: `\`\`\`🌐 로비에서 퇴장하셨습니다.\`\`\`` });
   }
 
 }

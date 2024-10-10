@@ -169,11 +169,11 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     if(input_keyword_value === undefined || input_keyword_value === '')
     {
-      interaction.channel.send({content: `>>> 모든 퀴즈를 표시합니다.`});
+      interaction.channel.send({content: `\`\`\`모든 퀴즈를 표시합니다.\`\`\``});
     }
     else
     {
-      interaction.channel.send({content: `>>> **${input_keyword_value}** 에 대한 검색 결과입니다.`});
+      interaction.channel.send({content: `\`\`\`${input_keyword_value} 에 대한 검색 결과입니다.\`\`\``});
     }
   }
 

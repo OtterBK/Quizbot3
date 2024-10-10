@@ -156,7 +156,16 @@ exports.getLocalQuizSessionCount = () =>
 
 exports.getMultiplayerQuizSessionCount = () => 
 {
-  return 0; //TODO 나중에 멀티플레이 만들면 수정, 멀티플레이 할 때, 퀴즈 정적 로드해두고, 로드 시, 파일 해쉬값 겹치는지 확인해서 중복로드 피할것
+  let multiplayer_session_count = 0;
+  for(const quiz_session of Object.values(quiz_session_map))
+  {
+    if(quiz_session.isMultiplayerSession())
+    {
+      ++multiplayer_session_count;
+    }
+  }
+
+  return multiplayer_session_count; 
 };
 
 exports.startFFmpegAgingManager = () => 
@@ -380,7 +389,7 @@ class QuizPlayUI
 		
           if(err.code === RESTJSONErrorCodes.MissingPermissions || err.code === RESTJSONErrorCodes.MissingAccess) //권한 부족해서 종료된거면 알려주자
           {
-            quiz_session.owner.send({content: `>>>${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}`});
+            quiz_session.owner.send({content: `\`\`\`${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}\`\`\``});
 		        logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}, err.code: ${err.code}`);
           }
 	
@@ -1076,8 +1085,6 @@ class MultiplayerQuizSession extends QuizSession
   {
     logger.info(`Waiting for next question data. guild_id: ${this.guild_id}`);
     this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_NEXT_QUESTION;
-    
-    this.sendMessage({content:`\`\`\`🌐 제출할 문제 데이터를 동기화 하는 중\`\`\``});
   }
 
   async waitForSyncDone()
@@ -1095,7 +1102,13 @@ class MultiplayerQuizSession extends QuizSession
 
       if(wait_sync_ready_time_sec === 50) //5초
       {
+        this.sendMessage({content:`\`\`\`🌐 제출할 문제 데이터를 동기화 하는 중\`\`\``});
+      }
+
+      if(wait_sync_ready_time_sec === 150) //15초
+      {
         this.sendMessage({content:`\`\`\`🌐 문제 데이터 동기화가 지연되고 있습니다. 잠시만 기다려주세요.\`\`\``});
+        logger.error(`Multiplayer quiz session sync ready delayed. guild_id: ${this.guild_id}`);
       }
 
       if(wait_sync_ready_time_sec >= 300) //30초
@@ -1130,7 +1143,7 @@ class MultiplayerQuizSession extends QuizSession
       if(wait_sync_done_time_sec === 200) //20초
       {
         this.sendMessage({content:`\`\`\`🌐 동기화가 지연되고 있습니다. 잠시만 기다려주세요...\`\`\``});
-        logger.error(`Multiplayer quiz session sync client delayed. guild_id: ${this.guild_id}`);
+        logger.error(`Multiplayer quiz session sync done delayed. guild_id: ${this.guild_id}`);
       }
 
       if(wait_sync_done_time_sec >= 500) //50초. 이정도면 그냥 뭔가 문제가 있음
@@ -1146,7 +1159,7 @@ class MultiplayerQuizSession extends QuizSession
   syncFailed()
   {
     this.sendMessage({content:`\`\`\`🌐 멀티플레이 동기화에 실패하였습니다. (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})\n퇴장으로 처리되지만, 패배 처리는 되지 않습니다.\`\`\``});
-    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}`);
+    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}, (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})`);
 
     this.sync_failed = true;
     
@@ -1171,7 +1184,7 @@ class MultiplayerQuizSession extends QuizSession
       {
         if(result.state === false)
         {
-          this.sendMessage(`\`요청 전송에 실패했습니다. 멀티플레이 퀴즈를 종료합니다.\n원인: ${result.reason}\``);
+          this.sendMessage(`\`\`\`요청 전송에 실패했습니다. 멀티플레이 퀴즈를 종료합니다.\n원인: ${result.reason}\`\`\``);
           this.syncFailed();
         }
       });
@@ -1394,7 +1407,7 @@ class MultiplayerQuizSession extends QuizSession
     if(this.quiz_data.question_list.length === 0)
     {
       logger.error(`Received Apply Question List signal. but question list is empty.`);
-      this.sendMessage({content:`\`🌐 문제 목록 동기화에 실패했습니다. 원인: 생성된 문제가 없습니다.\``});
+      this.sendMessage({content:`\`\`\`🌐 문제 목록 동기화에 실패했습니다. 원인: 생성된 문제가 없습니다.\`\`\``});
       this.forceStop();
 
       return;
@@ -1514,7 +1527,7 @@ class MultiplayerQuizSession extends QuizSession
   onReceivedLeavedGame(signal)
   {
     const leaved_guild_info = signal.leaved_guild_info;
-    this.sendMessage({content: `\`${leaved_guild_info.guild_name} 서버가 게임에서 퇴장하였습니다.\``});
+    this.sendMessage({content: `\`\`\`${leaved_guild_info.guild_name} 서버가 게임에서 퇴장하였습니다.\`\`\``});
 
     this.quiz_session.scoreboard.delete(leaved_guild_info.guild_id);
     logger.info(`Received Leaved game signal ${this.guild_id}. erasing ${leaved_guild_info.guild_id} from scoreboard`);
@@ -1528,7 +1541,7 @@ class MultiplayerQuizSession extends QuizSession
     }
 
     const failed_guild_info = signal.failed_guild_info;
-    this.sendMessage({content: `\`${failed_guild_info.guild_name} 서버가 동기화에 실패했습니다.\n해당 서버는 퇴장으로 처리됩니다.\``});
+    this.sendMessage({content: `\`\`\`${failed_guild_info.guild_name} 서버가 동기화에 실패했습니다.\n해당 서버는 퇴장으로 처리됩니다.\`\`\``});
 
     this.quiz_session.scoreboard.delete(failed_guild_info.guild_id);
     logger.info(`Received sync failed signal ${this.guild_id}. erasing ${failed_guild_info.guild_id} from scoreboard`);
@@ -1573,7 +1586,7 @@ class MultiplayerQuizSession extends QuizSession
 
     logger.info(`Received Expired Session signal ${this.guild_id} from ${signal.session_id}.`);
 
-    this.sendMessage({ content: `\`이 서버를 제외한 모든 참여자가 퇴장하였습니다.\n현재 문제가 끝난 뒤 퀴즈가 종료되며 승리로 간주됩니다.\`` });
+    this.sendMessage({ content: `\`\`\`이 서버를 제외한 모든 참여자가 퇴장하였습니다.\n현재 문제가 끝난 뒤 퀴즈가 종료되며 승리로 간주됩니다.\`\`\`` });
   }
 }
 
@@ -2606,9 +2619,11 @@ class InitializeOmakaseQuiz extends Initialize
         
     const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
 
+    const certified_filter = quiz_info['certified_filter'] ?? true; //인증된 퀴즈에서만 뽑을지 필터
+
     //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
     const [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
-    const [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit);
+    const [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit, certified_filter);
 
     //각각 문제 수 비율로 limit을 나눠 가진다.
     const total_all_question_count = total_dev_question_count + total_custom_question_count; //둘 합치고
@@ -3343,7 +3358,7 @@ class Prepare extends QuizLifeCycle
 
       logger.info(`No cache file of ${video_id}. downloading cache`);
             
-      this.quiz_session.sendMessage({content: '`현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥`'});
+      this.quiz_session.sendMessage({content: `\`\`\`현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥\`\`\``});
 
       const ip_info = {
         ipv4: this.quiz_session.ipv4,    
@@ -4208,7 +4223,7 @@ class Question extends QuizLifeCycleWithUtility
       this.selected_choice_map.set(member, selected_choice);
 
       interaction.explicit_replied = true;
-      interaction.reply({ content: `\`선택한 정답: ${this.choiceAsIcon(selected_choice)}\``, ephemeral: true });
+      interaction.reply({ content: `\`\`\`선택한 정답: ${this.choiceAsIcon(selected_choice)}\`\`\``, ephemeral: true });
     }
   }
 
@@ -4663,7 +4678,7 @@ class QuestionOX extends Question
     this.answers = current_question['answers'];
     const question = current_question['question'];
 
-    logger.info(`Questioning Text, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
+    logger.info(`Questioning OX, guild_id:${this.quiz_session.guild_id}, question_num: ${game_data['question_num']+1}/${quiz_data['quiz_size']}, question: ${question.trim()}`);
 
     //OX 퀴즈는 카운트다운 BGM만 틀어준다.
     const is_long = current_question['is_long'] ?? false;
@@ -4945,7 +4960,7 @@ class QuestionOmakase extends Question
 
     const question_num = game_data['question_num'];
     const quiz_size = quiz_data['quiz_size'];
-    logger.info(`Questioning Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id ?? current_question['question']}`);
+    logger.info(`Questioning ${this.quiz_session.isMultiplayerSession() ? 'Multiplayer ' : ''}Omakase, guild_id:${this.quiz_session.guild_id}, question_num: ${question_num + 1}/${quiz_size}, question_id: ${question_id ?? current_question['question']}`);
 
     //이미지 표시
     const image_resource = current_question['image_resource'];
