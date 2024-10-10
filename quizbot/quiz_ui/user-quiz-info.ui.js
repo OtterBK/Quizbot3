@@ -232,7 +232,7 @@ class UserQuizInfoUI extends QuizInfoUI
       if(this.user_quiz_info.question_list?.length == 0)
       {
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`이 퀴즈는 문제가 0개여서 시작할 수 없습니다.\``, ephemeral: true});
+        interaction.reply({content: `\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\``, ephemeral: true});
         return;
       }
   

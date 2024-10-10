@@ -872,14 +872,14 @@ const multiplayer_lobby_kick_select_menu = new StringSelectMenuBuilder().
   setCustomId('multiplayer_lobby_kick_select_menu').
   setPlaceholder('서버 추방하기');
 
-const multiplayer_lobby_participant_select_menu = new StringSelectMenuBuilder().
-  setCustomId('multiplayer_lobby_participant_select_menu').
+const multiplayer_participant_select_menu = new StringSelectMenuBuilder().
+  setCustomId('multiplayer_participant_select_menu').
   setPlaceholder('참여 중인 서버 목록 확인');
 
-const multiplayer_lobby_kick_select_row = new ActionRowBuilder()
+const multiplayer_participant_select_row = new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
-      setCustomId('multiplayer_lobby_participant_select_row').
+      setCustomId('multiplayer_participant_select_row').
       setPlaceholder('참여 중인 서버 목록 확인')
       .addOptions(
         new StringSelectMenuOptionBuilder()
@@ -887,6 +887,19 @@ const multiplayer_lobby_kick_select_row = new ActionRowBuilder()
           .setValue('participant_select_menu_temp'),
       )
   );
+
+const multiplayer_chat_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('multiplayer_chat_report_')
+      .setLabel('신고')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('multiplayer_chat_ignore')
+      .setLabel('모든 채팅 차단')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
 
 //#endregion
 
@@ -934,6 +947,7 @@ module.exports = {
   multiplayer_lobby_participant_comp,
   modal_multiplayer_edit_lobby,
   multiplayer_lobby_kick_select_menu,
-  multiplayer_lobby_kick_select_row,
-  multiplayer_lobby_participant_select_menu,
+  multiplayer_participant_select_row,
+  multiplayer_participant_select_menu,
+  multiplayer_chat_comp
 };

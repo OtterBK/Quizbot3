@@ -16,8 +16,8 @@ const cloneDeep = require("lodash/cloneDeep.js");
 const {
   multiplayer_lobby_host_comp,
   multiplayer_lobby_kick_select_menu,
-  multiplayer_lobby_participant_select_menu,
-  multiplayer_lobby_kick_select_row,
+  multiplayer_participant_select_menu,
+  multiplayer_participant_select_row,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,
@@ -48,7 +48,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['icon'] = '🌐';
 
     multiplayer_quiz_info['type_name'] = "**멀티플레이 퀴즈**"; 
-    multiplayer_quiz_info['description'] = "장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\n"; 
+    multiplayer_quiz_info['description'] = `장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n\`'/챗' 명령어로 전체 대화가 가능합니다.\`\n\n`; 
 
     multiplayer_quiz_info['author'] = guild.name ?? guild.id;
     multiplayer_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -125,11 +125,11 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     if(this.readonly)
     {
-      this.components = [multiplayer_lobby_participant_comp, cloneDeep(multiplayer_lobby_kick_select_row)];
+      this.components = [multiplayer_lobby_participant_comp, cloneDeep(multiplayer_participant_select_row)];
     }
     else
     {
-      this.components = [multiplayer_lobby_host_comp, cloneDeep(multiplayer_lobby_kick_select_row), omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu];
+      this.components = [multiplayer_lobby_host_comp, cloneDeep(multiplayer_participant_select_row), omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu];
     }
   }
 
@@ -207,7 +207,8 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     this.session_id = result.session_id; //불변
     this.applyMultiplayerLobbyInfo(result.lobby_info);      
 
-    quiz_system.startQuiz(this.guild, this.owner, this.channel, this.quiz_info, quiz_system.QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY); //Lobby용 퀴즈 세션 생성
+    const multiplayer_lobby_session = quiz_system.startQuiz(this.guild, this.owner, this.channel, this.quiz_info, quiz_system.QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY); //Lobby용 퀴즈 세션 생성
+    multiplayer_lobby_session.setSessionId(this.session_id);
 
     this.refreshTimer = setInterval(() => 
     {
@@ -304,6 +305,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return;
     }
 
+    if(this.quiz_info.selected_question_count === 0)
+    {
+      interaction.explicit_replied = true;
+      interaction.reply({content: `\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\``, ephemeral: true});
+      return;
+    }
+
     // if(this.participant_guilds_info.length < 2)
     // {
     //   interaction.explicit_replied = true;
@@ -389,7 +397,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return;
     }
 
-    interaction.explicit_replied = true;
+    // interaction.explicit_replied = true;
     ipc_manager.sendMultiplayerSignal(
       {
         signal_type: CLIENT_SIGNAL.EDIT_LOBBY,
@@ -402,12 +410,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       {
         if(result.state === true)
         {
-          interaction.deferUpdate();
-        // interaction.reply({ content: `\`설정이 반영되었습니다.\`` , ephemeral: true});
+          // interaction.deferUpdate();
+          // interaction.reply({ content: `\`설정이 반영되었습니다.\`` , ephemeral: true});
         }
         else
         {
-          interaction.reply({ content: `\`설정을 반영하지 못했습니다.\n원인: ${result.reason}\``, ephemeral: true });
+          interaction.followUp({ content: `\`설정을 반영하지 못했습니다.\n원인: ${result.reason}\``, ephemeral: true });
         }
       });
   }
@@ -501,7 +509,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   setupParticipantSelectMenu() 
   {
     let participant_select_menu_for_current_lobby = this.readonly
-      ? cloneDeep(multiplayer_lobby_participant_select_menu)
+      ? cloneDeep(multiplayer_participant_select_menu)
       : cloneDeep(multiplayer_lobby_kick_select_menu);
   
     for (let i = 0; i < this.participant_guilds_info.length; ++i) 

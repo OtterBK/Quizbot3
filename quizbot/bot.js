@@ -33,6 +33,7 @@ const db_manager = require('./managers/db_manager.js');
 const ipc_manager = require('./managers/ipc_manager.js');
 const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('./managers/audio_cache_manager.js');
+const { sendMultiplayerChat } = require('./managers/multiplayer_chat_manager.js');
 const { stdin } = require('process');
 const { dirname } = require('path');
 
@@ -201,9 +202,42 @@ client.on('ready', () =>
   createCleanUp();
 });
 
-//명령어별 처리
-const command_handlers = {};
+const checkPermission = (interaction) =>
+{
+  if (
+    interaction.guild.members.me
+      .permissionsIn(interaction.channel.id)
+      .has(PermissionsBitField.Flags.SendMessages) == false
+  ) 
+  {
+    interaction.explicit_replied = true; 
+    interaction.reply({
+      content:
+        '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.',
+      ephemeral: true,
+    });
+    return false;
+  }
 
+  if (
+    interaction.guild.members.me
+      .permissionsIn(interaction.channel.id)
+      .has(PermissionsBitField.Flags.ViewChannel) == false
+  ) 
+  {
+    interaction.explicit_replied = true; 
+    interaction.reply({
+      content:
+        '>>> 이 채널의 속성을 확인할 수 있는 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.',
+      ephemeral: true,
+    });
+    return false;
+  }
+
+  return true;
+};
+
+//명령어별 처리
 const start_quiz_handler = async (interaction) => 
 {
   if (interaction.guild == undefined) 
@@ -215,18 +249,8 @@ const start_quiz_handler = async (interaction) =>
     return;
   }
 
-  if (
-    interaction.guild.members.me
-      .permissionsIn(interaction.channel.id)
-      .has(PermissionsBitField.Flags.SendMessages) == false
-  ) 
+  if(checkPermission(interaction) === false)
   {
-    interaction.explicit_replied = true; 
-    interaction.reply({
-      content:
-        '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n퀴즈 시스템이 정상적으로 동작하지 않을겁니다.\n서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.',
-      ephemeral: true,
-    });
     return;
   }
 
@@ -313,11 +337,10 @@ const clear_quiz_handler = (interaction) =>
   quiz_system.forceStopSession(guild);
 };
 
-command_handlers['시작'] = start_quiz_handler;
-command_handlers['start'] = start_quiz_handler;
-
-command_handlers['만들기'] = create_quiz_handler;
-command_handlers['create'] = create_quiz_handler;
+const multiplayer_chat_handler = (interaction) =>
+{
+  sendMultiplayerChat(interaction);
+};
 
 // 상호작용 이벤트
 client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) => 
@@ -341,6 +364,12 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
   if (main_command === '퀴즈정리') 
   {
     clear_quiz_handler(interaction);
+    return;
+  }
+
+  if (main_command === '챗') 
+  {
+    sendMultiplayerChat(interaction);
     return;
   }
 
@@ -406,7 +435,7 @@ client.on(CUSTOM_EVENT_TYPE.messageCreate, async (message) =>
   const quiz_session = quiz_system.getQuizSession(guildID);
   if (quiz_session != undefined) 
   {
-    quiz_session.on(CUSTOM_EVENT_TYPE.message, message);
+    quiz_session.on(CUSTOM_EVENT_TYPE.messageCreate, message);
   }
 });
 

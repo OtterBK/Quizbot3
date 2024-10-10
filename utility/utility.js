@@ -327,9 +327,11 @@ exports.sortDictByValue = (dict_obj) =>
   return sorted_dict;
 };
 
-exports.sortMapByValue = (map_obj) => 
+exports.sortMapByProperty = (map, property) => 
 {
-  return new Map([...map_obj.entries()].sort((a, b) => b[1] - a[1]));
+  return new Map(
+    Array.from(map).sort((a, b) => b[1][property] - a[1][property])
+);
 };
 
 exports.playBGM = async (audio_player, bgm_type) => 

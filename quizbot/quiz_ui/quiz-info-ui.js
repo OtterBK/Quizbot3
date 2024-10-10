@@ -248,7 +248,7 @@ class QuizInfoUI extends QuizbotUI
     if(isNaN(selected_question_count) || selected_question_count <= 0) //입력 값 잘못된거 처리
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `>>> 문제 수 설정에 입력된 ${input_selected_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.`, ephemeral: true});
+      interaction.reply({content: `\` 문제 수 설정에 입력된 ${input_selected_question_count} 값은 잘못됐습니다.\n양수의 숫자만 입력해주세요.\``, ephemeral: true});
       return false;
     }
 
@@ -258,7 +258,7 @@ class QuizInfoUI extends QuizbotUI
     }
     
     interaction.explicit_replied = true;
-    interaction.reply({content: `>>> 제출할 문제 수를 ${selected_question_count}개로 설정했습니다.`, ephemeral: true});
+    interaction.reply({content: `\`제출할 문제 수를 ${selected_question_count}개로 설정했습니다.\``, ephemeral: true});
     quiz_info['selected_question_count'] = selected_question_count;
 
     return true;

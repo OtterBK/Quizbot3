@@ -8,7 +8,6 @@ const logger = require('../../utility/logger.js')('MultiplayerManager');
 const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 const { CLIENT_SIGNAL, SERVER_SIGNAL } = require('./multiplayer_signal.js');
 
-const quiz_system = require('../quiz_system/quiz_system.js');
 const utility = require('../../utility/utility.js');
 
 /**
@@ -18,8 +17,6 @@ let cluster_manager = undefined;
 const multiplayer_sessions = {}; //
 
 // Server Signals (최상위 비트를 1로 설정하여 서버 신호를 구분)
-
-
 
 exports.initialize = (manager) =>
 {
@@ -37,12 +34,15 @@ const signalHandlers =
   [CLIENT_SIGNAL.START_LOBBY]: handleStartLobby,
   [CLIENT_SIGNAL.QUESTION_LIST_GENERATED]: handleQuestionListGenerated,
   [CLIENT_SIGNAL.SYNC_WAIT]: handleSyncWait,
+  [CLIENT_SIGNAL.SYNC_FAILED]: handleSyncFailed,
   [CLIENT_SIGNAL.NEXT_QUESTION_GENERATED]: handleNextQuestionGenerated,
-  [CLIENT_SIGNAL.REQUEST_ANSWER_HIT]: handleRequestAnswerHit,
   [CLIENT_SIGNAL.REQUEST_HINT]: handleRequestHint,
   [CLIENT_SIGNAL.REQUEST_SKIP]: handleRequestSkip,
+  [CLIENT_SIGNAL.REQUEST_ANSWER_HIT]: handleRequestAnswerHit,
   [CLIENT_SIGNAL.LEAVE_GAME]: handleLeaveGame,
-  [CLIENT_SIGNAL.REQUEST_CHAT]: handleRequestChat,
+  [CLIENT_SIGNAL.FINISH_UP]: handleFinishUp,
+  [CLIENT_SIGNAL.FINISHED]: handleFinished,
+  [CLIENT_SIGNAL.REQUEST_CHAT]: handleRequestChat,  
 };
 
 exports.onSignalReceived = (signal) => 
@@ -191,7 +191,7 @@ function handleLeaveLobby(signal)
     return { state: false, reason: `더 이상 존재하지 않는 로비 세션입니다.` };
   }
 
-  const result = session.acceptLeaveRequest(guild_id);
+  const result = session.acceptLeaveLobby(guild_id);
   return { state: result };
 }
 
@@ -291,12 +291,6 @@ function handleStartLobby(signal)
     return { state: false, reason: `해당 세션에는 퀴즈 정보가 없습니다.` };
   }
 
-  // if(session.getParticipantCount() < 2)
-  // {
-  //   logger.error(`${guild_id} requests to start ${session_id}. but participant count < 1`);
-  //   return { state: false, reason: `적어도 참가 중인 서버가 2개 이상이어야 합니다.` };
-  // }
-
   if(session.getState() !== SESSION_STATE.LOBBY)
   {
     logger.error(`${guild_id} requests to start ${session_id}. but this session's state is ${session.getState()}!`);
@@ -329,7 +323,6 @@ function handleQuestionListGenerated(signal)
   if(guild_id !== session.getSessionHostId())
   {
     logger.warn(`${guild_id} generated question list for ${session_id}. but session owner id is ${this.session_owner_guild_id}!`);
-    // return { state: false, reason: `요청 서버가 해당 로비의 호스트 서버가 아닙니다.`};
   }
 
   const result =  session.shareQuestionList(signal.question_list, signal.quiz_size);
@@ -353,7 +346,7 @@ function handleSyncWait(signal)
   if(guild_info === undefined)
   {
     logger.error(`${guild_id} request sync wait for ${session_id}. but this session does not include this guild`);
-    return { state: false, reason: `해당 세션에 속하지 않습니다.`};
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
   }
 
   if(guild_info.isSyncing())
@@ -361,7 +354,24 @@ function handleSyncWait(signal)
     logger.error(`${guild_id} request sync wait for ${session_id}. but this guild is already syncing`);
   }
 
-  const result =  session.acceptSyncRequest(guild_id);
+  const result =  session.acceptSyncRequest(guild_id, signal.guild_state);
+  return { state: result };
+}
+
+function handleSyncFailed(signal) 
+{
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} send sync failed ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
+  }
+
+  const result = session.syncFailedDetected(guild_id);
   return { state: result };
 }
 
@@ -393,30 +403,163 @@ function handleNextQuestionGenerated(signal)
   return { state: result };
 }
 
-function handleRequestAnswerHit(signal) 
-{
-  // 기능 구현
-}
-
 function handleRequestHint(signal) 
 {
+  const guild_id = signal.guild_id;
 
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} request hint for ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 멀티플레이 세션입니다.`};
+  }
+
+  const guild_info = session.getParticipant(guild_id);
+  if(guild_info === undefined)
+  {
+    logger.error(`${guild_id} request hint for ${session_id}. but this session does not include this guild`);
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
+  }
+
+  const result =  session.acceptHintRequest(guild_id);
+  return { state: result };
 }
 
 function handleRequestSkip(signal) 
 {
-  // 기능 구현
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} request skip for ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 멀티플레이 세션입니다.`};
+  }
+
+  const guild_info = session.getParticipant(guild_id);
+  if(guild_info === undefined)
+  {
+    logger.error(`${guild_id} request skip for ${session_id}. but this session does not include this guild`);
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
+  }
+
+  const result =  session.acceptSkipRequest(guild_id);
+  return { state: result };
+}
+
+function handleRequestAnswerHit(signal) 
+{
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} request answer hit for ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 멀티플레이 세션입니다.`};
+  }
+
+  const guild_info = session.getParticipant(guild_id);
+  if(guild_info === undefined)
+  {
+    logger.error(`${guild_id} request answer hit for ${session_id}. but this session does not include this guild`);
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
+  }
+
+  if(signal.answerer_info === undefined
+      || signal.answerer_info.answerer_id === undefined
+      || signal.answerer_info.answerer_name === undefined
+      || signal.answerer_info.score === undefined
+  )
+  {
+    logger.error(`${guild_id} request answer hit for ${session_id}. but this answerer info is undefined`);
+    return { state: false, reason: `정답자 정보가 없거나 일부 누락되어 있습니다.`}; 
+  }
+
+  const result =  session.acceptAnswerHitRequest(guild_id, signal.answerer_info);
+  return { state: result };
 }
 
 function handleLeaveGame(signal) 
 {
-  // 기능 구현
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} leaves game ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
+  }
+
+  const result = session.acceptLeaveGame(guild_id);
+  return { state: result };
+}
+
+function handleFinishUp(signal) 
+{
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} finish up ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
+  }
+
+  const result = session.finishUp(guild_id);
+  return { state: result };
+}
+
+function handleFinished(signal) 
+{
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} finish ${session_id}. but this session is not exists`);
+    return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
+  }
+
+  const result = session.finish(guild_id);
+  return { state: result };
 }
 
 function handleRequestChat(signal) 
 {
-  // 기능 구현
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} request chat ${session_id}. but this session is not exists`);
+    return { state: true, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` }; //채팅 땜에 강종은 좀...
+  }
+
+  if(signal.user_id === undefined)
+  {
+    logger.error(`${guild_id} request chat ${session_id}. but user_id is undefined`);
+    return { state: true, reason: `USER_ID가 없습니다.` }; //채팅 땜에 강종은 좀...
+  }
+
+
+  const result = session.acceptChatRequest(signal.user_id, signal.chat_message);
+  return { state: result };
 }
+
 
 
 
@@ -451,6 +594,11 @@ class MultiplayerGuildInfo
     this.guild_name = guild_name;
 
     this.syncing = false;
+
+    this.hint = false;
+    this.skip = false;
+
+    this.member_count = 0;
   }
 
   toJsonObject()
@@ -458,6 +606,7 @@ class MultiplayerGuildInfo
     return {
       guild_id: this.guild_id,
       guild_name: this.guild_name,
+      member_count: this.member_count,
     };
   }
 
@@ -469,6 +618,59 @@ class MultiplayerGuildInfo
   setSyncState(value)
   {
     this.syncing = value;
+  }
+
+  isHintRequested()
+  {
+    return this.hint;
+  }
+
+  requestHint()
+  {
+    if(this.hint === true)
+    {
+      return false;
+    }
+
+    this.hint = true;
+    return true;
+  }
+
+  isSkipRequested()
+  {
+    return this.skip;
+  }
+
+  requestSkip()
+  {
+    if(this.skip === true)
+    {
+      return false;
+    }
+
+    this.skip = true;
+    return true;
+  }
+
+  resetRequestState()
+  {
+    this.hint = false;
+    this.skip = false;
+  }
+
+  setGuildState(guild_state)
+  {
+    if(guild_state === undefined)
+    {
+      return;
+    }
+
+    this.member_count = guild_state.member_count ?? 0;
+  }
+
+  getMemberCount()
+  {
+    return this.member_count;
   }
 }
 
@@ -497,8 +699,16 @@ class MultiplayerSession
     this.max_sync_wait = 40000; //최대 40초 간격까지 sync 대기
     this.sync_done_sequence_num = 0;
 
-    setTimeout(() => //대충 3초 정도는 기다리도록(별 의미는 없고 ui띄워지는 시간도 있으니)
+    this.current_answerer_info = undefined;
+
+    this.scoreboard = new Map(); //scoreboard 
+    this.mvp_scoreboard = new Map(); //vip 맴버 scoreboard 용
+
+    this.sync_failed_list = []; //sync 실패한 목록들
+
+    setTimeout(() => // return true;대충 1.5초 정도는 기다리도록(별 의미는 없고 ui띄워지는 시간도 있으니)
     {
+
       this.state = SESSION_STATE.LOBBY;
     }, 1500);
   }
@@ -513,6 +723,21 @@ class MultiplayerSession
     this.banned_guilds = null;
 
     this.state = null;
+
+    this.question_list = null;
+    this.quiz_size = null;
+    this.prepared_question = null;
+
+    this.first_sync_received_time = null;
+    this.max_sync_wait = null;
+    this.sync_done_sequence_num = null;
+
+    this.current_answerer_info = null;
+
+    this.scoreboard = null;
+    this.mvp_scoreboard = null;
+
+    this.sync_failed_list = null;
   }
 
   getState()
@@ -608,6 +833,8 @@ class MultiplayerSession
   delete()
   {
     delete multiplayer_sessions[this.getSessionId()];
+
+    this.free();
   }
 
   checkSyncDone()
@@ -630,6 +857,16 @@ class MultiplayerSession
     for(const guild_info of this.participant_guilds)
     {
       guild_info.setSyncState(false);
+    }
+  }
+
+  resetRequestState()
+  {
+    this.current_answerer_info = undefined;
+
+    for(const guild_info of this.participant_guilds)
+    {
+      guild_info.resetRequestState(false);
     }
   }
 
@@ -663,33 +900,109 @@ class MultiplayerSession
       }
 
       //범인들임
-      failed_guild_list.push(guild_info.toJsonObject());
+      failed_guild_list.push(guild_info);
+    }
+
+    logger.warn(`Sync failed detected from server side. session_id: ${this.getSessionId()}), failed_guild_size: ${failed_guild_list.length} / ${this.getParticipantCount()}`);
+    for(const guild_info of failed_guild_list)
+    {
+      this.syncFailedDetected(guild_info.guild_id);  
+    }
+  }
+
+  syncFailedDetected(guild_id)
+  {
+    logger.warn(`Sync failed detected. guild_id: ${guild_id}).`);
+
+    this.sync_failed_list.push(guild_id);
+
+    const failed_guild_info = this.getParticipant(guild_id);
+    if(failed_guild_info === undefined)
+    {
+      logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
+      return true;
     }
 
     const signal = {
-      signal_type: SERVER_SIGNAL.SYNC_FAILED,
-      lobby_info: this.getLobbyInfo(),
-      failed_guild_list: failed_guild_list,
+      signal_type: SERVER_SIGNAL.SYNC_FAILED_DETECTED,
+      failed_guild_info: failed_guild_info,
     };
     this.sendSignal(signal); 
-
-    logger.warn(`Sync failed detected. session_id: ${this.getSessionId()}), failed_guild_size: ${failed_guild_list.length} / ${this.getParticipantCount()}`);
+    
+    this.removeParticipant(guild_id);
   }
 
   sendSyncDone()
   {
     this.resetSyncState();
+    this.resetRequestState();
 
     this.sync_done_sequence_num += 1;
 
+    const guilds_info_list = [];
+    this.participant_guilds.forEach(g => 
+    {
+      guilds_info_list.push(g.toJsonObject());
+    });
+    
     const signal = {
       signal_type: SERVER_SIGNAL.SYNC_DONE,
       sequence_num: this.sync_done_sequence_num,
+      participant_guilds_info: guilds_info_list,
+      
     };
     this.sendSignal(signal);
 
 
     logger.info(`${this.getSessionId()} session sync done`);
+  }
+
+  getRequestConfirmCriteria()
+  {
+    return Math.ceil(this.participant_guilds.length);
+  }
+
+  processWinner(winner_info)
+  {
+    logger.info(`Processing winner ${winner_info.name}`);
+  }
+  
+  finishUp(guild_id)
+  {
+    logger.info(`${this.getSessionId()} finished up game. by ${guild_id}`);
+
+    //mvp 부터 구해보자
+    const sorted_mvp_scoreboard = utility.sortMapByProperty(this.mvp_scoreboard, 'score');
+    if(sorted_mvp_scoreboard.size !== 0)
+    {
+      const mvp_info = sorted_mvp_scoreboard.entries().next().value;
+
+      const signal = {
+        signal_type: SERVER_SIGNAL.CONFIRM_MVP,
+        mvp_info: mvp_info,
+      };
+      this.sendSignal(signal); 
+
+      logger.info(`${this.getSessionId()}'s mvp is ${mvp_info.name}/${mvp_info.score}`);
+    }
+
+    //이제 승리자 구해보자. 이긴 사람만이 점수를 받는거다.
+    const sorted_scoreboard = utility.sortMapByProperty(this.scoreboard, 'score');
+    if(sorted_scoreboard.size !== 0)
+    {
+      const winner_info = sorted_scoreboard.entries().next().value;
+
+      logger.info(`${this.getSessionId()}'s winner is ${winner_info.name}/${winner_info.score}`);
+
+      this.processWinner(winner_info);
+    }
+  }
+
+  finish(guild_id)
+  {
+    logger.info(`${this.getSessionId()} finished game. by ${guild_id}`);
+
+    this.delete();
   }
 
   convertToTimeString(time)
@@ -741,48 +1054,21 @@ class MultiplayerSession
     return true;
   }
 
-  acceptLeaveRequest(guild_id)
+  acceptLeaveLobby(guild_id)
   {
-    logger.info(`${guild_id} has been leaved from ${this.getSessionId()}(${this.getSessionName()})`);
+    logger.info(`${guild_id} has been leaved lobby from ${this.getSessionId()}(${this.getSessionName()})`);
 
+    if(this.getState !== SESSION_STATE.PREPARE && this.getState() !== SESSION_STATE.LOBBY)
+    {
+      logger.warn(`but ${this.getSessionId()} is not lobby`);
+      return true;
+    }
+  
     const leaved_guild_info = this.removeParticipant(guild_id);
-
     if(leaved_guild_info === undefined)
     {
       logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
-      return;
-    }
-
-    if(this.session_owner_guild_id === guild_id) //어라? 나간게... 호스트?
-    {
-      if(this.getState() == SESSION_STATE.INGAME && this.getParticipantCount() > 1) //게임 중이고 여전히 사람이 남아있다면
-      {
-        const previous_session_id = this.getSessionId();
-
-        //호스트 변경!
-        const new_host_guild_info = this.participant_guilds[0];
-        this.session_owner_guild_id = new_host_guild_info.guild_id;
-        this.owner_guild_info = new_host_guild_info; 
-
-        const signal = {
-          signal_type: SERVER_SIGNAL.HOST_CHANGED,
-          new_host_guild_info: new_host_guild_info.toJsonObject(),
-        };
-        this.sendSignal(signal);
-
-        logger.info(`The host changed to ${previous_session_id} -> ${this.getSessionId()}`);
-      }
-      else //게임 중이 아니거나 호스트가 나갔을 때 1명남 남았다면
-      {
-        const signal = { //세션 펑
-          signal_type: SERVER_SIGNAL.EXPIRED_SESSION,
-        };
-  
-        this.sendSignal(signal);
-        logger.info(`The host of ${this.getSessionId()} has been leaved. expiring this session`);
-  
-        this.delete();
-      }
+      return true;
     }
 
     const signal = {
@@ -791,6 +1077,18 @@ class MultiplayerSession
       leaved_guild_info: leaved_guild_info.toJsonObject(),
     };
     this.sendSignal(signal);
+
+    if(this.session_owner_guild_id === guild_id) //어라? 나간게... 호스트?
+    {
+      const signal = { //세션 펑
+        signal_type: SERVER_SIGNAL.EXPIRED_SESSION,
+      };
+      this.sendSignal(signal);
+      
+      logger.info(`The host of ${this.getSessionId()} has been leaved from lobby. expiring this session`);
+
+      this.finishguild_id();
+    }
 
     return true;
   }
@@ -843,6 +1141,8 @@ class MultiplayerSession
     };
     this.sendSignal(signal);
 
+    this.state = SESSION_STATE.INGAME;
+
     logger.info(`Multiplayer session ${this.getSessionId()}/${this.getSessionName()} started by ${guild_id}`);
 
     return true;
@@ -882,11 +1182,16 @@ class MultiplayerSession
     return true;
   }
 
-  acceptSyncRequest(guild_id)
+  acceptSyncRequest(guild_id, guild_state)
   {
     const guild_info = this.getParticipant(guild_id);
 
     guild_info.setSyncState(true);
+
+    if(guild_state !== undefined)
+    {
+      guild_info.setGuildState(guild_state);
+    }
 
     if(this.first_sync_received_time === undefined)
     {
@@ -899,6 +1204,226 @@ class MultiplayerSession
     {
       this.sendSyncDone();
     }
+  }
+
+  acceptHintRequest(guild_id)
+  {
+    const guild_info = this.getParticipant(guild_id);
+
+    if(guild_info.isHintRequested())
+    {
+      return true;
+    }
+
+    guild_info.requestHint();
+
+    let hint_requested_count = 0;
+    for(const guild_info of this.participant_guilds)
+    {
+      if(guild_info.isHintRequested() === false)
+      {
+        continue;
+      }
+
+      ++hint_requested_count;
+    }
+
+    const confirm_criteria = this.getRequestConfirmCriteria();
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.NOTICE_MESSAGE,
+      notice: `\`\`\`🗳 ${guild_info.guild_name} 서버가 힌트 요청에 투표했습니다. ( ${hint_requested_count} / ${confirm_criteria} )\`\`\``
+    };
+    this.sendSignal(signal);
+
+    if(hint_requested_count >= confirm_criteria)
+    {
+      const signal = {
+        signal_type: SERVER_SIGNAL.CONFIRM_HINT,
+      };
+      this.sendSignal(signal);
+    }
+
+    logger.info(`Accept Hint Request from ${guild_id} ${hint_requested_count}/${confirm_criteria}`);
+  }
+
+  acceptSkipRequest(guild_id)
+  {
+    const guild_info = this.getParticipant(guild_id);
+
+    if(guild_info.isSkipRequested())
+    {
+      return true;
+    }
+
+    guild_info.requestSkip();
+
+    let skip_requested_count = 0;
+    for(const guild_info of this.participant_guilds)
+    {
+      if(guild_info.isSkipRequested() === false)
+      {
+        continue;
+      }
+
+      ++skip_requested_count;
+    }
+
+    const confirm_criteria = this.getRequestConfirmCriteria();
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.NOTICE_MESSAGE,
+      notice: `\`🗳 ${guild_info.guild_name} 서버가 스킵 요청에 투표했습니다. ( ${skip_requested_count} / ${confirm_criteria} )\``
+    };
+    this.sendSignal(signal);
+
+    if(skip_requested_count >= confirm_criteria)
+    {
+      const signal = {
+        signal_type: SERVER_SIGNAL.CONFIRM_SKIP,
+      };
+      this.sendSignal(signal);
+    }
+
+    logger.info(`Accept Skip Request from ${guild_id} ${skip_requested_count}/${confirm_criteria}`);
+  }
+
+  acceptAnswerHitRequest(guild_id, answerer_info)
+  {
+    //사실 먼저 온 사람이 임자다 ㅋㅅㅋ
+    if(this.current_answerer_info !== undefined)
+    {
+      return true;
+    }
+
+    this.current_answerer_info = answerer_info;
+
+    const answerer_id = this.current_answerer_info.answerer_id;
+    const answerer_name = this.current_answerer_info.answerer_name;
+    const score = this.current_answerer_info.score;
+
+    const guild_info = this.getParticipant(guild_id);
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.CONFIRM_ANSWER_HIT,
+      answerer_info: {
+        answerer_id: guild_id,
+        answerer_name: guild_info.guild_name,
+        score: score,
+      }
+    };
+    this.sendSignal(signal); //우선 신호부터 보내준다.
+
+    logger.info(`Accept Request Answer hit from ${guild_id} by ${answerer_id}/${answerer_name}/${score}`);
+
+    //vip 계산용 scoreboard에 반영
+    let member_answerer_info = this.mvp_scoreboard.get(answerer_id);
+    if(member_answerer_info === undefined)
+    {
+      member_answerer_info = {
+        name: answerer_name,
+        score: score  
+      };
+
+      this.mvp_scoreboard.set(answerer_id, member_answerer_info);
+    }
+    else
+    {
+      member_answerer_info.name = answerer_name;
+      member_answerer_info.score += score;
+    }
+
+    //scoreboard 에 반영
+    let guild_answerer_info = this.scoreboard.get(guild_id);
+    if(guild_answerer_info === undefined)
+    {
+      guild_answerer_info = {
+        name: answerer_name,
+        score: score
+      };
+
+      this.scoreboard.set(guild_id, guild_answerer_info);
+    }
+    else
+    {
+      guild_answerer_info.name = answerer_name;
+      guild_answerer_info.score += score;
+    }
+  }
+
+  acceptLeaveGame(guild_id)
+  {
+    logger.info(`${guild_id} has been leaved game from ${this.getSessionId()}(${this.getSessionName()})`);
+
+    if(this.getState() !== SESSION_STATE.INGAME) //게임 중 아니면 패스임
+    {
+      logger.warn(`but ${this.getSessionId()} is not INGAME`);
+      return true;
+    }
+
+    const leaved_guild_info = this.removeParticipant(guild_id);
+    if(leaved_guild_info === undefined)
+    {
+      logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
+      return true;
+    }
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.LEAVED_GAME,
+      lobby_info: this.getLobbyInfo(),
+      leaved_guild_info: leaved_guild_info.toJsonObject(),
+    };
+    this.sendSignal(signal);
+
+    const guild_answerer_info = this.scoreboard.get(guild_id);
+    if(guild_answerer_info !== undefined)
+    {
+      guild_answerer_info.score = 0;
+    }
+
+    if(this.session_owner_guild_id === guild_id) //어라? 나간게... 호스트?
+    {
+      const previous_session_id = this.getSessionId();
+
+      //호스트 변경!
+      const new_host_guild_info = this.participant_guilds[0];
+      this.session_owner_guild_id = new_host_guild_info.guild_id;
+      this.owner_guild_info = new_host_guild_info; 
+
+      const signal = {
+        signal_type: SERVER_SIGNAL.HOST_CHANGED,
+        new_host_guild_info: new_host_guild_info.toJsonObject(),
+      };
+      this.sendSignal(signal);
+
+      logger.info(`The host changed to ${previous_session_id} -> ${this.getSessionId()}`);
+
+      if(this.getParticipantCount() <= 1) //1명 이하 남앗다면
+      {
+        const signal = { //세션 펑
+          signal_type: SERVER_SIGNAL.EXPIRED_SESSION,
+        };
+  
+        this.sendSignal(signal);
+        logger.info(`The host of ${this.getSessionId()} has been leaved from ingame. and only one guilds left. expiring this session`);
+
+        this.finishUp(new_host_guild_info.guild_id);
+        this.finish(new_host_guild_info.guild_id);
+      }
+    }
+
+    return true;
+  }
+
+  acceptChatRequest(user_id, chat_message)
+  {
+    const signal = { //세션 펑
+      signal_type: SERVER_SIGNAL.CONFIRM_CHAT,
+      user_id: user_id,
+      chat_message: chat_message
+    };
+    this.sendSignal(signal);
+    logger.info(`Broadcasting Chat Message ${user_id}: ${chat_message}`);
   }
 }
 

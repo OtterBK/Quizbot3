@@ -37,6 +37,16 @@ const commands = [
   new SlashCommandBuilder()
     .setName('퀴즈정리')
     .setDescription('현재 서버에서 진행 중인 모든 세션을 정리합니다.'),
+
+  new SlashCommandBuilder()
+    .setName('챗')
+    .setDescription('멀티플레이 퀴즈에서 전체 메시지를 전송합니다.')
+    .addStringOption(option =>
+      option
+        .setName("메시지")
+        .setDescription('전송할 메시지')
+        .setRequired(true)
+    ),
 ];
 
 //길드에 명령어 등록용
