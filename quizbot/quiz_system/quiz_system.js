@@ -199,7 +199,7 @@ exports.relayMultiplayerSignal = (multiplayer_signal) => //관련 세션에 멀�
 
 exports.forceStopSession = (guild) => 
 {
-  logger.info(`${guild.id} called force stop`);
+  logger.info(`${guild.id} called force stop session`);
 
   const guild_id = guild.id;
   const quiz_session = quiz_session_map[guild_id];
@@ -207,14 +207,14 @@ exports.forceStopSession = (guild) =>
   {
     quiz_session.forceStop();
     delete quiz_session_map[guild_id];
-    logger.info(`destroy quiz_session by force stop ${guild.id}`);
+    logger.debug(`destroy quiz_session by force stop ${guild.id}`);
   }
 
   const voice_state = guild.members.me.voice;
   if(voice_state && voice_state.channel)
   {
     voice_state.disconnect();
-    logger.info(`disconnected voice state by force stop ${guild.id}`);
+    logger.debug(`disconnected voice state by force stop ${guild.id}`);
   }
 };
 
@@ -551,7 +551,7 @@ class QuizSession
         audio_stream_for_close.splice(0, audio_stream_for_close.length);
       }
     }
-    logger.info(`free stream count, ${free_stream_count}`);
+    logger.debug(`free stream count, ${free_stream_count}`);
 
     for(const cycle of Object.values(this.lifecycle_map))
     {
@@ -1058,7 +1058,7 @@ const MultiplayerSessionMixin = Base => class extends Base
 
   sendRequestChat(user_id, chat_message)
   {
-    logger.info(`Send request chat signal. guild_id: ${this.guild_id} / user_id: ${user_id}`);
+    logger.debug(`Send request chat signal. guild_id: ${this.guild_id} / user_id: ${user_id}`);
 
     this.sendSignal(
       {
@@ -1181,7 +1181,7 @@ class MultiplayerLobbySession extends MultiplayerSessionMixin(DummyQuizSession) 
   {
     this.session_expired = true;
 
-    logger.info(`Received Expired Session signal on MultiplayerLobbySession. but do not call forcestop`);
+    logger.debug(`Received Expired Session signal on MultiplayerLobbySession. but do not call forcestop`);
     // this.forceStop(); //로비에서 받았으면 어차피 goToBack 하면서 해제될듯
   }
 
@@ -1202,7 +1202,7 @@ class MultiplayerLobbySession extends MultiplayerSessionMixin(DummyQuizSession) 
 
   transitToActiveQuizSession(finalized_quiz_info) //Lobby에서 게임 진행할 진짜 QuizSession 으로 전환
   {
-    logger.info(`transit to active quiz session from multiplayer session. guild_id: ${this.guild_id}`);
+    logger.debug(`transit to active quiz session from multiplayer session. guild_id: ${this.guild_id}`);
     return exports.startQuiz(this.guild, this.owner, this.channel, finalized_quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER); //진짜 퀴즈 세션 생성 -> 해당 함수에서 어차피 Lobby는 free됨
   }
 }
@@ -1272,7 +1272,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
   waitForQuestionList()
   {
-    logger.info(`Waiting for question list. guild_id: ${this.guild_id}`);
+    logger.debug(`Waiting for question list. guild_id: ${this.guild_id}`);
     this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_QUESTION_LIST;
 
     this.sendMessage({content:`\`\`\`🌐 문제 목록을 동기화 하는 중\`\`\``});
@@ -1280,7 +1280,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
   waitForNextQuestionData()
   {
-    logger.info(`Waiting for next question data. guild_id: ${this.guild_id}`);
+    logger.debug(`Waiting for next question data. guild_id: ${this.guild_id}`);
     this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_NEXT_QUESTION;
   }
 
@@ -1288,7 +1288,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
   {
     if(this.sync_ready === false)
     {
-      logger.info(`Waiting for sync ready. guild_id: ${this.guild_id}`);
+      logger.debug(`Waiting for sync ready. guild_id: ${this.guild_id}`);
     }
 
     let wait_sync_ready_time_sec = 0;
@@ -1305,7 +1305,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       if(wait_sync_ready_time_sec === 200) //20초
       {
         this.sendMessage({content:`\`\`\`🌐 문제 데이터 동기화가 지연되고 있습니다. 잠시만 기다려주세요.\`\`\``});
-        logger.error(`Multiplayer quiz session sync ready delayed. guild_id: ${this.guild_id}`);
+        logger.warn(`Multiplayer quiz session sync ready delayed. guild_id: ${this.guild_id}`);
       }
 
       if(wait_sync_ready_time_sec >= 450) //45초
@@ -1316,7 +1316,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     }
     
     this.multiplayer_state = MULTIPLAYER_STATE.WAITING_FOR_SYNC_DONE;
-    logger.info(`Waiting for sync done. guild_id: ${this.guild_id}`);
+    logger.debug(`Waiting for sync done. guild_id: ${this.guild_id}`);
   
     this.sendSignal(
       {
@@ -1340,7 +1340,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       if(wait_sync_done_time_sec === 200) //20초
       {
         this.sendMessage({content:`\`\`\`🌐 동기화가 지연되고 있습니다. 잠시만 기다려주세요...\`\`\``});
-        logger.error(`Multiplayer quiz session sync done delayed. guild_id: ${this.guild_id}`);
+        logger.warn(`Multiplayer quiz session sync done delayed. guild_id: ${this.guild_id}`);
       }
 
       if(wait_sync_done_time_sec >= 450) //45초. 이정도면 그냥 뭔가 문제가 있음
@@ -1366,7 +1366,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
         }
       );
   
-      logger.info(`Send question list generated signal. quiz_size: ${this.quiz_data.quiz_size}/${this.quiz_data.question_list.length}, guild_id: ${this.guild_id}`);
+      logger.debug(`Send question list generated signal. quiz_size: ${this.quiz_data.quiz_size}/${this.quiz_data.question_list.length}, guild_id: ${this.guild_id}`);
     }, 3000);
   }
 
@@ -1380,7 +1380,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       }
     );
 
-    logger.info(`Send current question generated signal. guild_id: ${this.guild_id}`);
+    logger.debug(`Send current question generated signal. guild_id: ${this.guild_id}`);
   }
 
   sendRequestHint(requester_id)
@@ -1392,7 +1392,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       }
     );
 
-    logger.info(`Send request hint signal. guild_id: ${this.guild_id}`);
+    logger.debug(`Send request hint signal. guild_id: ${this.guild_id}`);
   }
 
   sendRequestSkip(requester_id)
@@ -1404,7 +1404,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       }
     );
 
-    logger.info(`Send request hint signal. guild_id: ${this.guild_id}`);
+    logger.debug(`Send request hint signal. guild_id: ${this.guild_id}`);
   }
 
   sendRequestAnswerHit(answerer_id, answerer_name, score)
@@ -1421,7 +1421,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       }
     );
 
-    logger.info(`Send request answer hit signal. guild_id: ${this.guild_id}, answerer_id: ${answerer_id}, answerer_name: ${answerer_name}, score: ${score}`);
+    logger.debug(`Send request answer hit signal. guild_id: ${this.guild_id}, answerer_id: ${answerer_id}, answerer_name: ${answerer_name}, score: ${score}`);
   }
 
   sendFinishUp()
@@ -1514,7 +1514,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
   {
     const new_session_id = signal.session_id;
     
-    logger.info(`Applying new host session id ${this.session_id} -> ${new_session_id}`);
+    logger.debug(`Applying new host session id ${this.session_id} -> ${new_session_id}`);
 
     this.session_id = new_session_id;
   }
@@ -1522,7 +1522,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
   onReceivedNoticeMessage(signal)
   {
     this.sendMessage({ content: `${signal.notice}` });
-    logger.info(`Sending notice message to ${this.guild_id}, message: ${signal.notice}`);
+    logger.debug(`Sending notice message to ${this.guild_id}, message: ${signal.notice}`);
   }
 
   onReceivedApplyQuestionList(signal)
@@ -1537,7 +1537,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.quiz_data.question_list = signal.question_list;
     this.quiz_data.quiz_size = signal.quiz_size;
 
-    logger.info(`Applying question list signal. call Prepare Cycle quiz_size: ${signal.quiz_size}/${signal.question_list.length}, guild_id: ${this.guild_id}`);
+    logger.debug(`Applying question list signal. call Prepare Cycle quiz_size: ${signal.quiz_size}/${signal.question_list.length}, guild_id: ${this.guild_id}`);
     
     if(this.quiz_data.question_list.length === 0)
     {
@@ -1575,7 +1575,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.multiplayer_state = MULTIPLAYER_STATE.NEXT_QUESTION_READY;
     this.sync_ready = true;
 
-    logger.info(`Applying next question signal. set sync ready. guild_id: ${this.guild_id}`);
+    logger.debug(`Applying next question signal. set sync ready. guild_id: ${this.guild_id}`);
   }
 
   onReceivedSyncDone(signal)
@@ -1584,7 +1584,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     
     this.participant_guilds_info = signal.participant_guilds_info;
 
-    logger.info(`Received Sync Done signal ${this.sync_done_sequence_num}. calling Questioning Cycle.`);
+    logger.debug(`Received Sync Done signal ${this.sync_done_sequence_num}. calling Questioning Cycle.`);
 
     this.setupParticipantSelectMenu();
 
@@ -1608,7 +1608,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     }
         
         
-    logger.info(`Received Confirm hint signal ${this.guild_id}. calling showHint.`);
+    logger.debug(`Received Confirm hint signal ${this.guild_id}. calling showHint.`);
     question_cycle.showHint(question_cycle.current_question);
   }
 
@@ -1628,7 +1628,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     }
         
         
-    logger.info(`Received Confirm skip signal ${this.guild_id}. calling skip.`);
+    logger.debug(`Received Confirm skip signal ${this.guild_id}. calling skip.`);
     question_cycle.skip(question_cycle.current_question);
   }
 
@@ -1654,7 +1654,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       return;
     }
 
-    logger.info(`Received Confirm answer hit signal ${this.guild_id}. calling apply correct answer.`);
+    logger.debug(`Received Confirm answer hit signal ${this.guild_id}. calling apply correct answer.`);
     question_cycle.applyCorrectAnswer(answerer_info.answerer_id, answerer_info.answerer_name, answerer_info.score);
     question_cycle.stopTimeoverTimer();
   }
@@ -1665,7 +1665,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.sendMessage({content: `\`\`\`🌐 ${leaved_guild_info.guild_name} 서버가 게임에서 퇴장하였습니다.\`\`\``});
 
     this.scoreboard.delete(leaved_guild_info.guild_id);
-    logger.info(`Received Leaved game signal ${this.guild_id}. erasing ${leaved_guild_info.guild_id} from scoreboard`);
+    logger.debug(`Received Leaved game signal ${this.guild_id}. erasing ${leaved_guild_info.guild_id} from scoreboard`);
   }
 
   onReceivedSyncFailedDetected(signal)
@@ -1678,7 +1678,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     const failed_guild_info = signal.failed_guild_info;
     this.sendMessage({content: `\`\`\`🌐 ${failed_guild_info.guild_name} 서버가 동기화에 실패했습니다.\n해당 서버는 퇴장으로 처리됩니다.\`\`\``});
 
-    logger.info(`Received sync failed signal ${this.guild_id}. erasing ${failed_guild_info.guild_id} from scoreboard`);
+    logger.debug(`Received sync failed signal ${this.guild_id}. erasing ${failed_guild_info.guild_id} from scoreboard`);
   }
 
   onReceivedConfirmMVP(signal)
@@ -1686,7 +1686,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.multiplayer_state = MULTIPLAYER_STATE.FINISH_UP; //mvp 정해졌다는 신호 받은거면 finish up인거임
     this.mvp_info = signal.mvp_info;
 
-    logger.info(`Received MVP Info signal ${this.guild_id}. name: ${this.mvp_info.name}, score: ${this.mvp_info.score}`);
+    logger.debug(`Received MVP Info signal ${this.guild_id}. name: ${this.mvp_info.name}, score: ${this.mvp_info.score}`);
   }
 
   onReceivedExpiredSession(signal)
@@ -1694,7 +1694,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.multiplayer_state = MULTIPLAYER_STATE.FINISH_UP; //mvp 정해졌다는 신호 받은거면 finish up인거임
     this.session_expired = true;
 
-    logger.info(`Received Expired Session signal ${this.guild_id} from ${signal.session_id}.`);
+    logger.debug(`Received Expired Session signal ${this.guild_id} from ${signal.session_id}.`);
 
     this.sendMessage({ content: `\`\`\`🌐 이 서버를 제외한 모든 참여자가 퇴장하였습니다.\n현재 문제가 끝난 뒤 퀴즈가 종료되며 승리로 간주됩니다.\`\`\`` });
   }

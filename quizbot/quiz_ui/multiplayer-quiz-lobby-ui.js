@@ -547,7 +547,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     this.refreshUI();
     this.sendDelayedUI(this, false);
 
-    logger.info(`Applying lobby info to ${this.guild_id}`);
+    logger.debug(`Applying lobby info to ${this.guild_id}`);
   }
 
   // applyMultiplayerLobbySettings(interaction)
@@ -569,7 +569,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     const criteria = Date.now() - 600000; //넉넉잡아 10분
     if(this.getMessageCreatedTime() < criteria) //생성된지 15분 이상된 Message의 Interaction들은 더 이상 동작하지 않는다. 다시 보내줘야함
     {
-      logger.info(`Resending lobby ui to ${this.guild_id}`);
+      logger.debug(`Resending lobby ui to ${this.guild_id}`);
       this.channel.send( { content: `\`\`\`🌐 UI가 만료되어 재생성하였습니다.\`\`\`` } );
       this.sendDelayedUI(this, true); //만료된거면 무조건 재생성
     }
@@ -704,7 +704,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
   startLobby(finalized_lobby_info, owner_name='')
   {
-    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by start lobby`);
+    logger.debug(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by start lobby`);
     clearInterval(this.refreshTimer);
 
     this.expired = true; //다시 onExpired 호출 안하게
@@ -726,10 +726,10 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   //해당 UI가 날라갈때
   onExpired()
   {
-    logger.info(`Disconnecting voice state by leaving lobby guild_id: ${this.guild.id}`);
+    logger.debug(`Disconnecting voice state by leaving lobby guild_id: ${this.guild.id}`);
     quiz_system.forceStopSession(this.guild);
 
-    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by expire ui. guild_id: ${this.guild.id}`);
+    logger.debug(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by expire ui. guild_id: ${this.guild.id}`);
     clearInterval(this.refreshTimer);
     
     super.onExpired();

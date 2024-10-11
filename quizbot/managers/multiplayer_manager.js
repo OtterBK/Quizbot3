@@ -252,7 +252,7 @@ function handleRequestKick(signal)
 
   if(session.getSessionHostId() === target_guild_id)
   {
-    logger.info(`${guild_id} request to kick ${target_guild_id}. but target guild is host! ignore this`);
+    logger.debug(`${guild_id} request to kick ${target_guild_id}. but target guild is host! ignore this`);
     return { state: false, reason: `호스트 서버를 추방할 수 없습니다.`};
   }
 
@@ -982,7 +982,7 @@ class MultiplayerSession
     this.sendSignal(signal);
 
 
-    logger.info(`${this.getSessionId()} session sync done`);
+    logger.debug(`${this.getSessionId()} session sync done`);
   }
 
   getRequestConfirmCriteria()
@@ -1066,7 +1066,7 @@ class MultiplayerSession
       };
       this.sendSignal(signal); 
 
-      logger.info(`${this.getSessionId()}'s mvp is ${mvp_info.name}/${mvp_info.score}`);
+      logger.debug(`${this.getSessionId()}'s mvp is ${mvp_info.name}/${mvp_info.score}`);
     }
 
     //이제 승리자 구해보자. 이긴 사람만이 점수를 받는거다.
@@ -1075,7 +1075,7 @@ class MultiplayerSession
     {
       const [guild_id, winner_info] = sorted_scoreboard.entries().next().value;
 
-      logger.info(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
+      logger.debug(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
 
       this.processWinner(guild_id);
     }
@@ -1186,7 +1186,7 @@ class MultiplayerSession
     };
     this.sendSignal(signal);
 
-    logger.info(`session ${this.getSessionId()}'s quiz info edited by ${guild_id}`);
+    logger.debug(`session ${this.getSessionId()}'s quiz info edited by ${guild_id}`);
 
     return true;
   }
@@ -1266,7 +1266,7 @@ class MultiplayerSession
     };
     this.sendSignal(signal);
 
-    logger.info(`${this.getSessionId()} is Sharing prepared question ${this.question_num}`);
+    logger.debug(`${this.getSessionId()} is Sharing prepared question ${this.question_num}`);
 
     return true;
   }
@@ -1287,7 +1287,7 @@ class MultiplayerSession
       this.firstSyncReceived();
     }
 
-    logger.info(`Accept Sync Request from ${guild_id} first: ${this.convertToTimeString(this.first_sync_received_time)} current: ${this.convertToTimeString(new Date())}`);
+    logger.debug(`Accept Sync Request from ${guild_id} first: ${this.convertToTimeString(this.first_sync_received_time)} current: ${this.convertToTimeString(new Date())}`);
 
     if(this.checkSyncDone())
     {
@@ -1333,7 +1333,7 @@ class MultiplayerSession
       this.sendSignal(signal);
     }
 
-    logger.info(`Accept Hint Request from ${guild_id} ${hint_requested_count}/${confirm_criteria}`);
+    logger.debug(`Accept Hint Request from ${guild_id} ${hint_requested_count}/${confirm_criteria}`);
   }
 
   acceptSkipRequest(guild_id)
@@ -1374,7 +1374,7 @@ class MultiplayerSession
       this.sendSignal(signal);
     }
 
-    logger.info(`Accept Skip Request from ${guild_id} ${skip_requested_count}/${confirm_criteria}`);
+    logger.debug(`Accept Skip Request from ${guild_id} ${skip_requested_count}/${confirm_criteria}`);
   }
 
   acceptAnswerHitRequest(guild_id, answerer_info)
@@ -1403,7 +1403,7 @@ class MultiplayerSession
     };
     this.sendSignal(signal); //우선 신호부터 보내준다.
 
-    logger.info(`Accept Request Answer hit from ${guild_id} by ${answerer_id}/${answerer_name}/${score}`);
+    logger.debug(`Accept Request Answer hit from ${guild_id} by ${answerer_id}/${answerer_name}/${score}`);
 
     //vip 계산용 scoreboard에 반영
     let member_answerer_info = this.mvp_scoreboard.get(answerer_id);
@@ -1464,7 +1464,7 @@ class MultiplayerSession
       chat_message: chat_message
     };
     this.sendSignal(signal);
-    logger.info(`Broadcasting Chat Message ${user_id}: ${chat_message}`);
+    logger.debug(`Broadcasting Chat Message ${user_id}: ${chat_message}`);
   }
 }
 
