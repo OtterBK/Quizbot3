@@ -22,7 +22,7 @@ const {
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,
   multiplayer_lobby_participant_comp,
-  modal_multiplayer_edit_lobby,
+  modal_multiplayer_quiz_setting,
 } = require("./components.js");
 
 const { 
@@ -32,6 +32,7 @@ const {
 
 const { AlertQuizStartUI } = require("./alert-quiz-start-ui.js");
 const { QuizInfoUI } = require('./quiz-info-ui.js');
+const { UserQuizSelectUI } = require("./user-quiz-select-ui.js");
 
 //#endregion
 
@@ -65,6 +66,9 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['quiz_id'] = undefined;  //omasakse quiz는 quiz_id 불필요
 
     //오마카세 퀴즈용 추가 설정 값
+    multiplayer_quiz_info['basket_mode'] = false; //장바구니 모드
+    multiplayer_quiz_info['basket_items'] = {}; //장바구니 모드
+
     multiplayer_quiz_info['dev_quiz_tags'] = 0;
     
     multiplayer_quiz_info['custom_quiz_type_tags'] = 0;
@@ -98,6 +102,8 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     this.session_id = session_id;
     this.participant_guilds_info = []; //guild_id, guild_name //참여 중인 길드 정보
 
+    this.modal_quiz_setting = cloneDeep(modal_multiplayer_quiz_setting);
+
     this.initializeEmbed();
     this.initializeComponents();
 
@@ -106,8 +112,6 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
   initializeEmbed() 
   {
-    
-
     this.embed = {
       color: 0x87CEEB,
       title: `${this.quiz_info['icon']} ${this.quiz_info['title']}`,
@@ -124,13 +128,18 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
   initializeComponents() 
   {
+    if(this.multiplayer_participant_select_component === undefined)
+    {
+      this.multiplayer_participant_select_component = cloneDeep(multiplayer_participant_select_row);
+    }
+
     if(this.readonly)
     {
-      this.components = [multiplayer_lobby_participant_comp, cloneDeep(multiplayer_participant_select_row)];
+      this.components = [multiplayer_lobby_participant_comp, this.multiplayer_participant_select_component];
     }
     else
     {
-      this.components = [multiplayer_lobby_host_comp, cloneDeep(multiplayer_participant_select_row), omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu];
+      this.components = [multiplayer_lobby_host_comp, this.multiplayer_participant_select_component];
     }
   }
 
@@ -142,6 +151,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     }
     else
     {
+      this.applyQuizSettings(interaction);
       this.requestToCreateLobby(interaction);
     }
   }
@@ -224,7 +234,6 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.tag_selected_handler = 
     {
-      'toggle_certified_quiz_filter': this.handleTagSelected.bind(this),
       'dev_quiz_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_type_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_tags_select_menu':  this.handleTagSelected.bind(this),
@@ -280,14 +289,26 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     return;
   }
 
+  handleRequestUseBasketMode(interaction)
+  {
+    let basket_items = this.quiz_info['basket_items'];
+    if(basket_items === undefined)
+    {
+      this.quiz_info['basket_items'] = {};
+      basket_items = this.quiz_info['basket_items'];
+    }
+
+    interaction.explicit_replied = true;
+    interaction.reply({content: `\`\`\`장바구니 모드를 사용합니다.\n장바구니 모드는 직접 원하는 유저 퀴즈들을 선택하면\n선택한 퀴즈들에서만 무작위로 문제가 출제됩니다. \`\`\``, ephemeral: true});
+
+    return new UserQuizSelectUI(basket_items);
+  }
+
   initializeMultiplayerQuizLobbyUIEventHandler()
   {
     this.multiplayer_quiz_lobby_ui_handler = 
     {
       'multiplayer_start': this.requestStartLobby.bind(this),
-      'modal_quiz_setting': this.handleSubmitModalQuizSetting.bind(this),
-      'request_modal_multiplayer_settings': this.handleRequestModalMultiplayerSettings.bind(this),
-      'modal_multiplayer_edit_lobby': this.handleSubmitModalMultiplayerLobbySetting.bind(this),
       'multiplayer_lobby_kick_select_menu': this.requestKick.bind(this),
     };
   }
@@ -358,8 +379,6 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return;
     }
 
-    this.participant_guilds_info[selected_value];
-
     if(selected_value > this.participant_guilds_info)
     {
       interaction.explicit_replied = true;
@@ -417,7 +436,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       {
         if(result.state === true)
         {
-          // interaction.deferUpdate();
+          interaction.deferUpdate();
           // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
         }
         else
@@ -427,48 +446,48 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       });
   }
 
-  handleSubmitModalMultiplayerLobbySetting(interaction)
-  {
-    const need_refresh = this.applyMultiplayerLobbySettings(interaction);
+  // handleSubmitModalMultiplayerLobbySetting(interaction)
+  // {
+  //   const need_refresh = this.applyMultiplayerLobbySettings(interaction);
 
-    if(need_refresh === false)
-    {
-      return;
-    }
+  //   if(need_refresh === false)
+  //   {
+  //     return;
+  //   }
 
-    interaction.explicit_replied = true;
-    ipc_manager.sendMultiplayerSignal(
-      {
-        signal_type: CLIENT_SIGNAL.EDIT_LOBBY,
-        guild_id: this.guild_id,
-        session_id: this.session_id,
-        quiz_info: this.quiz_info,
-      }
-    )
-      .then(result => 
-      {
-        if(result.state === true)
-        {
-          interaction.deferUpdate();
-        // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
-        }
-        else
-        {
-          interaction.reply({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
-        }
-      });
-  }
+  //   interaction.explicit_replied = true;
+  //   ipc_manager.sendMultiplayerSignal(
+  //     {
+  //       signal_type: CLIENT_SIGNAL.EDIT_LOBBY,
+  //       guild_id: this.guild_id,
+  //       session_id: this.session_id,
+  //       quiz_info: this.quiz_info,
+  //     }
+  //   )
+  //     .then(result => 
+  //     {
+  //       if(result.state === true)
+  //       {
+  //         interaction.deferUpdate();
+  //       // interaction.reply({ content: `\`\`\`🌐 설정이 반영되었습니다.\`\`\`` , ephemeral: true});
+  //       }
+  //       else
+  //       {
+  //         interaction.reply({ content: `\`\`\`🌐 설정을 반영하지 못했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
+  //       }
+  //     });
+  // }
 
-  handleRequestModalMultiplayerSettings(interaction)
-  {
-    const modal_current_lobby_setting = cloneDeep(modal_multiplayer_edit_lobby);
+  // handleRequestModalMultiplayerSettings(interaction)
+  // {
+  //   const modal_current_lobby_setting = cloneDeep(modal_multiplayer_edit_lobby);
     
-    modal_current_lobby_setting.components[0].components[0].setValue(`${this.quiz_info.title ?? ''}`);
+  //   modal_current_lobby_setting.components[0].components[0].setValue(`${this.quiz_info.title ?? ''}`);
     
-    interaction.explicit_replied = true;
-    interaction.showModal(modal_current_lobby_setting); //로비 설정 모달 전달
-    return;
-  }
+  //   interaction.explicit_replied = true;
+  //   interaction.showModal(modal_current_lobby_setting); //로비 설정 모달 전달
+  //   return;
+  // }
 
   onInteractionCreate(interaction) 
   {
@@ -495,14 +514,41 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   
     // Description 설정
     let description = this.getDescription();
+
+    // 참가자 목록 설정
+    this.setupParticipantSelectMenu();
+
+    //퀴즈 선택 모드에 따라(장바구니 모드 on/off) 다르게 처리
+    this.setUpOmakaseQuizSelectComponent();
   
     // Tag 정보 설정
     description += this.getTagInfoText();
   
     this.embed.description = description;
-  
-    // 참가자 목록 설정
-    this.setupParticipantSelectMenu();
+  }
+
+  setUpOmakaseQuizSelectComponent()
+  {
+    this.initializeComponents(); //컴포넌트 초기화하고
+    
+    const basket_mode = this.quiz_info['basket_mode'] ?? false;
+
+    if(this.readonly)
+    {
+      return;
+    }
+
+    this.components.push(omakase_dev_quiz_tags_select_menu);
+
+    if(basket_mode === false)
+    {
+      this.components.push(omakase_custom_quiz_type_tags_select_menu);
+      this.components.push(omakase_custom_quiz_tags_select_menu);
+    }
+    else
+    {
+      return;
+    }   
   }
   
   updateLobbyEmbed(quiz_info) 
@@ -534,7 +580,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   
     if (this.participant_guilds_info.length !== 0) 
     {
-      this.components[1].components[0] = participant_select_menu_for_current_lobby;
+      this.multiplayer_participant_select_component.components[0] = participant_select_menu_for_current_lobby;
     }
   }
   
@@ -549,19 +595,19 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     logger.info(`Applying lobby info to ${this.guild_id}`);
   }
 
-  applyMultiplayerLobbySettings(interaction)
-  {
-    let need_refresh = false;
-    const lobby_name = interaction.fields.getTextInputValue('txt_input_lobby_name');
+  // applyMultiplayerLobbySettings(interaction)
+  // {
+  //   let need_refresh = false;
+  //   const lobby_name = interaction.fields.getTextInputValue('txt_input_lobby_name');
 
-    if(this.quiz_info['title'] !== lobby_name)
-    {
-      this.quiz_info['title'] = lobby_name;
-      need_refresh = true;
-    }
+  //   if(this.quiz_info['title'] !== lobby_name)
+  //   {
+  //     this.quiz_info['title'] = lobby_name;
+  //     need_refresh = true;
+  //   }
 
-    return need_refresh;
-  }
+  //   return need_refresh;
+  // }
 
   checkNeedToRefresh()
   {
@@ -692,24 +738,17 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   //해당 UI가 날라갈때
   onExpired()
   {
-    ipc_manager.sendMultiplayerSignal(
-      {
-        signal_type: CLIENT_SIGNAL.LEAVE_LOBBY,
-        guild_id: this.guild_id,
-        session_id: this.session_id
-      }
-    ); 
-
-    logger.info("Disconnecting voice state by leaving lobby");
+    logger.info(`Disconnecting voice state by leaving lobby guild_id: ${this.guild.id}`);
     quiz_system.forceStopSession(this.guild);
 
-    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by expire ui`);
+    logger.info(`Expire multiplayer lobby ui refresh timer(${this.refreshTimer}) by expire ui. guild_id: ${this.guild.id}`);
     clearInterval(this.refreshTimer);
     
     super.onExpired();
 
     this.channel.send({ content: `\`\`\`🌐 로비에서 퇴장하셨습니다.\`\`\`` });
   }
+  
 
 }
 

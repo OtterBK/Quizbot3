@@ -234,14 +234,14 @@ class QuizBotControlComponentUI extends QuizbotUI
     if(isNaN(selected_page_num)) //입력 값 잘못된거 처리
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`\`\`${input_page_value} 값은 잘못됐습니다.\`\`\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`🔸 ${input_page_value} 값은 잘못됐습니다.\`\`\``, ephemeral: true});
       return undefined;
     }
 
     if(selected_page_num <= 0 || selected_page_num > this.total_page) //이상한 범위면 return
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`\`\`${input_page_value} 페이지는 없네요...\`\`\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`🔸 ${input_page_value} 페이지는 없네요...\`\`\``, ephemeral: true});
       return undefined; 
     }
 

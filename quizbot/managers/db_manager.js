@@ -319,3 +319,16 @@ exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value
   
   return sendQuery(query_string, [quiz_type_tags_value, tags_value, limit]);
 };
+
+exports.insertReportInfo = async (key_fields, value_fields) =>
+{
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `insert into tb_report_chat_info (${key_fields}) values (${placeholders})`;
+  
+  return sendQuery(query_string, value_fields);
+}

@@ -13,6 +13,7 @@ const {
   quiz_search_tags_select_menu,
   modal_complex_page_jump,
   btn_search,
+  btn_done,
 } = require("./components.js");
 
 const { 
@@ -25,7 +26,7 @@ const { UserQuizInfoUI } = require("./user-quiz-info.ui.js");
 /** 유저 퀴즈 선택 UI */
 class UserQuizSelectUI extends QuizBotControlComponentUI  
 {
-  constructor()
+  constructor(basket_items=undefined)
   {
     super();
 
@@ -33,6 +34,9 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     this.selected_tags_value = 0;
     this.selected_keyword_value = undefined;
     this.selected_sort_by_value = 'modified_time';
+
+    this.basket_items = basket_items;
+    this.use_basket_mode = this.basket_items !== undefined;
     
     this.initializeEmbed();
     this.initializeComponents();
@@ -41,8 +45,6 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   initializeEmbed() 
   {
-    
-
     this.embed = {
       color: 0x05f1f1,
       title: text_contents.user_select_category.title,
@@ -53,14 +55,18 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
   initializeComponents() 
   {
-    
-
     this.sort_by_select_menu = cloneDeep(sort_by_select_menu); //아예 deep copy해야함
     this.search_tag_select_menu = cloneDeep(quiz_search_tags_select_menu); //아예 deep copy해야함
 
     this.components[2].components[2] = btn_search; //점프 버튼을 검색 버튼으로 대체, this.components는 clonedeep이라 그냥 바꿔도 된다.
     this.components.push(this.sort_by_select_menu);
     this.components.push(this.search_tag_select_menu);
+
+    if(this.use_basket_mode)
+    {
+      //꼼수...
+      this.components[2].components[1] = btn_done; //뒤로 버튼을 완료 버튼으로 대체, this.components는 clonedeep이라 그냥 바꿔도 된다.
+    }
   }
 
   initializeUserQuizSelectUIEventHandler()
@@ -169,11 +175,11 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     if(input_keyword_value === undefined || input_keyword_value === '')
     {
-      interaction.channel.send({content: `\`\`\`모든 퀴즈를 표시합니다.\`\`\``});
+      interaction.channel.send({content: `\`\`\`🔸 모든 퀴즈를 표시합니다.\`\`\``});
     }
     else
     {
-      interaction.channel.send({content: `\`\`\`${input_keyword_value} 에 대한 검색 결과입니다.\`\`\``});
+      interaction.channel.send({content: `\`\`\`🔸 ${input_keyword_value} 에 대한 검색 결과입니다.\`\`\``});
     }
   }
 
@@ -270,8 +276,38 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     const user_quiz_info = this.cur_contents[index]; //퀴즈를 선택했을 경우
 
+    if(this.use_basket_mode)
+    {
+      interaction.explicit_replied = true;
+
+      const quiz_id = user_quiz_info.quiz_id;
+      if(quiz_id === undefined)
+      {
+        interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈에서 Quiz id 값을 찾을 수 없습니다.\`\`\``});
+        return; 
+      }
+
+      const quiz_title = user_quiz_info.data.quiz_title;
+      this.basket_items[quiz_id] = 
+      {
+        quiz_id: quiz_id,
+        title: quiz_title,
+      };
+
+      
+      interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈를 장바구니에 담았습니다. (${Object.keys(this.basket_items).length}개 / 25개)\`\`\``});
+      return;
+    }
+
     return new UserQuizInfoUI(user_quiz_info, true); //readonly true로 넘겨야함
-    
+  }
+
+  onExpired()
+  {
+    if(this.use_basket_mode)
+    {
+      this.sendMessageReply({content: `\`\`\`🔸 ${Object.keys(this.basket_items).length}개의 유저 퀴즈를 장바구니에 담았습니다.\`\`\``});
+    }
   }
 }
 

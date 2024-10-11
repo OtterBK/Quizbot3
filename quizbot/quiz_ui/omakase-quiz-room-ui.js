@@ -1,6 +1,7 @@
 'use strict';
 
 //#region 필요한 외부 모듈
+const cloneDeep = require("lodash/cloneDeep.js");
 
 //#endregion
 
@@ -10,9 +11,12 @@ const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.l
 const utility = require('../../utility/utility.js');
 const {
   omakase_quiz_info_comp,
+  modal_omakase_quiz_setting,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
-  omakase_custom_quiz_tags_select_menu
+  omakase_custom_quiz_tags_select_menu,
+  omakase_basket_select_menu,
+  omakase_basket_select_row,
 } = require("./components.js");
 
 const { 
@@ -21,6 +25,7 @@ const {
 
 
 const { QuizInfoUI } = require('./quiz-info-ui.js');
+const { UserQuizSelectUI } = require("./user-quiz-select-ui.js");
 
 //#endregion
 
@@ -37,7 +42,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     omakase_quiz_info['icon'] = '🍴';
 
     omakase_quiz_info['type_name'] = "**퀴즈봇 마음대로 퀴즈!**"; 
-    omakase_quiz_info['description'] = `\`\`\`장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\`\`\``; 
+    omakase_quiz_info['description'] = `\`\`\`🔸 장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\`\`\``; 
 
     omakase_quiz_info['author'] = guild.name ?? guild.id;
     omakase_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -73,6 +78,8 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
     this.need_tags = true;
 
+    this.basket_select_component = undefined;
+
     this.initializeEmbed();
     this.initializeComponents();
     this.initializeTagSelectedHandler();
@@ -82,8 +89,6 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
   initializeEmbed() 
   {
-    
-
     this.embed = {
       color: 0x87CEEB,
       title: `${this.quiz_info['icon']} ${this.quiz_info['title']}`,
@@ -100,14 +105,20 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
   initializeComponents() 
   {
+    if(this.basket_select_component === undefined)
+    {
+      this.basket_select_component = cloneDeep(omakase_basket_select_row);
+    }
+
     this.components = [omakase_quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
+
+    this.modal_quiz_setting = cloneDeep(modal_omakase_quiz_setting);
   }
 
   initializeTagSelectedHandler()
   {
     this.tag_selected_handler = 
     {
-      'toggle_certified_quiz_filter': this.handleTagSelected.bind(this),
       'dev_quiz_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_type_tags_select_menu': this.handleTagSelected.bind(this),
       'custom_quiz_tags_select_menu':  this.handleTagSelected.bind(this),
@@ -147,6 +158,21 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     return this;
   }
 
+  handleRequestUseBasketMode(interaction)
+  {
+    let basket_items = this.quiz_info['basket_items'];
+    if(basket_items === undefined)
+    {
+      this.quiz_info['basket_items'] = {};
+      basket_items = this.quiz_info['basket_items'];
+    }
+
+    interaction.explicit_replied = true;
+    interaction.reply({content: `\`\`\`장바구니 모드를 사용합니다.\n장바구니 모드는 직접 원하는 유저 퀴즈들을 선택하면\n선택한 퀴즈들에서만 무작위로 문제가 출제됩니다. \`\`\``, ephemeral: true});
+
+    return new UserQuizSelectUI(basket_items);
+  }
+
   refreshUI()
   {
     let description = this.getDescription();
@@ -155,6 +181,8 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
     this.embed.description = description;
   }
+
+
 }
 
 module.exports = { OmakaseQuizRoomUI };

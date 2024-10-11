@@ -33,7 +33,8 @@ const db_manager = require('./managers/db_manager.js');
 const ipc_manager = require('./managers/ipc_manager.js');
 const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('./managers/audio_cache_manager.js');
-const { sendMultiplayerChat } = require('./managers/multiplayer_chat_manager.js');
+const multiplayer_chat_manager = require('./managers/multiplayer_chat_manager.js');
+const { checkReportEvent } = require('./managers/report_manager.js');
 const { stdin } = require('process');
 const { dirname } = require('path');
 
@@ -115,6 +116,9 @@ client.on('ready', () =>
 
   // logger.info(`Starting FFMPEG Aging Manager`);
   // quiz_system.startFFmpegAgingManager();
+
+  logger.info(`Initializing Multiplayer Chat Manager`);
+  multiplayer_chat_manager.initialize(koreanbots);
 
   ///////////
   logger.info(`Register commands...`);
@@ -213,7 +217,7 @@ const checkPermission = (interaction) =>
     interaction.explicit_replied = true; 
     interaction.reply({
       content:
-        '>>> 이 채널에 메시지를 보낼 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.',
+        `\`\`\`🔸 이 채널에 메시지를 보낼 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.\`\`\``,
       ephemeral: true,
     });
     return false;
@@ -228,7 +232,7 @@ const checkPermission = (interaction) =>
     interaction.explicit_replied = true; 
     interaction.reply({
       content:
-        '>>> 이 채널의 속성을 확인할 수 있는 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.',
+        `\`\`\`🔸 이 채널의 속성을 확인할 수 있는 권한이 없습니다.😥\n봇에게 필요한 권한을 부여하거나 서버 관리자에게 봇을 추방하고 다시 초대하도록 요청해보세요.\`\`\``,
       ephemeral: true,
     });
     return false;
@@ -243,7 +247,7 @@ const start_quiz_handler = async (interaction) =>
   if (interaction.guild == undefined) 
   {
     interaction.reply({
-      content: '>>> 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.',
+      content: `\`\`\`🔸 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.`,
       ephemeral: true,
     });
     return;
@@ -304,12 +308,12 @@ const create_quiz_handler = async (interaction) =>
     interaction.explicit_replied = true; 
     interaction.reply({
       content:
-        '>>> 퀴즈 제작에 참여해주셔서 감사합니다!\n퀴즈봇이 메시지를 보낼거에요. 확인해보세요!',
+        `\`\`\`🔸 퀴즈 제작에 참여해주셔서 감사합니다!\n퀴즈봇이 메시지를 보낼거에요. 확인해보세요!\`\`\``,
       ephemeral: true,
     });
     interaction.member.send({
       content:
-        '>>> **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력하시거나 버튼을 클릭하세요!',
+        `\`\`\`🔸 **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력하시거나 버튼을 클릭하세요!\`\`\``,
       components: [create_quiz_tool_btn_component],
       ephemeral: true,
     });
@@ -320,7 +324,7 @@ const create_quiz_handler = async (interaction) =>
   interaction.explicit_replied = true; 
   interaction.reply({
     content:
-      '>>> 개인 메시지로 퀴즈 제작 화면을 보내드렸어요!\n퀴즈봇과의 개인 메시지를 확인해주세요 🛠',
+      `\`\`\`🔸 개인 메시지로 퀴즈 제작 화면을 보내드렸어요!\n퀴즈봇과의 개인 메시지를 확인해주세요 🛠\`\`\``,
     ephemeral: true,
   });
 };
@@ -328,18 +332,13 @@ const create_quiz_handler = async (interaction) =>
 const clear_quiz_handler = (interaction) =>
 {
   interaction.explicit_replied = true; 
-  interaction.reply({ content: `\`\`\`서버에서 진행 중인 모든 세션을 정리했습니다.\n이 명령어는 봇 이용에 문제가 발생했을 때만 사용하세요.\`\`\`` });
+  interaction.reply({ content: `\`\`\`🔸 서버에서 진행 중인 모든 세션을 정리했습니다.\n이 명령어는 봇 이용에 문제가 발생했을 때만 사용하세요.\`\`\`` });
   logger.info(`Cleared quiz session of ${interaction.guild.id} by ${interaction.user.id}`);
 
   const guild = interaction.guild;
 
   quizbot_ui.eraseUIHolder(guild);
   quiz_system.forceStopSession(guild);
-};
-
-const multiplayer_chat_handler = (interaction) =>
-{
-  sendMultiplayerChat(interaction);
 };
 
 // 상호작용 이벤트
@@ -369,7 +368,18 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
 
   if (main_command === '챗') 
   {
-    sendMultiplayerChat(interaction);
+    multiplayer_chat_manager.sendMultiplayerChat(interaction);
+    return;
+  }
+
+  if (main_command === '채팅전환') 
+  {
+    multiplayer_chat_manager.toggleMultiplayerChat(interaction);
+    return;
+  }
+
+  if(checkReportEvent(interaction)) ////신고 관련 체크
+  {
     return;
   }
 
@@ -392,7 +402,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
     {
       //이제 Public UI 조작은 주인만 가능~
       interaction.reply({
-        content: `\`\`\`해당 UI를 생성한 ${uiHolder.getOwnerName()}님만이 조작할 수 있어요.\nUI를 새로 만들려면 [/퀴즈] 명령어를 다시 입력해주세요!\`\`\``,
+        content: `\`\`\`🔸 해당 UI를 생성한 ${uiHolder.getOwnerName()}님만이 조작할 수 있어요.\nUI를 새로 만들려면 [/퀴즈] 명령어를 다시 입력해주세요!\`\`\``,
         ephemeral: true,
       });
       return;
@@ -506,9 +516,8 @@ const createCleanUp = function ()
 
 const relayMultiplayerSignal = (signal) =>
 {
-  const quiz_ui_handled = quizbot_ui.relayMultiplayerSignal(signal);
-  
   const quiz_session_handled = quiz_system.relayMultiplayerSignal(signal);
+  const quiz_ui_handled = quizbot_ui.relayMultiplayerSignal(signal);
 
   // if(quiz_session_handled && quiz_ui_handled)  //아니아니 STARTED_LOBBY 신호는 어차피 double handle
   // {

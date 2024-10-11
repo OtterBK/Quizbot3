@@ -232,7 +232,7 @@ class UserQuizInfoUI extends QuizInfoUI
       if(this.user_quiz_info.question_list?.length == 0)
       {
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`\`\`이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\`\`\``, ephemeral: true});
+        interaction.reply({content: `\`\`\`🔸 이 퀴즈의 문제 수가 0개라 시작할 수 없습니다.\`\`\``, ephemeral: true});
         return;
       }
   
@@ -243,7 +243,7 @@ class UserQuizInfoUI extends QuizInfoUI
         const reason_message = text_contents.quiz_info_ui.failed_start.replace("${reason}", reason);
 
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`\`\`${reason_message}\`\`\``, ephemeral: true});
+        interaction.reply({content: `\`\`\`🔸 ${reason_message}\`\`\``, ephemeral: true});
         return;
       }
         
@@ -310,7 +310,7 @@ class UserQuizInfoUI extends QuizInfoUI
       //비공개에서 공개로 전환할 경우
       if(user_quiz_info.data.is_private === true && (user_quiz_info.data.tags_value === undefined || user_quiz_info.data.tags_value === 0))
       {
-        interaction.user.send({ content: ">>> 태그를 1개 이상 선택해주세요...ㅜㅜ 😥", ephemeral: true });
+        interaction.user.send({ content: `\`\`\`🔸 태그를 1개 이상 선택해주세요...ㅜㅜ 😥\`\`\``, ephemeral: true });
         return;
       }
   
@@ -326,7 +326,7 @@ class UserQuizInfoUI extends QuizInfoUI
   
     if(interaction.customId === 'quiz_delete') //퀴즈 삭제 버튼
     {
-      interaction.user.send({ content: `\`\`\`${text_contents.quiz_maker_ui.confirm_quiz_delete}\`\`\``, components: [quiz_delete_confirm_comp], ephemeral: true });
+      interaction.user.send({ content: `\`\`\`🔸 ${text_contents.quiz_maker_ui.confirm_quiz_delete}\`\`\``, components: [quiz_delete_confirm_comp], ephemeral: true });
       return;
     }
   
@@ -382,7 +382,7 @@ class UserQuizInfoUI extends QuizInfoUI
     this.refreshUI();
   
     modal_interaction.explicit_replied = true;
-    modal_interaction.reply({ content: ">>> 퀴즈 정보를 수정하였습니다.", ephemeral: true });
+    modal_interaction.reply({ content: `\`\`\`🔸 퀴즈 정보를 수정하였습니다.\`\`\``, ephemeral: true });
     logger.info(`Edited Quiz info... quiz_id: ${user_quiz_info.quiz_id}`);
   }
   
@@ -437,8 +437,7 @@ class UserQuizInfoUI extends QuizInfoUI
     {
       quiz_info['selected_question_count'] = quiz_info['quiz_size'];
     }
-  }
-  
+  }  
   
 }
 

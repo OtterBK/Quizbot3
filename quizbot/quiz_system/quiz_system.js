@@ -31,6 +31,7 @@ const {
   multiplayer_participant_select_row,
   multiplayer_chat_comp,
 } = require("../quiz_ui/components.js");
+const e = require('express');
 
 //#endregion
 
@@ -206,14 +207,14 @@ exports.forceStopSession = (guild) =>
   {
     quiz_session.forceStop();
     delete quiz_session_map[guild_id];
-    logger.info("destroy quiz_session by force stop");
+    logger.info(`destroy quiz_session by force stop ${guild.id}`);
   }
 
   const voice_state = guild.members.me.voice;
   if(voice_state && voice_state.channel)
   {
     voice_state.disconnect();
-    logger.info("disconnected voice state by force stop");
+    logger.info(`disconnected voice state by force stop ${guild.id}`);
   }
 };
 
@@ -389,7 +390,7 @@ class QuizPlayUI
 		
           if(err.code === RESTJSONErrorCodes.MissingPermissions || err.code === RESTJSONErrorCodes.MissingAccess) //권한 부족해서 종료된거면 알려주자
           {
-            quiz_session.owner.send({content: `\`\`\`${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}\`\`\``});
+            quiz_session.owner.send({content: `\`\`\`🔸 ${guild_id}에서 진행한 퀴즈가 강제 종료되었습니다.\n이유: 봇에게 메시지 보내기 권한이 부족합니다.\n봇을 추방하고 관리자가 다시 초대하도록 해보세요.\n${err.code}\`\`\``});
 		        logger.info(`Send Forcestop Reason MissingPermissions to ${quiz_session.owner.id}, guild_id: ${guild_id}, err.code: ${err.code}`);
           }
 	
@@ -517,6 +518,8 @@ class QuizSession
     this.already_liked = true; //이미 like 버튼 눌렀는지 여부. 기본 true 깔고 initializeCustom에서만 false 또는 true 다시 정함
 
     this.quiz_session_type = quiz_session_type;
+
+    this.is_multiplayer_session = false;
   }
 
   free() //자원 해제
@@ -695,6 +698,11 @@ class QuizSession
     const current_cycle_type = this.current_cycle_type;
     logger.info(`Call force stop quiz session, guild_id: ${this.guild_id}, current cycle type: ${current_cycle_type}`);
 
+    if(this.isMultiplayerSession())
+    {
+      this.sendLeave();
+    }
+
     const cycle = this.getCycle(current_cycle_type);
     cycle?.forceStop();
   }
@@ -798,7 +806,7 @@ class QuizSession
 
   isMultiplayerSession()
   {
-    return this.quiz_session_type === QUIZ_SESSION_TYPE.MULTIPLAYER || this.quiz_session_type === QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY;
+    return this.is_multiplayer_session;
   }
 
   hasMoreQuestion()
@@ -832,160 +840,17 @@ class DummyQuizSession extends QuizSession
   {
     super(guild, owner, channel, quiz_info, quiz_session_type); //dummy 세션으로 생성
 
-    this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this)); //DUMMY도 이 정도는 넣어주자
+    //DUMMY도 이 정도는 넣어주자
+    this.inputLifeCycle(CYCLE_TYPE.HOLD, new HOLD(this));
+    this.inputLifeCycle(CYCLE_TYPE.FINISH, new Finish(this)); 
+
+    this.goToCycle(CYCLE_TYPE.HOLD);
   } 
-}
-
-class MultiplayerLobbySession extends DummyQuizSession //멀티플레이 로비임
-{
-  constructor(guild, owner, channel, quiz_info)
-  {
-    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY);
-
-    this.createVoiceConnection(); //음성 채널 참가까지는 진행한다.
-    
-  }
-
-  on(event_name, signal)
-  {
-    if(event_name !== CUSTOM_EVENT_TYPE.receivedMultiplayerSignal)
-    {
-      return false;
-    }
-
-    const signal_type = signal.signal_type;
-
-    if(signal_type === SERVER_SIGNAL.STARTED_LOBBY)
-    {
-      //로비 시작만 핸들
-      this.onReceivedStatedLobby(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.CONFIRM_CHAT)
-    {
-      this.onReceivedConfirmChat(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.EXPIRED_SESSION)
-    {
-      this.onReceivedExpiredSession(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.JOINED_LOBBY)
-    {
-      this.onReceivedJoinedLobby(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.LEAVED_LOBBY)
-    {
-      this.onReceivedLeavedLobby(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.KICKED_PARTICIPANT)
-    {
-      this.onReceivedKickedParticipant(signal);
-    }
-  }    
-
-  setSessionId(session_id)
-  {
-    this.session_id = session_id;
-  }
-
-  sendSignal(signal)
-  {
-    signal.guild_id = this.guild_id;
-    signal.session_id = this.session_id;
-
-    ipc_manager.sendMultiplayerSignal(
-      signal
-    );
-  }
-
-  onReceivedStatedLobby(signal)
-  {
-    const session_id = signal.session_id;
-    const lobby_info = signal.lobby_info;
-    if(lobby_info.quiz_info === undefined)
-    {
-      logger.error(`Cannot transit to active quiz session from multiplayer session. finalized quiz info is undefined. guild_id: ${this.guild_id}`);
-      return;
-    }
-
-    const transited_session = this.transitToActiveQuizSession(lobby_info.quiz_info);
-
-    if(!(transited_session instanceof MultiplayerQuizSession))
-    {
-      logger.error(`Transited Quiz Session is not Multiplayer Quiz Session type!!!. session_id: ${session_id} guild_id: ${this.guild_id}`);
-      return;
-    }
-
-    transited_session.setSessionId(session_id);
-    transited_session.startMultiplayer();
-  }
-
-  onReceivedConfirmChat(signal)
-  {
-    if(this.ignore_chat === true)
-    {
-      return;
-    }
-
-    // '신고' 버튼의 customId를 변경
-    const custom_chat_button = multiplayer_chat_comp.components.map(button => 
-    {
-      if (button.customId === 'multiplayer_chat_report_id_') 
-      {
-        // customId 변경
-        return ButtonBuilder.from(button).setCustomId('multiplayer_chat_report_id_' + signal.user_id);
-      }
-
-      return button; // 다른 버튼은 그대로 유지
-    });
-
-    const custom_chat_comp = new ActionRowBuilder().addComponents(custom_chat_button);
-
-    this.sendMessage({ content: signal.chat_message, components: [custom_chat_comp]});
-  }
-
-  onReceivedExpiredSession(signal)
-  {
-    logger.info(`Received Expired Session signal on MultiplayerLobbySession. call force stop.`);
-    this.forceStop();
-  }
-
-  onReceivedJoinedLobby(signal)
-  {
-    utility.playBGM(this.audio_player, BGM_TYPE.MATCHING);
-  }
-
-  onReceivedLeavedLobby(signal)
-  {
-    utility.playBGM(this.audio_player, BGM_TYPE.MATCH_FIND);
-  }
-
-  onReceivedKickedParticipant(signal)
-  {
-    utility.playBGM(this.audio_player, BGM_TYPE.MATCH_FIND);
-  }
-
-  sendRequestChat(user_id, chat_message)
-  {
-    logger.info(`Send request chat signal. guild_id: ${this.guild_id} / user_id: ${user_id}`);
-
-    this.sendSignal(
-      {
-        signal_type: CLIENT_SIGNAL.REQUEST_CHAT,
-        user_id: user_id,
-        chat_message: chat_message
-      }
-    );
-  }
-
-  transitToActiveQuizSession(finalized_quiz_info) //Lobby에서 게임 진행할 진짜 QuizSession 으로 전환
-  {
-    logger.info(`transit to active quiz session from multiplayer session. guild_id: ${this.guild_id}`);
-    return exports.startQuiz(this.guild, this.owner, this.channel, finalized_quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER); //진짜 퀴즈 세션 생성 -> 해당 함수에서 어차피 Lobby는 free됨
-  }
 }
 
 const MULTIPLAYER_STATE =
 {
+  LOBBY: 'LOBBY',
   INITIALIZING: 'initializing',
   WAITING_FOR_QUESTION_LIST: 'waiting_for_question_list',
   QUESTION_LIST_READY: 'question_list_ready',
@@ -1011,32 +876,27 @@ const MULTIPLAYER_COMMON_OPTION =
   }
 };
 
-class MultiplayerQuizSession extends QuizSession
+//Mix in 패턴. Base 클래스 달라도 공통 함수 정의하기 위해 사용
+const MultiplayerSessionMixin = Base => class extends Base 
 {
-  constructor(guild, owner, channel, quiz_info)
+  constructor(...args)
   {
-    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER);
-    
+    super(...args);
+
+    this.is_multiplayer_session = true;
+
     this.session_id = undefined;
+    this.ignore_chat = false; 
+
     this.participant_guilds_info = undefined;
 
-    this.multiplayer_state = MULTIPLAYER_STATE.INITIALIZING;
-
-    this.sync_done_sequence_num = 0;
-    this.sync_callback = undefined;
-    this.sync_failed = false;
     this.sync_ready = false;
-
-    this.ignore_chat = false;
-
-    this.participant_select_menu = undefined;
-    this.participant_select_row = cloneDeep(multiplayer_participant_select_row);
-
-    this.mvp_info = undefined;
+    this.sync_failed = false;
+    this.leaved = false;
 
     this.session_expired = false;
 
-    this.leaved_game = false;
+    this.multiplayer_state = undefined;
   }
 
   setSessionId(session_id)
@@ -1044,16 +904,40 @@ class MultiplayerQuizSession extends QuizSession
     this.session_id = session_id;
   }
 
+  setIgnoreChat(value, who=undefined)
+  {
+    this.ignore_chat = value;
+
+    if(who === undefined)
+    {
+      return;
+    }
+
+    if(this.isIgnoreChat())
+    {
+      this.sendMessage(`\`\`\`🔸 ${who} 님이 전체 채팅을 껐습니다.\n'/채팅전환' 명령어로 켜거나 끌 수 있습니다.\`\`\``);
+    }
+    else
+    {
+      this.sendMessage(`\`\`\`🔸 ${who} 님이 전체 채팅을 켰습니다.\`\`\``);
+    }
+  }
+
+  toggleIgnoreChat(who=undefined)
+  {
+    this.setIgnoreChat(!this.ignore_chat, who);
+
+    return this.isIgnoreChat();
+  }
+
+  isIgnoreChat()
+  {
+    return this.ignore_chat;
+  }
+
   isMultiplayerSessionExpired()
   {
     return this.session_expired;
-  }
-
-  startMultiplayer()
-  {
-    //그냥 사이클만 만들어주면 끗
-    this.createCycle();
-    this.cycleLoop();
   }
 
   isHostSession()
@@ -1061,9 +945,285 @@ class MultiplayerQuizSession extends QuizSession
     return this.session_id === this.guild_id;
   }
 
+  isIngame()
+  {
+    return this.multiplayer_state !== MULTIPLAYER_STATE.LOBBY;
+  }
+
   isLeavedGame()
   {
-    return this.leaved_game;
+    return this.leaved;
+  }
+
+  getParticipant(guild_id)
+  {
+    for(const guild_info of this.participant_guilds_info)
+    {
+      if(guild_info.guild_id === guild_id)
+      {
+        return guild_info;
+      }
+    }
+
+    return undefined;
+  }
+
+  sendSignal(signal, handle_failed=true)
+  {
+    if(this.isMultiplayerSessionExpired())
+    {
+      return;
+    }
+
+    if(this.sync_failed || this.leaved)
+    {
+      return;
+    }
+
+    signal.guild_id = this.guild_id;
+    signal.session_id = this.session_id;
+
+    ipc_manager.sendMultiplayerSignal(
+      signal
+    )
+      .then(result =>
+      {
+        if(handle_failed === false)
+        {
+          return;
+        }
+
+        if(result.state === false)
+        {
+          this.sendMessage(`\`\`\`🔸 요청 전송에 실패했습니다. 멀티플레이 퀴즈를 종료합니다.\n원인: ${result.reason}\`\`\``);
+          this.syncFailed();
+        }
+      });
+  }
+
+  syncFailed()
+  {
+    this.sendMessage({content:`\`\`\`🌐 멀티플레이 동기화에 실패하였습니다. (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})\n퇴장으로 처리되지만, 패배 처리는 되지 않습니다.\`\`\``});
+    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}, (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})`);
+
+    this.sync_failed = true;
+    
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.SYNC_FAILED,
+      }
+    );
+
+    this.forceStop();
+  }
+
+  sendLeave()
+  {
+    if(this.multiplayer_state === MULTIPLAYER_STATE.LOBBY)
+    {
+      this.sendLeaveLobby();
+    }
+    else
+    {
+      this.sendLeaveGame();
+    }
+  }
+
+  sendLeaveLobby()
+  {
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.LEAVE_LOBBY,
+      },
+      false
+    ); 
+
+    this.leaved = true;
+
+    logger.info(`Send Leave Lobby Signal. guild_id: ${this.guild_id}`); 
+  }
+
+  sendLeaveGame()
+  {
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.LEAVE_GAME,
+      }
+    );
+
+    this.leaved = true;
+
+    logger.info(`Send Leave Game Signal. guild_id: ${this.guild_id}`); 
+  }
+
+  sendRequestChat(user_id, chat_message)
+  {
+    logger.info(`Send request chat signal. guild_id: ${this.guild_id} / user_id: ${user_id}`);
+
+    this.sendSignal(
+      {
+        signal_type: CLIENT_SIGNAL.REQUEST_CHAT,
+        user_id: user_id,
+        chat_message: chat_message
+      },
+      false
+    );
+  }
+
+  on(event_name, event_object)
+  {
+    if(event_name === CUSTOM_EVENT_TYPE.interactionCreate)
+    {
+      if(event_object.isButton() && event_object.customId === 'chat_ignore')
+      {
+        this.setIgnoreChat(true, event_object.user.displayName);
+        return;
+      }
+    }
+
+    const signal_type = event_object.signal_type;
+
+    if(signal_type === SERVER_SIGNAL.CONFIRM_CHAT)
+    {
+      return this.onReceivedConfirmChat(event_object);
+    }
+  }
+
+  onReceivedConfirmChat(signal)
+  {
+    if(this.ignore_chat === true)
+    {
+      return;
+    }
+
+    const custom_chat_component = cloneDeep(multiplayer_chat_comp);
+    const message_id = signal.user_id + '-' + signal.timestamp;
+    custom_chat_component.components[0].setCustomId(`chat_report_${message_id}`);
+    //신고 버튼에 ID 설정해줘야함
+
+    this.sendMessage({ content: signal.chat_message, components: [custom_chat_component]});
+  }
+
+};
+
+class MultiplayerLobbySession extends MultiplayerSessionMixin(DummyQuizSession) //멀티플레이 로비임
+{
+  constructor(guild, owner, channel, quiz_info)
+  {
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER_LOBBY);
+
+    this.createVoiceConnection(); //음성 채널 참가까지는 진행한다.
+
+    this.multiplayer_state = MULTIPLAYER_STATE.LOBBY;
+  }
+
+  on(event_name, signal)
+  {
+    if(event_name !== CUSTOM_EVENT_TYPE.receivedMultiplayerSignal)
+    {
+      super.on(event_name, signal);
+      return false;
+    }
+
+    const signal_type = signal.signal_type;
+
+    if(signal_type === SERVER_SIGNAL.STARTED_LOBBY)
+    {
+      //로비 시작만 핸들
+      return this.onReceivedStatedLobby(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.EXPIRED_SESSION)
+    {
+      return this.onReceivedExpiredSession(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.JOINED_LOBBY)
+    {
+      return this.onReceivedJoinedLobby(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.LEAVED_LOBBY)
+    {
+      return this.onReceivedLeavedLobby(signal);
+    }
+    else if(signal_type === SERVER_SIGNAL.KICKED_PARTICIPANT)
+    {
+      return this.onReceivedKickedParticipant(signal);
+    }
+
+    return super.on(event_name, signal); //핸들 안된건 위쪽으로
+  }    
+
+  onReceivedStatedLobby(signal)
+  {
+    const session_id = signal.session_id;
+    const lobby_info = signal.lobby_info;
+    if(lobby_info.quiz_info === undefined)
+    {
+      logger.error(`Cannot transit to active quiz session from multiplayer session. finalized quiz info is undefined. guild_id: ${this.guild_id}`);
+      return;
+    }
+
+    const transited_session = this.transitToActiveQuizSession(lobby_info.quiz_info);
+
+    if(!(transited_session instanceof MultiplayerQuizSession))
+    {
+      logger.error(`Transited Quiz Session is not Multiplayer Quiz Session type!!!. session_id: ${session_id} guild_id: ${this.guild_id}`);
+      return;
+    }
+
+    transited_session.setSessionId(session_id);
+    transited_session.setIgnoreChat(this.ignore_chat);
+    transited_session.startMultiplayer();
+  }
+
+  onReceivedExpiredSession(signal)
+  {
+    this.session_expired = true;
+
+    logger.info(`Received Expired Session signal on MultiplayerLobbySession. but do not call forcestop`);
+    // this.forceStop(); //로비에서 받았으면 어차피 goToBack 하면서 해제될듯
+  }
+
+  onReceivedJoinedLobby(signal)
+  {
+    utility.playBGM(this.audio_player, BGM_TYPE.MATCHING);
+  }
+
+  onReceivedLeavedLobby(signal)
+  {
+    utility.playBGM(this.audio_player, BGM_TYPE.MATCH_FIND);
+  }
+
+  onReceivedKickedParticipant(signal)
+  {
+    utility.playBGM(this.audio_player, BGM_TYPE.MATCH_FIND);
+  }
+
+  transitToActiveQuizSession(finalized_quiz_info) //Lobby에서 게임 진행할 진짜 QuizSession 으로 전환
+  {
+    logger.info(`transit to active quiz session from multiplayer session. guild_id: ${this.guild_id}`);
+    return exports.startQuiz(this.guild, this.owner, this.channel, finalized_quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER); //진짜 퀴즈 세션 생성 -> 해당 함수에서 어차피 Lobby는 free됨
+  }
+}
+
+class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
+{
+  constructor(guild, owner, channel, quiz_info)
+  {
+    super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER);
+    
+    this.sync_done_sequence_num = 0;
+
+    this.participant_select_menu = undefined;
+    this.participant_select_row = cloneDeep(multiplayer_participant_select_row);
+
+    this.mvp_info = undefined;
+  }
+
+  startMultiplayer()
+  {
+    //그냥 사이클만 만들어주면 끗
+    this.createCycle();
+    this.cycleLoop();
   }
 
   getGuildState()
@@ -1101,19 +1261,6 @@ class MultiplayerQuizSession extends QuizSession
     {
       this.participant_select_row.components[0] = participant_select_menu;
     }
-  }
-
-  getParticipant(guild_id)
-  {
-    for(const guild_info of this.participant_guilds_info)
-    {
-      if(guild_info.guild_id === guild_id)
-      {
-        return guild_info;
-      }
-    }
-
-    return undefined;
   }
 
   appendParticipantInfoMenu(quiz_play_ui)
@@ -1204,50 +1351,6 @@ class MultiplayerQuizSession extends QuizSession
     this.sync_ready = false;
   }
 
-  syncFailed()
-  {
-    this.sendMessage({content:`\`\`\`🌐 멀티플레이 동기화에 실패하였습니다. (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})\n퇴장으로 처리되지만, 패배 처리는 되지 않습니다.\`\`\``});
-    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}, (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})`);
-
-    this.sync_failed = true;
-    
-    this.sendSignal(
-      {
-        signal_type: CLIENT_SIGNAL.SYNC_FAILED,
-      }
-    );
-
-    this.forceStop();
-  }
-
-  sendSignal(signal)
-  {
-    if(this.isMultiplayerSessionExpired())
-    {
-      return;
-    }
-
-    if(this.sync_failed || this.leaved_game)
-    {
-      return;
-    }
-
-    signal.guild_id = this.guild_id;
-    signal.session_id = this.session_id;
-
-    ipc_manager.sendMultiplayerSignal(
-      signal
-    )
-      .then(result =>
-      {
-        if(result.state === false)
-        {
-          this.sendMessage(`\`\`\`요청 전송에 실패했습니다. 멀티플레이 퀴즈를 종료합니다.\n원인: ${result.reason}\`\`\``);
-          this.syncFailed();
-        }
-      });
-  }
-
   sendQuestionListInfo()
   {
     //꼼수다... 가아끔 basicInitialized 끝나기도 전에 question list가 오는 경우가 잇다
@@ -1319,25 +1422,13 @@ class MultiplayerQuizSession extends QuizSession
     logger.info(`Send request answer hit signal. guild_id: ${this.guild_id}, answerer_id: ${answerer_id}, answerer_name: ${answerer_name}, score: ${score}`);
   }
 
-  sendLeaveGame()
-  {
-    this.sendSignal(
-      {
-        signal_type: CLIENT_SIGNAL.LEAVE_GAME,
-      }
-    );
-
-    this.leaved_game = true;
-
-    logger.info(`Send Leave Game Signal. guild_id: ${this.guild_id}`); 
-  }
-
   sendFinishUp()
   {
     this.sendSignal(
       {
         signal_type: CLIENT_SIGNAL.FINISH_UP,
-      }
+      },
+      false
     );
 
     logger.info(`Send Finish Up Signal. guild_id: ${this.guild_id}`); 
@@ -1348,23 +1439,11 @@ class MultiplayerQuizSession extends QuizSession
     this.sendSignal(
       {
         signal_type: CLIENT_SIGNAL.FINISHED,
-      }
+      },
+      false
     );
 
     logger.info(`Send Finished Signal. guild_id: ${this.guild_id}`); 
-  }
-
-  sendRequestChat(user_id, chat_message)
-  {
-    logger.info(`Send request chat signal. guild_id: ${this.guild_id} / user_id: ${user_id}`);
-
-    this.sendSignal(
-      {
-        signal_type: CLIENT_SIGNAL.REQUEST_CHAT,
-        user_id: user_id,
-        chat_message: chat_message
-      }
-    );
   }
 
   on(event_name, signal)
@@ -1372,62 +1451,61 @@ class MultiplayerQuizSession extends QuizSession
     if(event_name !== CUSTOM_EVENT_TYPE.receivedMultiplayerSignal) //multiplayer signal 아니면 전부 quiz session한테 넘겨준다
     {
       super.on(event_name, signal);
+      return;
     }
 
     const signal_type = signal.signal_type;
 
     if(signal_type === SERVER_SIGNAL.HOST_CHANGED)
     {
-      this.onReceivedHostChanged(signal);
+      return this.onReceivedHostChanged(signal);
     }
     else if(signal_type === SERVER_SIGNAL.NOTICE_MESSAGE)
     {
-      this.onReceivedNoticeMessage(signal);
+      return this.onReceivedNoticeMessage(signal);
     }
     else if(signal_type === SERVER_SIGNAL.APPLY_QUESTION_LIST)
     {
-      this.onReceivedApplyQuestionList(signal);
+      return this.onReceivedApplyQuestionList(signal);
     }
     else if(signal_type === SERVER_SIGNAL.APPLY_NEXT_QUESTION)
     {
-      this.onReceivedApplyNextQuestion(signal);
+      return this.onReceivedApplyNextQuestion(signal);
     }
     else if(signal_type === SERVER_SIGNAL.SYNC_DONE)
     {
-      this.onReceivedSyncDone(signal);
+      return this.onReceivedSyncDone(signal);
     }
     else if(signal_type === SERVER_SIGNAL.CONFIRM_HINT)
     {
-      this.onReceivedConfirmHint(signal);
+      return this.onReceivedConfirmHint(signal);
     }
     else if(signal_type === SERVER_SIGNAL.CONFIRM_SKIP)
     {
-      this.onReceivedConfirmSkip(signal);
+      return this.onReceivedConfirmSkip(signal);
     }
     else if(signal_type === SERVER_SIGNAL.CONFIRM_ANSWER_HIT)
     {
-      this.onReceivedConfirmAnswerHit(signal);
+      return this.onReceivedConfirmAnswerHit(signal);
     }
     else if(signal_type === SERVER_SIGNAL.LEAVED_GAME)
     {
-      this.onReceivedLeavedGame(signal);
+      return this.onReceivedLeavedGame(signal);
     }
     else if(signal_type === SERVER_SIGNAL.SYNC_FAILED_DETECTED)
     {
-      this.onReceivedSyncFailedDetected(signal);
+      return this.onReceivedSyncFailedDetected(signal);
     }
     else if(signal_type === SERVER_SIGNAL.CONFIRM_MVP)
     {
-      this.onReceivedConfirmMVP(signal);
-    }
-    else if(signal_type === SERVER_SIGNAL.CONFIRM_CHAT)
-    {
-      this.onReceivedConfirmChat(signal);
+      return this.onReceivedConfirmMVP(signal);
     }
     else if(signal_type === SERVER_SIGNAL.EXPIRED_SESSION)
     {
-      this.onReceivedExpiredSession(signal);
+      return this.onReceivedExpiredSession(signal);
     }
+
+    return super.on(event_name, signal); //핸들 안된건 위쪽으로
   }
 
   onReceivedHostChanged(signal)
@@ -1598,7 +1676,6 @@ class MultiplayerQuizSession extends QuizSession
     const failed_guild_info = signal.failed_guild_info;
     this.sendMessage({content: `\`\`\`🌐 ${failed_guild_info.guild_name} 서버가 동기화에 실패했습니다.\n해당 서버는 퇴장으로 처리됩니다.\`\`\``});
 
-    this.quiz_session.scoreboard.delete(failed_guild_info.guild_id);
     logger.info(`Received sync failed signal ${this.guild_id}. erasing ${failed_guild_info.guild_id} from scoreboard`);
   }
 
@@ -1608,30 +1685,6 @@ class MultiplayerQuizSession extends QuizSession
     this.mvp_info = signal.mvp_info;
 
     logger.info(`Received MVP Info signal ${this.guild_id}. name: ${this.mvp_info.name}, score: ${this.mvp_info.score}`);
-  }
-  
-  onReceivedConfirmChat(signal)
-  {
-    if(this.ignore_chat === true)
-    {
-      return;
-    }
-
-    // '신고' 버튼의 customId를 변경
-    const custom_chat_button = multiplayer_chat_comp.components.map(button => 
-    {
-      if (button.customId === 'multiplayer_chat_report_id_') 
-      {
-        // customId 변경
-        return ButtonBuilder.from(button).setCustomId('multiplayer_chat_report_id_' + signal.user_id);
-      }
-
-      return button; // 다른 버튼은 그대로 유지
-    });
-
-    const custom_chat_comp = new ActionRowBuilder().addComponents(custom_chat_button);
-
-    this.sendMessage({ content: signal.chat_message, components: [custom_chat_comp]});
   }
 
   onReceivedExpiredSession(signal)
@@ -1663,7 +1716,7 @@ class QuizLifeCycle
 
   free()
   {
-    this.quiz_session = null;
+    // this.quiz_session = null;
   }
 
   do()
@@ -1769,11 +1822,6 @@ class QuizLifeCycle
     this.quiz_session.force_stop = true;
     this.force_stop = true;
     this.next_cycle == CYCLE_TYPE.UNDEFINED;
-
-    if(this.quiz_session.isMultiplayerSession())
-    {
-      this.quiz_session.sendLeaveGame();
-    }
 
     if(this.exit != undefined && do_exit)
     {
@@ -2667,18 +2715,30 @@ class InitializeOmakaseQuiz extends Initialize
     let question_list = [];
 
     //오마카세 퀴즈 설정 값
-    const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
-    const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
-    const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
+    const use_basket_mode = quiz_info['basket_mode'] ?? false;
+
+    let total_dev_question_count = undefined;
+    let dev_question_list = undefined;
+    let total_custom_question_count = undefined;
+    let custom_question_list = undefined;
     let selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
-        
     const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
-
-    const certified_filter = quiz_info['certified_filter'] ?? true; //인증된 퀴즈에서만 뽑을지 필터
-
-    //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
-    const [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
-    const [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit, certified_filter);
+    if(use_basket_mode === false) //장르 선택 모드
+    {
+      const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
+      const custom_quiz_type_tags = quiz_info['custom_quiz_type_tags']; //오마카세 퀴즈는 quiz_type_tags 가 있다.
+      const custom_quiz_tags = quiz_info['custom_quiz_tags']; //오마카세 퀴즈는 quiz_tags 도 있다.
+          
+      const certified_filter = quiz_info['certified_filter'] ?? true; //인증된 퀴즈에서만 뽑을지 필터
+  
+      //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
+      [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
+      [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit, certified_filter);
+    }
+    else //장바구니 모드
+    {
+      //TODO 바스켓 모드
+    }
 
     //각각 문제 수 비율로 limit을 나눠 가진다.
     const total_all_question_count = total_dev_question_count + total_custom_question_count; //둘 합치고
@@ -2686,6 +2746,7 @@ class InitializeOmakaseQuiz extends Initialize
     const custom_quiz_count = Math.round(total_custom_question_count / total_all_question_count * limit);
 
     logger.info(`Omakase Question count of this session. dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
+    
         
     //좀 더 세부적으로 섞어야할 것 같은데...너무 귀찮다 우선 걍 이렇게 ㄱㄱ하자
 
@@ -3413,7 +3474,7 @@ class Prepare extends QuizLifeCycle
 
       logger.info(`No cache file of ${video_id}. downloading cache`);
             
-      this.quiz_session.sendMessage({content: `\`\`\`현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥\`\`\``});
+      this.quiz_session.sendMessage({content: `\`\`\`🔸 현재 재생할 오디오에 대한 캐시가 없어 다운로드 중입니다. 시간이 좀 걸릴 수 있습니다... ㅜㅜ 😥\`\`\``});
 
       const ip_info = {
         ipv4: this.quiz_session.ipv4,    
@@ -3604,7 +3665,7 @@ class Question extends QuizLifeCycleWithUtility
       {
         this.next_cycle = CYCLE_TYPE.CLEARING; 
         logger.error(`Prepared Queue is Empty, tried ${current_check_prepared_queue} * ${check_interval}..., going to CLEARING cycle, guild_id: ${this.quiz_session.guild_id}`);
-        this.quiz_session.sendMessage({content: `\`\`\`예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.\`\`\``});
+        this.quiz_session.sendMessage({content: `\`\`\`🔸 예기치 않은 문제로 오디오 리소스 초기화에 실패했습니다...\n퀴즈가 강제 종료됩니다...\n서버 메모리 부족, 네트워크 연결 등의 문제일 수 있습니다.\`\`\``});
 
         const memoryUsage = process.memoryUsage();
         logger.error(`Memory Usage:, ${JSON.stringify({
@@ -4278,7 +4339,7 @@ class Question extends QuizLifeCycleWithUtility
       this.selected_choice_map.set(member, selected_choice);
 
       interaction.explicit_replied = true;
-      interaction.reply({ content: `\`\`\`선택한 정답: ${this.choiceAsIcon(selected_choice)}\`\`\``, ephemeral: true });
+      interaction.reply({ content: `\`\`\`🔸 선택한 정답: ${this.choiceAsIcon(selected_choice)}\`\`\``, ephemeral: true });
     }
   }
 
@@ -5647,7 +5708,7 @@ class Finish extends QuizLifeCycle
       }
     }
 
-    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession())
+    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession() && this.quiz_session.isIngame())
     {
       this.quiz_session.sendFinished(); //호스트는 서버에 게임 끝났다고 알림
     }
@@ -5657,8 +5718,7 @@ class Finish extends QuizLifeCycle
   {
     const guild_id = this.quiz_session.guild_id;
         
-    const quiz_session = quiz_session_map[guild_id];
-    quiz_session.free();
+    this.quiz_session.free();
 
     delete quiz_session_map[guild_id];
   }

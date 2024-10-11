@@ -47,6 +47,10 @@ const commands = [
         .setDescription('전송할 메시지')
         .setRequired(true)
     ),
+
+  new SlashCommandBuilder()
+    .setName('채팅전환')
+    .setDescription('전체 채팅 기능을 켜거나 끕니다.'),
 ];
 
 //길드에 명령어 등록용

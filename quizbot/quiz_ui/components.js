@@ -234,7 +234,7 @@ const quiz_info_comp = new ActionRowBuilder()
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('request_modal_quiz_setting')
-      .setLabel('문제 수 설정')
+      .setLabel('퀴즈 설정')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('settings')
@@ -701,6 +701,12 @@ const btn_search = new ButtonBuilder()
   .setLabel('검색')
   .setStyle(ButtonStyle.Secondary);
 
+//사용자 개발 퀴즈 선택 UI
+const btn_done = new ButtonBuilder()
+  .setCustomId('back')
+  .setLabel('완료')
+  .setStyle(ButtonStyle.Success);
+
 //#endregion
 
 //#region 오마카세 퀴즈 관련 컴포넌트
@@ -709,7 +715,7 @@ const btn_search = new ButtonBuilder()
 
 const modal_quiz_setting = new ModalBuilder()
   .setCustomId('modal_quiz_setting')
-  .setTitle('문제 수 설정')
+  .setTitle('퀴즈 설정')
   .addComponents(
     new ActionRowBuilder()
       .addComponents(
@@ -719,7 +725,6 @@ const modal_quiz_setting = new ModalBuilder()
           .setStyle(TextInputStyle.Short)
           .setMinLength(1)
           .setMaxLength(3)
-          .setRequired(true)
           .setPlaceholder('예시) 30')
       ),
   );
@@ -733,20 +738,50 @@ const omakase_quiz_info_comp = new ActionRowBuilder()
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('request_modal_quiz_setting')
-      .setLabel('문제 수 설정')
+      .setLabel('퀴즈 설정')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('settings')
       .setLabel('서버 설정')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId('toggle_certified_quiz_filter')
-      .setLabel('인증 필터')
+      .setCustomId('use_basket_mode')
+      .setLabel('장바구니 모드')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('back')
       .setLabel('뒤로가기')
       .setStyle(ButtonStyle.Secondary),
+  );
+  
+
+//오마카세 퀴즈용 퀴즈 설정 modal
+const modal_omakase_quiz_setting = new ModalBuilder()
+  .setCustomId('modal_quiz_setting')
+  .setTitle('오마카세 퀴즈 설정')
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_selected_question_count')
+          .setLabel('몇 개의 문제를 제출할까요? (최대 100)')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(1)
+          .setMaxLength(3)
+          .setPlaceholder('예시) 30')
+      ) 
+  )
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_certified_quiz_filter_off')
+          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(1)
+          .setPlaceholder('예시) 네')
+      )
   );
 
 
@@ -813,6 +848,22 @@ const omakase_custom_quiz_tags_select_menu =  new ActionRowBuilder()
   omakase_custom_quiz_tags_select_menu.components[0].setMaxValues(total_menu_count);
 }
 
+const omakase_basket_select_menu = new StringSelectMenuBuilder().
+  setCustomId('basket_select_menu').
+  setPlaceholder('장바구니 확인하기');
+
+const omakase_basket_select_row = new ActionRowBuilder()
+  .addComponents(
+    new StringSelectMenuBuilder().
+      setCustomId('basket_select_row').
+      setPlaceholder('장바구니 확인하기')
+      .addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel('장바구니 목록을 불러오는 중...')
+          .setValue('basket_select_temp'),
+      )
+  );
+
 /** 멀티플레이 관련 컴포넌트 */
 const modal_multiplayer_create_lobby = new ModalBuilder()
   .setCustomId('modal_multiplayer_create_lobby')
@@ -821,7 +872,7 @@ const modal_multiplayer_create_lobby = new ModalBuilder()
     new ActionRowBuilder()
       .addComponents(
         new TextInputBuilder()
-          .setCustomId('txt_input_lobby_name')
+          .setCustomId('txt_input_custom_title')
           .setLabel('방 제목을 입력해주세요.')
           .setStyle(TextInputStyle.Short)
           .setMinLength(1)
@@ -829,23 +880,73 @@ const modal_multiplayer_create_lobby = new ModalBuilder()
           .setRequired(true)
           .setPlaceholder('예시) 즐겜할 사람~')
       )
+  )
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_selected_question_count')
+          .setLabel('몇 개의 문제를 제출할까요? (최대 50)')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(1)
+          .setMaxLength(3)
+          .setRequired(true)
+          .setValue('30')
+          .setPlaceholder('예시) 30')
+      )
+  )
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_certified_quiz_filter_off')
+          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(1)
+          .setPlaceholder('예시) 네')
+      )
   );
 
 //로비 생성하고 따라 나눈 이유는 나중에라도 생성 전용 설정 값이 있을까봐
-const modal_multiplayer_edit_lobby = new ModalBuilder()
-  .setCustomId('modal_multiplayer_edit_lobby')
+const modal_multiplayer_quiz_setting = new ModalBuilder()
+  .setCustomId('modal_quiz_setting') //modal_quiz_setting으로 해둬야. applyQuizSetting이 호출됨
   .setTitle('로비 설정')
   .addComponents(
     new ActionRowBuilder()
       .addComponents(
         new TextInputBuilder()
-          .setCustomId('txt_input_lobby_name')
+          .setCustomId('txt_input_custom_title')
           .setLabel('방 제목을 입력해주세요.')
           .setStyle(TextInputStyle.Short)
           .setMinLength(1)
           .setMaxLength(20)
           .setRequired(true)
           .setPlaceholder('예시) 즐겜할 사람~')
+      )
+  )
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_selected_question_count')
+          .setLabel('몇 개의 문제를 제출할까요? (최대 50)')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(1)
+          .setMaxLength(3)
+          .setPlaceholder('예시) 30')
+      )
+  )
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_certified_quiz_filter_off')
+          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(1)
+          .setPlaceholder('예시) 네')
       )
   );
 
@@ -874,15 +975,11 @@ const multiplayer_lobby_host_comp = new ActionRowBuilder()
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('request_modal_quiz_setting')
-      .setLabel('문제 수 설정')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('request_modal_multiplayer_settings')
       .setLabel('로비 설정')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId('toggle_certified_quiz_filter')
-      .setLabel('인증 필터')
+      .setCustomId('use_basket_mode')
+      .setLabel('장바구니 모드')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('back')
@@ -921,14 +1018,34 @@ const multiplayer_participant_select_row = new ActionRowBuilder()
 const multiplayer_chat_comp = new ActionRowBuilder()
   .addComponents(
     new ButtonBuilder()
-      .setCustomId('multiplayer_chat_report_')
+      .setCustomId('chat_report_')
       .setLabel('신고')
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
-      .setCustomId('multiplayer_chat_ignore')
+      .setCustomId('chat_ignore')
       .setLabel('모든 채팅 차단')
       .setStyle(ButtonStyle.Secondary),
   );
+
+//#region 신고 관련
+
+const modal_chat_report = new ModalBuilder()
+  .setCustomId('modal_chat_report_')
+  .setTitle('신고ID')
+  .addComponents(
+    new ActionRowBuilder()
+      .addComponents(
+        new TextInputBuilder()
+          .setCustomId('txt_input_report_detail')
+          .setLabel('신고 사유를 입력해주세요.')
+          .setStyle(TextInputStyle.Paragraph)
+          .setMaxLength(100)
+          .setRequired(true)
+          .setPlaceholder('')
+      ),
+  );
+
+//#endregion
 
 
 //#endregion
@@ -967,8 +1084,10 @@ module.exports = {
   question_answer_type_select_menu,
   question_control_btn_component,
   btn_search,
+  btn_done,
   modal_quiz_setting,
   omakase_quiz_info_comp,
+  modal_omakase_quiz_setting,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,
@@ -976,9 +1095,12 @@ module.exports = {
   modal_multiplayer_create_lobby,
   multiplayer_lobby_host_comp,
   multiplayer_lobby_participant_comp,
-  modal_multiplayer_edit_lobby,
+  modal_multiplayer_quiz_setting,
   multiplayer_lobby_kick_select_menu,
   multiplayer_participant_select_row,
   multiplayer_participant_select_menu,
-  multiplayer_chat_comp
+  multiplayer_chat_comp,
+  modal_chat_report,
+  omakase_basket_select_menu,
+  omakase_basket_select_row,
 };

@@ -515,6 +515,12 @@ function handleFinishUp(signal)
     return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
   }
 
+  if(session.getSessionHostId() !== guild_id)
+  {
+    logger.error(`${guild_id} finish up ${session.getSessionHostId()}. but ${guild_id} is not host!`);
+    return { state: false, reason: `요청 서버가 해당 세션의 호스트 서버가 아닙니다.`}; 
+  }
+
   const result = session.finishUp(guild_id);
   return { state: result };
 }
@@ -530,6 +536,12 @@ function handleFinished(signal)
   {
     logger.error(`${guild_id} finish ${session_id}. but this session is not exists`);
     return { state: false, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
+  }
+
+  if(session.getSessionHostId() !== guild_id)
+  {
+    logger.error(`${guild_id} finish ${session.getSessionHostId()}. but ${guild_id} is not host!`);
+    return { state: false, reason: `요청 서버가 해당 세션의 호스트 서버가 아닙니다.`}; 
   }
 
   const result = session.finish(guild_id);
@@ -559,8 +571,6 @@ function handleRequestChat(signal)
   const result = session.acceptChatRequest(signal.user_id, signal.chat_message);
   return { state: result };
 }
-
-
 
 
 
@@ -947,7 +957,7 @@ class MultiplayerSession
     };
     this.sendSignal(signal); 
     
-    this.removeParticipant(guild_id);
+    this.processLeaveGame(guild_id); //동기 실패 신호 보내주고 퇴장 처리
   }
 
   sendSyncDone()
@@ -978,6 +988,59 @@ class MultiplayerSession
   getRequestConfirmCriteria()
   {
     return Math.ceil(this.participant_guilds.length);
+  }
+
+  processLeaveGame(guild_id)
+  {
+    const leaved_guild_info = this.getParticipant(guild_id);
+    if(leaved_guild_info === undefined)
+    {
+      logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
+      return true;
+    }
+
+    this.removeParticipant(guild_id);
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.LEAVED_GAME,
+      lobby_info: this.getLobbyInfo(),
+      leaved_guild_info: leaved_guild_info.toJsonObject(),
+    };
+    this.sendSignal(signal);
+
+    const guild_answerer_info = this.scoreboard.get(guild_id);
+    if(guild_answerer_info !== undefined)
+    {
+      guild_answerer_info.score = 0;
+    }
+
+    if(this.session_owner_guild_id !== guild_id)
+    {
+      return false;
+    }
+    
+    //어라? 나간게... 호스트?
+    //호스트도 변경!
+    let new_host_guild_info = undefined;
+    if(this.getParticipantCount() > 0)
+    {
+      new_host_guild_info = this.participant_guilds[0];
+      this.changeHost(new_host_guild_info);
+    }
+    
+    if(this.getParticipantCount() <= 1) //1명 이하 남앗다면
+    {
+      const signal = { //세션 펑
+        signal_type: SERVER_SIGNAL.EXPIRED_SESSION,
+      };
+
+      this.sendSignal(signal);
+      logger.info(`The host of ${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
+
+      const new_host_guild_id = new_host_guild_info?.guild_id;
+      this.finishUp(new_host_guild_id);
+      this.finish(new_host_guild_id);
+    }
   }
 
   processWinner(guild_id)
@@ -1107,7 +1170,7 @@ class MultiplayerSession
       
       logger.info(`The host of ${this.getSessionId()} has been leaved from lobby. expiring this session`);
 
-      this.finish();
+      this.finish(guild_id);
     }
 
     return true;
@@ -1170,6 +1233,12 @@ class MultiplayerSession
 
   shareQuestionList(question_list, quiz_size)
   {
+    if(this.question_list.length !== 0)
+    {
+      logger.warn(`Receive generated question list. but question list is already assigned`);
+      return;
+    }
+
     this.question_list = question_list;
     this.quiz_size = quiz_size;
 
@@ -1381,50 +1450,7 @@ class MultiplayerSession
       return true;
     }
 
-    const leaved_guild_info = this.removeParticipant(guild_id);
-    if(leaved_guild_info === undefined)
-    {
-      logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
-      return true;
-    }
-
-    const signal = {
-      signal_type: SERVER_SIGNAL.LEAVED_GAME,
-      lobby_info: this.getLobbyInfo(),
-      leaved_guild_info: leaved_guild_info.toJsonObject(),
-    };
-    this.sendSignal(signal);
-
-    const guild_answerer_info = this.scoreboard.get(guild_id);
-    if(guild_answerer_info !== undefined)
-    {
-      guild_answerer_info.score = 0;
-    }
-
-    if(this.session_owner_guild_id === guild_id) //어라? 나간게... 호스트?
-    {
-      //호스트 변경!
-      let new_host_guild_info = undefined;
-      if(this.getParticipantCount() > 0)
-      {
-        new_host_guild_info = this.participant_guilds[0];
-        this.changeHost(new_host_guild_info);
-      }
-      
-      if(this.getParticipantCount() <= 1) //1명 이하 남앗다면
-      {
-        const signal = { //세션 펑
-          signal_type: SERVER_SIGNAL.EXPIRED_SESSION,
-        };
-  
-        this.sendSignal(signal);
-        logger.info(`The host of ${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
-
-        const new_host_guild_id = new_host_guild_info?.guild_id;
-        this.finishUp(new_host_guild_id);
-        this.finish(new_host_guild_id);
-      }
-    }
+    this.processLeaveGame(guild_id);
 
     return true;
   }
@@ -1434,6 +1460,7 @@ class MultiplayerSession
     const signal = { //세션 펑
       signal_type: SERVER_SIGNAL.CONFIRM_CHAT,
       user_id: user_id,
+      timestamp: Date.now(),
       chat_message: chat_message
     };
     this.sendSignal(signal);

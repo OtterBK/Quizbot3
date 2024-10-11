@@ -155,14 +155,14 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
   {
     this.loadMultiplayerLobbyList();
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`\`\`목록을 다시 불러왔습니다.\`\`\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`🔸 목록을 다시 불러왔습니다.\`\`\``, ephemeral: true});
     return undefined;
   }
 
   handleRequestScoreboard(interaction)
   {
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`\`\`순위표는 11월에 추가될 예정입니다...😥\`\`\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`🔸 랭킹 기능은 11월에 추가될 예정입니다...😥\`\`\``, ephemeral: true});
     return undefined;
   }
 
@@ -223,11 +223,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
       return;
     }
 
-    const lobby_name = interaction.fields.getTextInputValue('txt_input_lobby_name');
-
     const multiplayer_quiz_info = MultiplayerQuizLobbyUI.createDefaultMultiplayerQuizInfo(interaction);
-    multiplayer_quiz_info['title'] = lobby_name;
-
     return new MultiplayerQuizLobbyUI(multiplayer_quiz_info, interaction, false); 
   }
 

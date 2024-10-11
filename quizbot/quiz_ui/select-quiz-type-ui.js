@@ -23,7 +23,7 @@ const { UserQuizSelectUI } = require("./user-quiz-select-ui.js");
 
 //#endregion
 
-/** 퀴즈 유형(개발자/유저) 선택 UI */
+/** 퀴즈 유형(개발자/유저/오마카세) 선택 UI */
 class SelectQuizTypeUI extends QuizbotUI 
 {
 
@@ -64,7 +64,7 @@ class SelectQuizTypeUI extends QuizbotUI
   
     if(interaction.customId === '1') //개발자 퀴즈 눌렀을 때
     {
-      return new DevQuizSelectUI();
+      return new DevQuizSelectUI(undefined);
     }
       
     if(interaction.customId === '2') //유저 제작 퀴즈 눌렀을 때

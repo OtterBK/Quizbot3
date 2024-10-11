@@ -4,8 +4,10 @@ const { EmbedBuilder } = require('discord.js');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
 const mm = require('music-metadata');
 const os = require('os');
+const axios = require('axios');
 
 //로컬 modules
+const PRIVATE_CONFIG = require('../config/private_config.json');
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE, QUIZ_TYPE, BGM_TYPE, QUIZ_TAG } = require('../config/system_setting.js');
 const { orderBy } = require('lodash');
 const text_contents = require('../config/text_contents.json')[SYSTEM_CONFIG.language];
@@ -331,7 +333,7 @@ exports.sortMapByProperty = (map, property) =>
 {
   return new Map(
     Array.from(map).sort((a, b) => b[1][property] - a[1][property])
-);
+  );
 };
 
 exports.playBGM = async (audio_player, bgm_type) => 
@@ -483,7 +485,7 @@ exports.generateUUID = () => //UUID v4 형식
   });
 };
 
-exports.calcTagsValue= (values) =>
+exports.calcTagsValue = (values) =>
 {
   return values.reduce((acc, tag_value) => acc + parseInt(tag_value), 0);
 };

@@ -175,7 +175,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     const quiz_description = modal_interaction.fields.getTextInputValue('txt_input_quiz_description');
 
     modal_interaction.explicit_replied = true;
-    modal_interaction.reply({content: `\`\`\`${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.\`\`\``, ephemeral: true});
+    modal_interaction.reply({content: `\`\`\`🔸 ${quiz_title} 퀴즈를 생성 중... 잠시만 기다려주세요.\`\`\``, ephemeral: true});
 
     //이건 어쩔 수 없음 직접 하드코딩으로 데이터 넣어야함
     user_quiz_info.data.creator_id = modal_interaction.user.id;
@@ -197,7 +197,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
       {
         if(created_quiz_id === undefined) //저장 실패
         {
-          modal_interaction.user.send({content: `\`\`\`${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM(제육보끔#1916)으로 문의 바랍니다.\`\`\``, ephemeral: true});
+          modal_interaction.user.send({content: `\`\`\`🔸 ${quiz_title} 퀴즈를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM(제육보끔#1916)으로 문의 바랍니다.\`\`\``, ephemeral: true});
           return;
         }
     
@@ -228,7 +228,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
   {
     if(user.id !== user_quiz_info.data.creator_id && user.id !== PRIVATE_CONFIG?.ADMIN_ID) //어드민이면 다 수정 할 수 있음
     {
-      user.send({content: `\`\`\`당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}\`\`\``, ephemeral: true});
+      user.send({content: `\`\`\`🔸 당신은 해당 퀴즈를 수정할 권한이 없습니다. quiz_id: ${user_quiz_info.data.quiz_id}\`\`\``, ephemeral: true});
       return;
     }
 
