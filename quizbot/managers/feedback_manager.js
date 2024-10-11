@@ -52,10 +52,10 @@ exports.addQuizLikeAuto = async (interaction, quiz_id, quiz_title) =>
   const guild_id = guild.id;
   const user_id = user.id;
 
+  interaction.explicit_replied = true;
   if(await exports.checkAlreadyLike(quiz_id, user_id))
   {
     interaction.reply({content: '```' + `💚 이미 [${quiz_title}] 퀴즈를 추천했네요. 감사합니다! 😄` + '```', ephemeral: true});
-    interaction.explicit_replied = true;
     return;
   }
 
@@ -65,7 +65,6 @@ exports.addQuizLikeAuto = async (interaction, quiz_id, quiz_title) =>
 
       if(result == true)
       {
-        interaction.explicit_replied = true;
         interaction.reply({content: '```' + `👍 [${quiz_title}] 퀴즈를 추천했어요! ` + '```', ephemeral: true});
         logger.info(`Custom quiz got liked by ${user.displayName}[${user_id}]. quiz_title: ${quiz_title} quiz_id: ${quiz_id}`);
       }

@@ -85,11 +85,6 @@ class UserQuizInfoUI extends QuizInfoUI
     }
   }
   
-  onAwaked() //ui 재활성화 됐을 때, UserQuestionInfo 에서 back 쳐서 돌아왔을 때, select menu 랑 문제 수 갱신해줘야함
-  {
-    this.refreshUI();
-  }
-  
   async loadQuestionList()
   {
     await this.user_quiz_info.loadQuestionListFromDB();
@@ -310,7 +305,7 @@ class UserQuizInfoUI extends QuizInfoUI
       //비공개에서 공개로 전환할 경우
       if(user_quiz_info.data.is_private === true && (user_quiz_info.data.tags_value === undefined || user_quiz_info.data.tags_value === 0))
       {
-        interaction.user.send({ content: `\`\`\`🔸 태그를 1개 이상 선택해주세요...ㅜㅜ 😥\`\`\``, ephemeral: true });
+        interaction.user.send({ content: `\`\`\`🔸 태그를 1개 이상 선택해주세요.\n🔸 최대한 올바른 태그를 입력해주세요! 😥\`\`\``, ephemeral: true });
         return;
       }
   

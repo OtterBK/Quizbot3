@@ -320,6 +320,26 @@ exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value
   return sendQuery(query_string, [quiz_type_tags_value, tags_value, limit]);
 };
 
+exports.selectRandomQuestionListByBasket = async (basket_condition_query, limit) => 
+{
+  const query_string =
+  `
+  WITH matching_quizzes AS (
+    SELECT quiz_id, quiz_title, creator_name, creator_icon_url, simple_description, tags_value
+    FROM tb_quiz_info
+    WHERE quiz_id IN ${basket_condition_query}
+  )
+  SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value,
+    COUNT(*) OVER() AS total_count
+  FROM tb_question_info qu
+  JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
+  WHERE qu.answer_type = 1 OR qu.answer_type IS NULL
+  ORDER BY RANDOM()
+  LIMIT $1;`;
+  
+  return sendQuery(query_string, [limit]);
+};
+
 exports.insertReportInfo = async (key_fields, value_fields) =>
 {
   let placeholders = '';
@@ -331,4 +351,4 @@ exports.insertReportInfo = async (key_fields, value_fields) =>
   `insert into tb_report_chat_info (${key_fields}) values (${placeholders})`;
   
   return sendQuery(query_string, value_fields);
-}
+};

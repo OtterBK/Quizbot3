@@ -10,13 +10,13 @@ const { SYSTEM_CONFIG, QUIZ_MAKER_TYPE, QUIZ_TYPE } = require('../../config/syst
 const text_contents = require('../../config/text_contents.json')[SYSTEM_CONFIG.language]; 
 const utility = require('../../utility/utility.js');
 const {
-  omakase_quiz_info_comp,
+  omakase_quiz_info_tag_comp,
+  omakase_quiz_info_basket_comp,
   modal_omakase_quiz_setting,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,
-  omakase_basket_select_menu,
-  omakase_basket_select_row,
+  request_basket_reopen_comp,
 } = require("./components.js");
 
 const { 
@@ -59,6 +59,9 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     omakase_quiz_info['quiz_id'] = undefined;  //omasakse quiz는 quiz_id 불필요
 
     //오마카세 퀴즈용 추가 설정 값
+    omakase_quiz_info['basket_mode'] = false; //장바구니 모드
+    omakase_quiz_info['basket_items'] = {}; //장바구니 모드
+
     omakase_quiz_info['dev_quiz_tags'] = 0;
     
     omakase_quiz_info['custom_quiz_type_tags'] = 0;
@@ -78,7 +81,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
     this.need_tags = true;
 
-    this.basket_select_component = undefined;
+    this.modal_quiz_setting = cloneDeep(modal_omakase_quiz_setting);
 
     this.initializeEmbed();
     this.initializeComponents();
@@ -105,14 +108,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
   initializeComponents() 
   {
-    if(this.basket_select_component === undefined)
-    {
-      this.basket_select_component = cloneDeep(omakase_basket_select_row);
-    }
-
-    this.components = [omakase_quiz_info_comp, omakase_dev_quiz_tags_select_menu, omakase_custom_quiz_type_tags_select_menu, omakase_custom_quiz_tags_select_menu]; //여기서는 component를 바꿔서 해주자
-
-    this.modal_quiz_setting = cloneDeep(modal_omakase_quiz_setting);
+    this.components = []; //여기서는 component를 바꿔서 해주자
   }
 
   initializeTagSelectedHandler()
@@ -167,10 +163,31 @@ class OmakaseQuizRoomUI extends QuizInfoUI
       basket_items = this.quiz_info['basket_items'];
     }
 
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    if(use_basket_mode === true) //이미 사용 중이다?
+    {
+      return new UserQuizSelectUI(basket_items); //그럼 다시 담을 수 있게 ㄱㄱ
+    }
+
+    this.quiz_info['basket_mode'] = true;
+
     interaction.explicit_replied = true;
     interaction.reply({content: `\`\`\`장바구니 모드를 사용합니다.\n장바구니 모드는 직접 원하는 유저 퀴즈들을 선택하면\n선택한 퀴즈들에서만 무작위로 문제가 출제됩니다. \`\`\``, ephemeral: true});
 
     return new UserQuizSelectUI(basket_items);
+  }
+
+  handleRequestUseTagMode(interaction)
+  {
+    this.quiz_info['basket_mode'] = false;
+
+    interaction.explicit_replied = true;
+    interaction.reply({content: `\`\`\`🔸 장르 선택 모드를 사용합니다.\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\`\`\``, ephemeral: true});
+
+    this.sendEditLobbySignal(interaction);
+
+    this.refreshUI();
+    return this;
   }
 
   refreshUI()
@@ -180,8 +197,39 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     description += this.getTagInfoText();
 
     this.embed.description = description;
+
+    this.setUpOmakaseQuizSelectComponent();
   }
 
+  setUpOmakaseQuizSelectComponent()
+  {
+    this.initializeComponents(); //컴포넌트 초기화하고
+
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+
+    if(use_basket_mode === false)
+    {
+      this.components.push(omakase_quiz_info_tag_comp);
+    }
+    else
+    {
+      this.components.push(omakase_quiz_info_basket_comp);
+    }
+
+    this.components.push(omakase_dev_quiz_tags_select_menu);
+
+    if(use_basket_mode === false)
+    {
+      this.components.push(omakase_custom_quiz_type_tags_select_menu);
+      this.components.push(omakase_custom_quiz_tags_select_menu);
+    }
+    else
+    {
+      this.setupBasketSelectMenu();
+      this.components.push(this.basket_select_component);
+      this.components.push(request_basket_reopen_comp);
+    }   
+  }
 
 }
 

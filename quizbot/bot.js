@@ -313,7 +313,7 @@ const create_quiz_handler = async (interaction) =>
     });
     interaction.member.send({
       content:
-        `\`\`\`🔸 **퀴즈만들기**는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 __**/퀴즈만들기**__를 입력하시거나 버튼을 클릭하세요!\`\`\``,
+        `\`\`\`🔸 퀴즈만들기는 개인채널(DM)으로만 요청 가능해요!\n여기서 다시 한번 '/퀴즈만들기' 를 입력하시거나 버튼을 클릭하세요!\`\`\``,
       components: [create_quiz_tool_btn_component],
       ephemeral: true,
     });

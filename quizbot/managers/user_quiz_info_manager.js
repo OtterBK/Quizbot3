@@ -317,4 +317,57 @@ const loadQuestionListFromDBByTags = async (quiz_type_tags_value, tag_value, lim
   return [total_question_count, question_list];
 };
 
-module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags };
+const loadQuestionListByBasket = async (basket_condition_query, limit) => 
+{ //quiz_id 로 랜덤 문제 불러오기
+
+  if(basket_condition_query == '') //선택된 퀴즈 basket이 없다면
+  {
+    return [0, []];
+  }
+
+  const additionalColumn = [
+    'quiz_title',
+    'tags_value',
+    'creator_name',
+    'creator_icon_url',
+    'simple_description'
+  ];
+  const question_list = [];
+
+  const result = await db_manager.selectRandomQuestionListByBasket(basket_condition_query, limit);
+
+  for(const result_row of result.rows)
+  {
+    let user_question_info = new UserQuestionInfo();
+
+    user_question_info.question_id = result_row.question_id;
+
+    if(user_question_info.question_id == undefined) // quiz id는 없을 수 없다.
+    {
+      logger.error(`User Question Info ID is undefined... pass this`);
+      continue;
+    }
+
+    for(const column of QuestionInfoColumn)
+    {
+      user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+    }
+
+    for(const column of additionalColumn)
+    {
+      user_question_info.data[column] = (result_row[column] === '' ? undefined : result_row[column]);
+    }
+
+    question_list.push(user_question_info);
+  }
+
+  let total_question_count = 0;
+  if(result.rows.length > 0)
+  {
+    total_question_count = parseInt(result.rows[0]['total_count']); //그냥 맨 윗꺼 가져오자
+  }
+
+  return [total_question_count, question_list];
+};
+
+module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags, loadQuestionListByBasket };

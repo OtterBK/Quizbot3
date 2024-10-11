@@ -70,6 +70,7 @@ class QuizInfoUI extends QuizbotUI
       'settings': this.handleRequestSettingUI.bind(this), 
       'request_modal_quiz_setting': this.handleRequestModalQuizSetting.bind(this), 
       'modal_quiz_setting': this.handleSubmitModalQuizSetting.bind(this),
+      'use_tag_mode': this.handleRequestUseTagMode.bind(this), 
       'use_basket_mode': this.handleRequestUseBasketMode.bind(this), 
       'basket_select_menu': this.handleBasketSelected.bind(this), 
     };
@@ -103,7 +104,7 @@ class QuizInfoUI extends QuizbotUI
     tag_info_text += `🔸 퀴즈 유형: \`음악 퀴즈\`\n`;
     tag_info_text += `🔹 퀴즈 장르: \`${dev_quiz_tags_string}\`\n\n`;
     
-    tag_info_text += `📗 **유저 퀴즈 설정(베타)**\n`;
+    tag_info_text += `📗 **유저 퀴즈 설정**\n`;
     const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
     if(use_basket_mode === false)
     {
@@ -122,7 +123,7 @@ class QuizInfoUI extends QuizbotUI
     }
     else
     {
-      tag_info_text += `🔸 장바구니 모드 사용 중\`\n\n`;
+      tag_info_text += `🔸 \`장바구니 모드 사용 중(베타)\`\n\n`;
     }
     
     return tag_info_text;
@@ -163,6 +164,11 @@ class QuizInfoUI extends QuizbotUI
     {
       return this.handleQuizInfoUIEvent(interaction);
     }
+  }
+
+  onAwaked() //ui 재활성화 됐을 때, UserQuestionInfo 에서 back 쳐서 돌아왔을 때, select menu 랑 문제 수 갱신해줘야함. 장바구니도 고려
+  {
+    this.refreshUI();
   }
 
   isQuizInfoUIEvent(interaction)
@@ -428,12 +434,17 @@ class QuizInfoUI extends QuizbotUI
 
   checkTagSelected()
   {
-    return this.need_tags == false || this.quiz_info['dev_quiz_tags'] !== 0 || this.quiz_info['custom_quiz_type_tags'] !== 0;
+    return this.need_tags == false || this.quiz_info['dev_quiz_tags'] !== 0 || this.quiz_info['custom_quiz_type_tags'] !== 0 || (this.quiz_info['basket_mode'] && Object.keys(this.quiz_info['basket_items']).length > 0);
   }
 
   handleRequestUseBasketMode(interaction)
   {
     //일반적으론 지원하지 않음
+  }
+
+  handleRequestUseTagMode(interaction)
+  {
+    //일반적으로 지원하지 않음
   }
 
   setupBasketSelectMenu() 
@@ -461,7 +472,7 @@ class QuizInfoUI extends QuizbotUI
       const basket_item = basket_items[key];
 
       const quiz_id = basket_item.quiz_id;
-      const quiz_title = basket_item.quiz_title;
+      const quiz_title = basket_item.title;
 
       const option = { label: `${quiz_title}`, description: `선택하여 장바구니에서 제거`, value: `${quiz_id}` };
       
@@ -484,7 +495,10 @@ class QuizInfoUI extends QuizbotUI
     }
 
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`\`\`${remove_count} 개의 퀴즈를 제거했습니다.\`\`\``});
+    interaction.reply({content: `\`\`\`🔸 장바구니에서 ${remove_count}개의 퀴즈를 제거했습니다.\`\`\``});
+
+    this.refreshUI();
+    return this;
   }
 
 }

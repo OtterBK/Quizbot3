@@ -293,21 +293,12 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
         quiz_id: quiz_id,
         title: quiz_title,
       };
-
-      
+   
       interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈를 장바구니에 담았습니다. (${Object.keys(this.basket_items).length}개 / 25개)\`\`\``});
       return;
     }
 
     return new UserQuizInfoUI(user_quiz_info, true); //readonly true로 넘겨야함
-  }
-
-  onExpired()
-  {
-    if(this.use_basket_mode)
-    {
-      this.sendMessageReply({content: `\`\`\`🔸 ${Object.keys(this.basket_items).length}개의 유저 퀴즈를 장바구니에 담았습니다.\`\`\``});
-    }
   }
 }
 

@@ -23,7 +23,7 @@ const utility = require('../../utility/utility.js');
 const logger = require('../../utility/logger.js')('QuizSystem');
 const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
 const feedback_manager = require('../managers/feedback_manager.js');
-const { loadQuestionListFromDBByTags } = require('../managers/user_quiz_info_manager.js');
+const { loadQuestionListFromDBByTags, loadQuestionListByBasket } = require('../managers/user_quiz_info_manager.js');
 const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('../managers/audio_cache_manager.js');
 const {
@@ -1087,6 +1087,8 @@ const MultiplayerSessionMixin = Base => class extends Base
     {
       return this.onReceivedConfirmChat(event_object);
     }
+
+    super.on(event_name, event_object);
   }
 
   onReceivedConfirmChat(signal)
@@ -2723,6 +2725,10 @@ class InitializeOmakaseQuiz extends Initialize
     let custom_question_list = undefined;
     let selected_question_count = quiz_info['selected_question_count']; //최대 문제 개수도 있다.
     const limit = selected_question_count * 2; //question prepare 에서 오류 발생 시, failover 용으로 넉넉하게 2배 잡는다.
+
+    let dev_quiz_count = 0;
+    let custom_quiz_count = 0;
+
     if(use_basket_mode === false) //장르 선택 모드
     {
       const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
@@ -2734,16 +2740,28 @@ class InitializeOmakaseQuiz extends Initialize
       //무작위로 question들 뽑아내자. 각각 넉넉하게 limit 만큼 뽑는다.
       [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
       [total_custom_question_count, custom_question_list] = await loadQuestionListFromDBByTags(custom_quiz_type_tags, custom_quiz_tags, limit, certified_filter);
+
+      //장르 선택 모드는 각각 문제 수 비율로 limit을 나눠 가진다.
+      const total_all_question_count = total_dev_question_count + total_custom_question_count; //둘 합치고
+      dev_quiz_count = Math.round(total_dev_question_count / total_all_question_count * limit);
+      custom_quiz_count = Math.round(total_custom_question_count / total_all_question_count * limit);
     }
     else //장바구니 모드
     {
-      //TODO 바스켓 모드
-    }
+      const dev_quiz_tags = quiz_info['dev_quiz_tags']; //오마카세 퀴즈는 quiz_tags 가 있다.
+      [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
 
-    //각각 문제 수 비율로 limit을 나눠 가진다.
-    const total_all_question_count = total_dev_question_count + total_custom_question_count; //둘 합치고
-    const dev_quiz_count = Math.round(total_dev_question_count / total_all_question_count * limit);
-    const custom_quiz_count = Math.round(total_custom_question_count / total_all_question_count * limit);
+      const basket_items = quiz_info['basket_items'];
+      const basket_condition_query = '(' + Object.values(basket_items)
+        .map(basket_item => basket_item.quiz_id)
+        .join(',') + ')';  
+
+      [total_custom_question_count, custom_question_list] = await loadQuestionListByBasket(basket_condition_query, limit);
+
+      //장바구니 모드는 각각 반반씩 문제를 limit을 나눠 갖는다.
+      dev_quiz_count = Math.round(limit / 2);
+      custom_quiz_count = Math.round(limit / 2);
+    }
 
     logger.info(`Omakase Question count of this session. dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
     
@@ -2874,6 +2892,11 @@ class Explain extends QuizLifeCycle
     if(quiz_data.quiz_maker_type == QUIZ_MAKER_TYPE.CUSTOM)
     {
       explain_type = EXPLAIN_TYPE.CUSTOM_ANSWER_TYPE;
+    }
+
+    if(this.quiz_session.isMultiplayerSession())
+    {
+      explain_type = EXPLAIN_TYPE.MULTIPLAYER_ANSWER_TYPE;
     }
         
     const explain_list = text_contents.quiz_explain[explain_type];

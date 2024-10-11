@@ -94,6 +94,7 @@ exports.EXPLAIN_TYPE = {
   SHORT_ANSWER_TYPE: "short_answer",
   CUSTOM_ANSWER_TYPE: "custom_answer",
   OMAKASE_ANSWER_TYPE: "omakase_answer",
+  MULTIPLAYER_ANSWER_TYPE: "multiplayer_answer",
 };
 
 exports.BGM_TYPE = {

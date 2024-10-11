@@ -729,8 +729,16 @@ const modal_quiz_setting = new ModalBuilder()
       ),
   );
 
+const request_basket_reopen_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('use_basket_mode')
+      .setLabel('장바구니에 퀴즈 더 담기')
+      .setStyle(ButtonStyle.Primary),
+  );
+
 //오마카세 퀴즈용
-const omakase_quiz_info_comp = new ActionRowBuilder()
+const omakase_quiz_info_tag_comp = new ActionRowBuilder()
   .addComponents(
     new ButtonBuilder()
       .setCustomId('start')
@@ -747,6 +755,30 @@ const omakase_quiz_info_comp = new ActionRowBuilder()
     new ButtonBuilder()
       .setCustomId('use_basket_mode')
       .setLabel('장바구니 모드')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('back')
+      .setLabel('뒤로가기')
+      .setStyle(ButtonStyle.Secondary),
+  );
+  
+const omakase_quiz_info_basket_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('start')
+      .setLabel('시작')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('request_modal_quiz_setting')
+      .setLabel('퀴즈 설정')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('settings')
+      .setLabel('서버 설정')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('use_tag_mode')
+      .setLabel('장르 선택 모드')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('back')
@@ -790,7 +822,7 @@ const omakase_dev_quiz_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('dev_quiz_tags_select_menu').
-      setPlaceholder('공식 퀴즈 장르 선택하기 (다중 선택 가능)').
+      setPlaceholder('공식 퀴즈 장르 선택하기').
       setMaxValues(Object.keys(DEV_QUIZ_TAG).length)
   );
 for(const [tag_name, tag_value] of Object.entries(DEV_QUIZ_TAG))
@@ -804,7 +836,7 @@ const omakase_custom_quiz_type_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('custom_quiz_type_tags_select_menu').
-      setPlaceholder('유저 퀴즈 유형 선택하기 (다중 선택 가능)').
+      setPlaceholder('유저 퀴즈 유형 선택하기').
       setMaxValues(Object.keys(QUIZ_TAG).length)
   );
 {
@@ -829,7 +861,7 @@ const omakase_custom_quiz_tags_select_menu =  new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('custom_quiz_tags_select_menu').
-      setPlaceholder('유저 퀴즈 장르 선택하기 (다중 선택 가능)').
+      setPlaceholder('유저 퀴즈 장르 선택하기').
       setMaxValues(Object.keys(QUIZ_TAG).length)
   );
 {
@@ -967,7 +999,7 @@ const multiplayer_select_control = new ActionRowBuilder()
       .setStyle(ButtonStyle.Secondary),
   );
 
-const multiplayer_lobby_host_comp = new ActionRowBuilder()
+const multiplayer_lobby_host_tag_comp = new ActionRowBuilder()
   .addComponents(
     new ButtonBuilder()
       .setCustomId('multiplayer_start')
@@ -980,6 +1012,26 @@ const multiplayer_lobby_host_comp = new ActionRowBuilder()
     new ButtonBuilder()
       .setCustomId('use_basket_mode')
       .setLabel('장바구니 모드')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('back')
+      .setLabel('나가기')
+      .setStyle(ButtonStyle.Danger),
+  );
+
+const multiplayer_lobby_host_basket_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('multiplayer_start')
+      .setLabel('시작')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('request_modal_quiz_setting')
+      .setLabel('로비 설정')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('use_tag_mode')
+      .setLabel('장르 선택 모드')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('back')
@@ -1086,14 +1138,16 @@ module.exports = {
   btn_search,
   btn_done,
   modal_quiz_setting,
-  omakase_quiz_info_comp,
+  omakase_quiz_info_tag_comp,
+  omakase_quiz_info_basket_comp,
   modal_omakase_quiz_setting,
   omakase_dev_quiz_tags_select_menu,
   omakase_custom_quiz_type_tags_select_menu,
   omakase_custom_quiz_tags_select_menu,
   multiplayer_select_control,
   modal_multiplayer_create_lobby,
-  multiplayer_lobby_host_comp,
+  multiplayer_lobby_host_tag_comp,
+  multiplayer_lobby_host_basket_comp,
   multiplayer_lobby_participant_comp,
   modal_multiplayer_quiz_setting,
   multiplayer_lobby_kick_select_menu,
@@ -1103,4 +1157,5 @@ module.exports = {
   modal_chat_report,
   omakase_basket_select_menu,
   omakase_basket_select_row,
+  request_basket_reopen_comp,
 };
