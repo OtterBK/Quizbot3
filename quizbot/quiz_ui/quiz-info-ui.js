@@ -13,6 +13,7 @@ const {
   quiz_info_comp,
   modal_quiz_setting,
   omakase_basket_select_menu,
+  omakase_basket_readonly_select_menu,
   omakase_basket_select_row,
 } = require("./components.js");
 
@@ -105,7 +106,7 @@ class QuizInfoUI extends QuizbotUI
     tag_info_text += `🔹 퀴즈 장르: \`${dev_quiz_tags_string}\`\n\n`;
     
     tag_info_text += `📗 **유저 퀴즈 설정**\n`;
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
     if(use_basket_mode === false)
     {
       // 유저 퀴즈 설정
@@ -449,14 +450,14 @@ class QuizInfoUI extends QuizbotUI
 
   setupBasketSelectMenu() 
   {
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
     if(use_basket_mode === false)
     {
       return;
     }
 
     const basket_items = this.quiz_info['basket_items'] ?? {};
-    let basket_select_menu_for_current = cloneDeep(omakase_basket_select_menu);
+    let basket_select_menu_for_current = cloneDeep(this.readonly ? omakase_basket_readonly_select_menu : omakase_basket_select_menu);
 
     const basket_keys = Object.keys(basket_items);
     if(basket_keys.length === 0)
@@ -466,7 +467,7 @@ class QuizInfoUI extends QuizbotUI
       return;
     }
   
-    basket_select_menu_for_current.setMaxValues(basket_keys.length > 25 ? 25 : basket_keys.length);
+    basket_select_menu_for_current.setMaxValues(basket_keys.length > 24 ? 24 : basket_keys.length);
     for (const key of basket_keys) 
     {
       const basket_item = basket_items[key];
@@ -474,7 +475,15 @@ class QuizInfoUI extends QuizbotUI
       const quiz_id = basket_item.quiz_id;
       const quiz_title = basket_item.title;
 
-      const option = { label: `${quiz_title}`, description: `선택하여 장바구니에서 제거`, value: `${quiz_id}` };
+      let option;
+      if(this.readonly)
+      {
+        option = { label: `${quiz_title}`, description: `.`, value: `${quiz_id}` };
+      }
+      else
+      {
+        option = { label: `${quiz_title}`, description: `선택하여 장바구니에서 제거`, value: `${quiz_id}` };
+      }
       
       basket_select_menu_for_current.addOptions(option);
     }

@@ -68,7 +68,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['quiz_id'] = undefined;  //omasakse quiz는 quiz_id 불필요
 
     //오마카세 퀴즈용 추가 설정 값
-    multiplayer_quiz_info['basket_mode'] = false; //장바구니 모드
+    multiplayer_quiz_info['basket_mode'] = true; //장바구니 모드
     multiplayer_quiz_info['basket_items'] = {}; //장바구니 모드
 
     multiplayer_quiz_info['dev_quiz_tags'] = 0;
@@ -281,7 +281,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       basket_items = this.quiz_info['basket_items'];
     }
 
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
     if(use_basket_mode === true) //이미 사용 중이다?
     {
       return new UserQuizSelectUI(basket_items); //그럼 다시 담을 수 있게 ㄱㄱ
@@ -350,7 +350,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     {
       interaction.explicit_replied = true;
       interaction.reply({content: `\`\`\`🌐 시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\`\`\``, ephemeral: true});
-      // return;
+      return;
     }
 
     interaction.explicit_replied = true;
@@ -474,12 +474,18 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.initializeComponents(); //컴포넌트 초기화하고
 
-    if(this.readonly) //readonly면 불필요
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
+
+    if(this.readonly) //readonly면 불필요. 
     {
+      if(use_basket_mode)
+      {
+        this.setupBasketSelectMenu(); //이거정도는 필요 ㅋ
+        this.components.push(this.basket_select_component);
+      }
+      
       return;
     }
-
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
 
     if(use_basket_mode === false)
     {

@@ -880,18 +880,22 @@ const omakase_custom_quiz_tags_select_menu =  new ActionRowBuilder()
   omakase_custom_quiz_tags_select_menu.components[0].setMaxValues(total_menu_count);
 }
 
+const omakase_basket_readonly_select_menu = new StringSelectMenuBuilder().
+  setCustomId('basket_readonly_select_menu').
+  setPlaceholder('장바구니에 담긴 퀴즈 확인하기');
+
 const omakase_basket_select_menu = new StringSelectMenuBuilder().
   setCustomId('basket_select_menu').
-  setPlaceholder('장바구니 확인하기');
+  setPlaceholder('장바구니에 담긴 퀴즈 확인하기');
 
 const omakase_basket_select_row = new ActionRowBuilder()
   .addComponents(
     new StringSelectMenuBuilder().
       setCustomId('basket_select_row').
-      setPlaceholder('장바구니 확인하기')
+      setPlaceholder('장바구니에 담긴 퀴즈 확인하기')
       .addOptions(
         new StringSelectMenuOptionBuilder()
-          .setLabel('장바구니 목록을 불러오는 중...')
+          .setLabel('장바구니가 비어있습니다.')
           .setValue('basket_select_temp'),
       )
   );
@@ -1156,6 +1160,7 @@ module.exports = {
   multiplayer_chat_comp,
   modal_chat_report,
   omakase_basket_select_menu,
+  omakase_basket_readonly_select_menu,
   omakase_basket_select_row,
   request_basket_reopen_comp,
 };

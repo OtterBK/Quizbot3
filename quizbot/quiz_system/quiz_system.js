@@ -869,7 +869,7 @@ const MULTIPLAYER_COMMON_OPTION =
     audio_play_time: 35000,
     hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
     skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
-    use_similar_answer: OPTION_TYPE.ENABLED,
+    use_similar_answer: OPTION_TYPE.DISABLED,
     score_type: OPTION_TYPE.SCORE_TYPE.TIME,
     improved_audio_cut: OPTION_TYPE.ENABLED,
     use_message_intent: OPTION_TYPE.ENABLED,
@@ -2731,7 +2731,7 @@ class InitializeOmakaseQuiz extends Initialize
     let question_list = [];
 
     //오마카세 퀴즈 설정 값
-    const use_basket_mode = quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = quiz_info['basket_mode'] ?? true;
 
     let total_dev_question_count = undefined;
     let dev_question_list = undefined;
