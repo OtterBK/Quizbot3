@@ -89,8 +89,8 @@ class QuizInfoUI extends QuizbotUI
   
     return description
       .replace('${quiz_size}', `[ ${this.quiz_info['selected_question_count'] ?? this.quiz_info['quiz_size']} / ${this.max_quiz_count} ]`)
-      .replace('${quiz_type_name}', `${this.quiz_info['type_name']}`)
-      .replace('${quiz_description}', `${this.quiz_info['description']}`);
+      .replace('${quiz_type_name}', `${this.quiz_info['type_name'] ?? ''}`)
+      .replace('${quiz_description}', `${this.quiz_info['description'] ?? ''}`);
   }
   
   getTagInfoText() 

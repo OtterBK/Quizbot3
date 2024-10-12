@@ -34,7 +34,7 @@ const ipc_manager = require('./managers/ipc_manager.js');
 const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('./managers/audio_cache_manager.js');
 const multiplayer_chat_manager = require('./managers/multiplayer_chat_manager.js');
-const { checkReportEvent } = require('./managers/report_manager.js');
+const report_manager = require('./managers/report_manager.js');
 const { stdin } = require('process');
 const { dirname } = require('path');
 
@@ -119,6 +119,9 @@ client.on('ready', () =>
 
   logger.info(`Initializing Multiplayer Chat Manager`);
   multiplayer_chat_manager.initialize(koreanbots);
+
+  logger.info(`Initializing Report Manager`);
+  report_manager.initialize(client);
 
   ///////////
   logger.info(`Register commands...`);
@@ -388,7 +391,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
     return;
   }
 
-  if(checkReportEvent(interaction)) ////신고 관련 체크
+  if(report_manager.checkReportEvent(interaction)) ////신고 관련 체크
   {
     return;
   }

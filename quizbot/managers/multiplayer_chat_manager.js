@@ -2,6 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getQuizSession } = require('../quiz_system/quiz_system.js');
 const utility = require('../../utility/utility.js');
 const { SYSTEM_CONFIG } = require('../../config/system_setting.js');
+const db_manager = require('./db_manager.js');
 const logger = require('../../utility/logger.js')('MultiplayerChatManager');
 
 const agree_comp = new ActionRowBuilder()
@@ -59,12 +60,47 @@ const checkVote = async (user_id) =>
   }
 };
 
+const checkBanned = async (interaction, user_id) => 
+{
+  try
+  {
+    const ban_history_result = await db_manager.selectBanHistory(user_id);
+    if(!ban_history_result)
+    {
+      return false;
+    }
+
+    const ban_history = ban_history_result.rows[0];
+    const ban_expiration_timestamp = ban_history.ban_expiration_timestamp;
+
+    if(ban_expiration_timestamp < Date.now())
+    {
+      return false;
+    }
+
+    const expiration_date = new Date(parseInt(ban_expiration_timestamp));
+    interaction.reply({content: `\`\`\`전체 대화 기능 이용이 제한되었습니다. (${expiration_date.toLocaleString()} 까지)\`\`\``, ephemeral: true});   
+    return true;
+  }
+  catch(err)
+  {
+    logger.error(`Check ban failed. user_id: ${user_id}. err: ${err}. ignore ban check`);
+  }
+
+  return false;
+};
+
 const sendMultiplayerChat = async (interaction) =>
 {
   interaction.explicit_replied = true;
 
   const user = interaction.user; //맴버로 할까... 유저로 할까... -> 유저다!
   const user_id = user.id;
+
+  if(await checkBanned(interaction, user_id))
+  {
+    return;
+  }
 
   if(await checkVote(user_id) === false) //동의를 안했어?
   {
