@@ -3819,7 +3819,7 @@ class Question extends QuizLifeCycleWithUtility
 
     if(this.quiz_session.isMultiplayerSession())
     {
-      description_message += `\n\`\`\`'🔖 [Tip]. /챗' 명령어로 전체 대화가 가능합니다.\`\`\``;
+      description_message += `\n\`\`\`🔖 [Tip]. /챗' 명령어로 전체 대화가 가능합니다.\`\`\``;
     }
 
     quiz_ui.embed.description = description_message;

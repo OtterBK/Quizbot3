@@ -1060,15 +1060,10 @@ class MultiplayerSession
       guild_answerer_info.score = 0;
     }
 
-    if(this.session_owner_guild_id !== guild_id)
-    {
-      return false;
-    }
-    
     //어라? 나간게... 호스트?
     //호스트도 변경!
     let new_host_guild_info = undefined;
-    if(this.getParticipantCount() > 0)
+    if(this.session_owner_guild_id === guild_id && this.getParticipantCount() > 0)
     {
       new_host_guild_info = this.participant_guilds[0];
       this.changeHost(new_host_guild_info);
