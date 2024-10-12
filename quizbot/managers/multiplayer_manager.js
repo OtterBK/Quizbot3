@@ -137,11 +137,11 @@ function handleCreateLobby(signal)
 
   const new_multiplayer_session = new MultiplayerSession(guild_id, guild_name, quiz_info);
   new_multiplayer_session.owner_guild_info.loadStat()
-    .then((result) => 
+    .then((updated_guild_info) => 
     {
-      if(result)
+      if(updated_guild_info)
       {
-        new_multiplayer_session.sendStatLoaded();
+        new_multiplayer_session.sendStatLoaded(updated_guild_info);
       }
     });
 
@@ -724,10 +724,10 @@ class MultiplayerGuildInfo
     catch(err)
     {
       logger.info(`Failed to load Stat. guild_id: ${this.guild_id}. err: ${err}`);
-      return false;
+      return undefined;
     }
 
-    return true;
+    return this;
     
   }
 }
@@ -1184,11 +1184,11 @@ class MultiplayerSession
     const new_guild_info = new MultiplayerGuildInfo(guild_id, guild_name);
 
     new_guild_info.loadStat()
-      .then((result) => 
+      .then((updated_guild_info) => 
       {
-        if(result)
+        if(updated_guild_info)
         {
-          this.sendStatLoaded();
+          this.sendStatLoaded(updated_guild_info);
         }
       });
 
@@ -1536,7 +1536,7 @@ class MultiplayerSession
     logger.debug(`Broadcasting Chat Message ${user_id}: ${chat_message}`);
   }
 
-  sendStatLoaded()
+  sendStatLoaded(updated_guild_info)
   {
     const guilds_info_list = [];
     this.participant_guilds.forEach(g => 
@@ -1547,6 +1547,7 @@ class MultiplayerSession
     const signal = {
       signal_type: SERVER_SIGNAL.PARTICIPANT_INFO_UPDATE,
       participant_guilds_info: guilds_info_list,
+      updated_guild_info: updated_guild_info,
     };
     this.sendSignal(signal);
   }

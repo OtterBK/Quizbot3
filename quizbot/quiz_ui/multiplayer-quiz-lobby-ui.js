@@ -672,6 +672,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     };
     
     this.applyMultiplayerLobbyInfo(lobby_info);
+
+    const updated_guild_info = signal.updated_guild_info;
+    if(updated_guild_info !== undefined)
+    {
+      this.sendMessageReply({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패\`\`\``});
+    }
   }
 
   // KICKED_PARTICIPANT 처리
