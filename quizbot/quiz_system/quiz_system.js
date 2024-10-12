@@ -1010,6 +1010,7 @@ const MultiplayerSessionMixin = Base => class extends Base
       guild_id: ${this.guild_id},  /
       sequence_info: (timeout/ sync_ready: ${this.sync_ready}, sequence_num: ${this.sync_done_sequence_num}) /
       prepared question queue length: ${this.game_data.prepared_question_queue.length} /   
+      remaining question list length: ${this.quiz_data.question_list.length} /   
     `);
 
     this.sync_failed = true;
@@ -5185,17 +5186,15 @@ class QuestionOmakase extends Question
     if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
     {
       logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.");
-      this.next_cycle = CYCLE_TYPE.QUESTIONING;
+      this.next_cycle = CYCLE_TYPE.CLEARING;
       game_data['question_num'] -= 1;
       utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
-      await utility.sleep(11000); //Failover 브금 11초임 
-
-      let error_message = '```';
-      error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
-      error_message += this.progress_bar_fixed_text?.trim();
-      error_message += '```';
+      
+      const error_message = `\`\`\`❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: ${this.progress_bar_fixed_text?.trim()}\`\`\``;
 
       this.quiz_session.sendMessage({content: error_message});
+
+      await utility.sleep(11000); //Failover 브금 11초임 
             
       return;
     }
@@ -5547,7 +5546,16 @@ class Clearing extends QuizLifeCycleWithUtility
 
     delete game_data['processing_question'];
 
-    if(this.quiz_session.hasMoreQuestion() === false) //모든 퀴즈 제출됐음
+    let has_more_question = this.quiz_session.hasMoreQuestion();
+    if(has_more_question && this.quiz_session.quiz_data.question_list.length === 0) //has more question 인데 question_list가 empty다.
+    {
+      logger.warn(`has more question. but question list is empty. stop quiz`);
+      has_more_question = false;
+
+      this.quiz_session.sendMessage(`\`\`\`🔸 더 이상 제출할 문제가 없어 퀴즈가 마무리 됩니다.\`\`\``);
+    }
+
+    if(has_more_question === false) //모든 퀴즈 제출됐음
     {
       this.next_cycle = CYCLE_TYPE.ENDING;
       logger.info(`All Question Submitted on Clearing, guild_id:${this.quiz_session.guild_id}`);
