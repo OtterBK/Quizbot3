@@ -558,6 +558,8 @@ class QuizSession
       // cycle.free();
     }
 
+    delete quiz_session_map[this.guild_id];
+
     this.guild = null;
     this.owner = null;
     this.channel = null;
