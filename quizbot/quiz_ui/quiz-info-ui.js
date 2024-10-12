@@ -316,6 +316,7 @@ class QuizInfoUI extends QuizbotUI
 
     const quiz_info = this.quiz_info;
     const all_question_count = quiz_info['quiz_size'] ?? this.max_quiz_count;
+    const min_quiz_size = quiz_info['min_quiz_size'] ?? 1;
 
     let selected_question_count = parseInt(input_selected_question_count.trim());
     if(isNaN(selected_question_count) || selected_question_count <= 0) //입력 값 잘못된거 처리
@@ -328,6 +329,11 @@ class QuizInfoUI extends QuizbotUI
     if(selected_question_count > all_question_count)
     {
       selected_question_count = all_question_count;
+    }
+
+    if(selected_question_count < min_quiz_size)
+    {
+      selected_question_count = min_quiz_size;
     }
     
     // interaction.explicit_replied = true;

@@ -58,6 +58,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['thumbnail'] = ''; //썸네일은 고정 이미지가 있지롱 ㅎ
 
     multiplayer_quiz_info['quiz_size'] = 50; //default, 멀티플레이에서 100문제는 너무 많소
+    multiplayer_quiz_info['min_quiz_size'] = 20; //최소 퀴즈 수, 멀티는 이게 필요
     multiplayer_quiz_info['selected_question_count'] = 30; //default
     multiplayer_quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
     multiplayer_quiz_info['winner_nickname'] = "플레이어";
