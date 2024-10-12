@@ -18,6 +18,7 @@ const SERVER_SIGNAL =
   CONFIRM_CHAT: 0x8F,            // 10001111 - 채팅 승인 후 표시. (완료)
   HOST_CHANGED: 0x90,            // 10010000 - 호스트 변경됨. 
   NOTICE_MESSAGE: 0x91,          // 10010001 - 전체 메시지. (완료)
+  PARTICIPANT_INFO_UPDATE: 0x92, // 10010010 - 참여자 정보 갱신(전적 로드 완료). (완료)
 };
 
 const CLIENT_SIGNAL = 

@@ -7,6 +7,7 @@ const { messageType } = require('discord-hybrid-sharding');
 const logger = require('../../utility/logger.js')('MultiplayerManager');
 const { IPC_MESSAGE_TYPE } = require('./ipc_manager.js');
 const { CLIENT_SIGNAL, SERVER_SIGNAL } = require('./multiplayer_signal.js');
+const db_manager = require('./db_manager.js');
 
 const utility = require('../../utility/utility.js');
 
@@ -21,6 +22,7 @@ const multiplayer_sessions = {}; //
 exports.initialize = (manager) =>
 {
   cluster_manager = manager;
+  db_manager.initialize();
 };
 
 const signalHandlers = 
@@ -133,6 +135,14 @@ function handleCreateLobby(signal)
   }
 
   const new_multiplayer_session = new MultiplayerSession(guild_id, guild_name, quiz_info);
+  new_multiplayer_session.owner_guild_info.loadStat()
+    .then((result) => 
+    {
+      if(result)
+      {
+        new_multiplayer_session.sendStatLoaded();
+      }
+    });
 
   multiplayer_sessions[new_multiplayer_session.getSessionId()] = new_multiplayer_session;
   logger.info(`New multiplayer lobby has been registered ${guild_id} = ${quiz_info.title}`);
@@ -608,6 +618,11 @@ class MultiplayerGuildInfo
     this.hint = false;
     this.skip = false;
 
+    this.stat = {
+      win: 0,
+      lose: 0,
+    };
+
     this.member_count = 0;
   }
 
@@ -617,6 +632,7 @@ class MultiplayerGuildInfo
       guild_id: this.guild_id,
       guild_name: this.guild_name,
       member_count: this.member_count,
+      stat: this.stat,
     };
   }
 
@@ -682,6 +698,37 @@ class MultiplayerGuildInfo
   {
     return this.member_count;
   }
+
+  async loadStat()
+  {
+    try
+    {
+      const scoreboard_info_result = await db_manager.selectGlobalScoreboard(this.guild_id);
+      
+      if(scoreboard_info_result === undefined || scoreboard_info_result.rowCount === 0)
+      {
+        return;
+      }
+
+      const scoreboard_info = scoreboard_info_result.rows[0];
+
+      this.stat = {
+        win: scoreboard_info.win,
+        lose: scoreboard_info.lose,
+        mmr: scoreboard_info.mmr,
+      };
+
+      logger.info(`Load Stat. guild_id: ${this.guild_id}. win: ${this.stat.win} / lose: ${this.stat.lose} / mmr: ${this.stat.mmr}`);
+    }
+    catch(err)
+    {
+      logger.info(`Failed to load Stat. guild_id: ${this.guild_id}. err: ${err}`);
+      return false;
+    }
+    
+    return true;
+    
+  }
 }
 
 class MultiplayerSession
@@ -718,7 +765,6 @@ class MultiplayerSession
 
     setTimeout(() => // return true;대충 1.5초 정도는 기다리도록(별 의미는 없고 ui띄워지는 시간도 있으니)
     {
-
       this.state = SESSION_STATE.LOBBY;
     }, 1500);
   }
@@ -1045,9 +1091,16 @@ class MultiplayerSession
 
   processWinner(guild_id)
   {
-    const guild_info = this.getParticipant(guild_id);
+    logger.info(`Processing winner ${guild_id}`);
 
-    logger.info(`Processing winner ${guild_info.name}`);
+    db_manager.updateGlobalScoreboard(guild_id, 1, 0, 1, 0);
+  }
+
+  processLoser(guild_id)
+  {
+    logger.info(`Processing loser ${guild_id}`);
+
+    db_manager.updateGlobalScoreboard(guild_id, 0, 1, 1, 0);
   }
   
   finishUp(guild_id)
@@ -1071,13 +1124,26 @@ class MultiplayerSession
 
     //이제 승리자 구해보자. 이긴 사람만이 점수를 받는거다.
     const sorted_scoreboard = utility.sortMapByProperty(this.scoreboard, 'score');
-    if(sorted_scoreboard.size !== 0)
+    for(let i = 0; i < sorted_scoreboard.size; ++i)
     {
       const [guild_id, winner_info] = sorted_scoreboard.entries().next().value;
 
-      logger.debug(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
+      if(i === 0)
+      {
+        this.processWinner(guild_id);
+        logger.debug(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
+      }
+      else
+      {
+        if(this.syncFailedDetected.includes(guild_id))
+        {
+          logger.debug(`${this.getSessionId()}'s loser is ${guild_id}. but this guild is sync failed`);
+          continue;
+        }
 
-      this.processWinner(guild_id);
+        this.processLoser(guild_id);
+      }
+      
     }
   }
 
@@ -1117,11 +1183,18 @@ class MultiplayerSession
   }
 
 
-
-
   acceptJoinRequest(guild_id, guild_name)
   {
     const new_guild_info = new MultiplayerGuildInfo(guild_id, guild_name);
+
+    new_guild_info.loadStat()
+      .then((result) => 
+      {
+        if(result)
+        {
+          this.sendStatLoaded();
+        }
+      });
 
     this.participant_guilds.push(new_guild_info);
 
@@ -1465,6 +1538,21 @@ class MultiplayerSession
     };
     this.sendSignal(signal);
     logger.debug(`Broadcasting Chat Message ${user_id}: ${chat_message}`);
+  }
+
+  sendStatLoaded()
+  {
+    const guilds_info_list = [];
+    this.participant_guilds.forEach(g => 
+    {
+      guilds_info_list.push(g.toJsonObject());
+    });
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.PARTICIPANT_INFO_UPDATE,
+      participant_guilds_info: guilds_info_list,
+    };
+    this.sendSignal(signal);
   }
 }
 

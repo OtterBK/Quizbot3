@@ -346,12 +346,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return;
     }
 
-    // if(this.participant_guilds_info.length < 2)
-    // {
-    //   interaction.explicit_replied = true;
-    //   interaction.reply({content: `\`\`\`🌐 시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\`\`\``, ephemeral: true});
-    //   return;
-    // }
+    if(this.participant_guilds_info.length < 2)
+    {
+      interaction.explicit_replied = true;
+      interaction.reply({content: `\`\`\`🌐 시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\`\`\``, ephemeral: true});
+      // return;
+    }
 
     interaction.explicit_replied = true;
     ipc_manager.sendMultiplayerSignal(
@@ -524,12 +524,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     for (let i = 0; i < this.participant_guilds_info.length; ++i) 
     {
       const guilds_info = this.participant_guilds_info[i];
-      const option = { label: `${guilds_info.guild_name}`, description: `.`, value: `${i}` };
+      const stat = guilds_info.stat;
+      const option = { label: `${guilds_info.guild_name}`, description: `전적: ${stat.win}승 ${stat.lose}패`, value: `${i}` };
       
-      if (this.session_id === guilds_info.guild_id) 
-      {
-        option['description'] = `호스트 서버`;
-      }
+      // if (this.session_id === guilds_info.guild_id) 
+      // {
+      //   option['description'] = `호스트 서버`;
+      // }
       
       participant_select_menu_for_current_lobby.addOptions(option);
     }
@@ -599,6 +600,10 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       this.onReceivedEditedLobby(signal);
       break;
 
+    case SERVER_SIGNAL.PARTICIPANT_INFO_UPDATE:
+      this.onReceivedUpdatedStat(signal);
+      break;
+
     case SERVER_SIGNAL.KICKED_PARTICIPANT:
       this.onReceivedKickedParticipant(signal);
       break;
@@ -622,8 +627,10 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return; // 참가자가 자신일 경우 무시
     }
 
+    const stat = joined_guild_info?.stat;
+
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\`\`\``});
+    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다. 전적: ${stat.win}승 ${stat.lose}패\`\`\``});
   }
 
   // LEAVED_LOBBY 처리
@@ -645,6 +652,16 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
     this.sendMessageReply({ content: `\`\`\`🌐 로비 정보가 변경되었습니다.\`\`\`` });
+  }
+
+  // STAT 로드됨 처리
+  onReceivedUpdatedStat(signal)
+  {
+    const lobby_info = {
+      quiz_info: this.quiz_info,
+      participant_guilds_info: signal.participant_guilds_info
+    };
+    this.applyMultiplayerLobbyInfo(lobby_info);
   }
 
   // KICKED_PARTICIPANT 처리

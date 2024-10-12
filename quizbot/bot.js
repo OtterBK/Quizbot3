@@ -411,7 +411,7 @@ client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) =>
   const uiHolder = quizbot_ui.getUIHolder(holder_id);
   if (uiHolder != undefined) 
   {
-    if (interaction.user.id != uiHolder.getOwnerId() && uiHolder.isPublicUI()) 
+    if (interaction.user.id != uiHolder.getOwnerId() && uiHolder.isPublicUI() && (quiz_session === undefined || (quiz_session.isMultiplayerSession() && !quiz_session.isIngame())))
     {
       //이제 Public UI 조작은 주인만 가능~
       interaction.reply({
