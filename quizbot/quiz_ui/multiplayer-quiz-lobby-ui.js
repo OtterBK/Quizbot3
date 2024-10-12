@@ -721,7 +721,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
         if(result.state === true)
         {
-          if(!interaction.explicit_replied)
+          if(!interaction.explicit_replied === false)
           {
             interaction.explicit_replied = true;
             interaction.deferUpdate();
