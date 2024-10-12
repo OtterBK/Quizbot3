@@ -1006,7 +1006,11 @@ const MultiplayerSessionMixin = Base => class extends Base
   syncFailed()
   {
     this.sendMessage({content:`\`\`\`🌐 멀티플레이 동기화에 실패하였습니다. (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})\n퇴장으로 처리되지만, 패배 처리는 되지 않습니다.\`\`\``});
-    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}, (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})`);
+    logger.error(`Multiplayer quiz session sync client timeout. 
+      guild_id: ${this.guild_id},  /
+      sequence_info: (timeout/ sync_ready: ${this.sync_ready}, sequence_num: ${this.sync_done_sequence_num}) /
+      prepared question queue length: ${this.game_data.prepared_question_queue.length} /   
+    `);
 
     this.sync_failed = true;
     
@@ -1298,6 +1302,12 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     {
       await utility.sleep(100);
       ++wait_sync_ready_time_sec;
+
+      if(this.game_data.prepared_question_queue?.length !== 0)
+      {
+        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip skip ready`);
+        break;
+      }
 
       if(wait_sync_ready_time_sec === 50) //5초
       {

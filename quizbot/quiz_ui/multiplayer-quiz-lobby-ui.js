@@ -633,10 +633,10 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return; // 참가자가 자신일 경우 무시
     }
 
-    const stat = joined_guild_info?.stat;
-
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다. 전적: ${stat.win}승 ${stat.lose}패\`\`\``});
+    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\`\`\``});
+
+    this.sendDelayedUI(this, true);
   }
 
   // LEAVED_LOBBY 처리
@@ -644,6 +644,8 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
     this.sendMessageReply({content: `\`\`\`🌐 ${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\`\`\``});
+
+    this.sendDelayedUI(this, true);
   }
 
   // EXPIRED_SESSION 처리
@@ -667,6 +669,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       quiz_info: this.quiz_info,
       participant_guilds_info: signal.participant_guilds_info
     };
+    
     this.applyMultiplayerLobbyInfo(lobby_info);
   }
 

@@ -254,6 +254,8 @@ const submitReportChatModal = (interaction) =>
 
   db_manager.insertChatInfo(chat_info_key_fields, [chat_id, content, sender_id, result]);
   db_manager.insertReportInfo(report_info_key_fields, [chat_id, reporter_id, report_detail, report_type]);
+
+  logger.info(`${sender_id} Reported Message ${content}`);
 };
 
 const sendReportLog = async (interaction) =>

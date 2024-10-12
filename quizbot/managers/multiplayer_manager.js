@@ -108,6 +108,7 @@ function handleRequestLobbyList(signal)
       session_id: session.getSessionId(),
       participant_count: session.getParticipantCount(),
       session_name: session.getSessionName(),
+      host_name: session.owner_guild_info.guild_name,
     };
         
     lobby_session_list.push(simple_session_info);
