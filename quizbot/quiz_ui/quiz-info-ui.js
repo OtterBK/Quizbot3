@@ -466,7 +466,7 @@ class QuizInfoUI extends QuizbotUI
       return;
     }
   
-    basket_select_menu_for_current.setMaxValues(basket_keys.length);
+    basket_select_menu_for_current.setMaxValues(basket_keys.length > 25 ? 25 : basket_keys.length);
     for (const key of basket_keys) 
     {
       const basket_item = basket_items[key];

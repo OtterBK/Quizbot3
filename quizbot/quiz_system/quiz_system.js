@@ -1950,8 +1950,20 @@ class QuizLifeCycleWithUtility extends QuizLifeCycle //여러 기능을 포함�
     for(let i = 0; i < show_count; ++i)
     {
       const [answerer_id, answerer_info] = iter.next().value;
+
+      let answerer_name = answerer_info.name;
+
+      if(this.quiz_session.isMultiplayerSession())
+      {
+        const guild_info = this.quiz_session.getParticipant(answerer_id);
+        if(guild_info !== undefined)
+        {
+          answerer_name = guild_info.guild_name;
+        }
+      }
+
       scoreboard_fields.push({
-        name: answerer_info.name,
+        name: answerer_name,
         value: `${answerer_info.score}${text_contents.scoreboard.point_name}`,
         inline: true
       });
