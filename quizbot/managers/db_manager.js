@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 
 //외부 modules
 const { ThreadChannel } = require('discord.js');
@@ -25,45 +25,54 @@ const sendQuery = (query_string, values=[]) =>
 {
   if(is_initialized == false)
   {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => 
+    {
       resolve(undefined);
     });
   }
 
   return pool.query(query_string, values)
-  .then((result) =>
-  {
-    return result;
-  })
-  .catch(err => 
-  {
-    logger.error(`query error, query: ${query_string}, values: ${values}\nerr: ${err}`);
-    return undefined;
-  });
-}
-
-exports.initialize = () => {
-    return new Promise((resolve, reject) => {
-      pool.connect(err => {
-        if (err) {
-          logger.error(`Failed to connect db err: ${err}`);
-          is_initialized = false;
-        } else {
-          logger.info(`Connected to db!`);
-          is_initialized = true;
-        }
-        resolve(is_initialized);
-      });
+    .then((result) =>
+    {
+      return result;
+    })
+    .catch(err => 
+    {
+      logger.error(`query error, query: ${query_string}, values: ${values}\nerr: ${err}`);
+      return undefined;
     });
-}
+};
 
-exports.executeQuery = async (query, values) => {
-    return pool.query(query, values);
-}
+exports.initialize = () => 
+{
+  return new Promise((resolve, reject) => 
+  {
+    pool.connect(err => 
+    {
+      if (err) 
+      {
+        logger.error(`Failed to connect db err: ${err}`);
+        is_initialized = false;
+      }
+      else 
+      {
+        logger.info(`Connected to db!`);
+        is_initialized = true;
+      }
+      resolve(is_initialized);
+    });
+  });
+};
+
+exports.executeQuery = async (query, values) => 
+{
+  return pool.query(query, values);
+};
 
 /** 옵션 */
 //옵션쪽은 어차피 고정값이니깐 placeholder 사용하지 말자, 건드리기 두렵다
-exports.selectOption = async (guild_id, option_fields) => {
+exports.selectOption = async (guild_id, option_fields) => 
+{
 
   const query_string = 
   `select ${option_fields} from tb_option 
@@ -71,9 +80,10 @@ exports.selectOption = async (guild_id, option_fields) => {
 
   return sendQuery(query_string);
 
-}
+};
 
-exports.updateOption = async (guild_id, option_fields, option_values) => {
+exports.updateOption = async (guild_id, option_fields, option_values) => 
+{
 
   const query_string =
   `insert into tb_option (guild_id,${option_fields}) values (${guild_id},${option_values}) 
@@ -81,37 +91,40 @@ exports.updateOption = async (guild_id, option_fields, option_values) => {
     DO UPDATE set (${option_fields}) = (${option_values}) 
     where tb_option.guild_id = ${guild_id};`;
 
-    return sendQuery(query_string); 
+  return sendQuery(query_string); 
 
-}
+};
 
 /** User Quiz info */
 //option이랑 쿼리 날리는 방식이 다르다...쏘리
-exports.selectQuizInfo = async (creator_id) => {
+exports.selectQuizInfo = async (creator_id) => 
+{
 
   let query_string = 
   `select * 
     from tb_quiz_info
     where is_use = true and creator_id = $1
-    order by quiz_id desc`
+    order by quiz_id desc`;
 
   return sendQuery(query_string, [creator_id]);
 
-}
+};
 
-exports.selectAllQuizInfo = async () => {
+exports.selectAllQuizInfo = async () => 
+{
 
   let query_string = 
   `select * 
     from tb_quiz_info
     where is_use = true and is_private = false
-    order by modified_time desc`
+    order by modified_time desc`;
 
   return sendQuery(query_string);
 
-}
+};
 
-exports.insertQuizInfo = async (key_fields, value_fields) => {
+exports.insertQuizInfo = async (key_fields, value_fields) => 
+{
 
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -124,9 +137,10 @@ exports.insertQuizInfo = async (key_fields, value_fields) => {
 
   return sendQuery(query_string, value_fields);
 
-}
+};
 
-exports.updateQuizInfo = async (key_fields, value_fields, quiz_id) => {
+exports.updateQuizInfo = async (key_fields, value_fields, quiz_id) => 
+{
   
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -141,18 +155,20 @@ exports.updateQuizInfo = async (key_fields, value_fields, quiz_id) => {
 
   return sendQuery(query_string, value_fields);
 
-}
+};
 
-exports.disableQuizInfo = async (quiz_id) => {
+exports.disableQuizInfo = async (quiz_id) => 
+{
   
   const query_string = 
   `UPDATE tb_quiz_info set is_use = false 
     where quiz_id = $1;`;
 
   return sendQuery(query_string, [quiz_id]);
-}
+};
 
-exports.addQuizInfoPlayedCount = async (quiz_id) => {
+exports.addQuizInfoPlayedCount = async (quiz_id) => 
+{
 
   const query_string = 
   `UPDATE tb_quiz_info set played_count = played_count + 1, played_count_of_week = played_count_of_week + 1
@@ -160,11 +176,12 @@ exports.addQuizInfoPlayedCount = async (quiz_id) => {
 
   return sendQuery(query_string, [quiz_id]);
 
-}
+};
 
 
 /** User QuestioN Info */ 
-exports.selectQuestionInfo = async (value_fields) => {
+exports.selectQuestionInfo = async (value_fields) => 
+{
 
   const query_string =
   `select *
@@ -174,8 +191,9 @@ exports.selectQuestionInfo = async (value_fields) => {
     
   return sendQuery(query_string, value_fields);
 
-}
-exports.insertQuestionInfo = async (key_fields, value_fields) => {
+};
+exports.insertQuestionInfo = async (key_fields, value_fields) => 
+{
 
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -188,9 +206,10 @@ exports.insertQuestionInfo = async (key_fields, value_fields) => {
 
   return sendQuery(query_string, value_fields);
 
-}
+};
 
-exports.updateQuestionInfo = async (key_fields, value_fields, question_id) => {
+exports.updateQuestionInfo = async (key_fields, value_fields, question_id) => 
+{
   
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -204,19 +223,21 @@ exports.updateQuestionInfo = async (key_fields, value_fields, question_id) => {
     returning question_id`;
 
   return sendQuery(query_string, value_fields);
-}
+};
 
 /** User QuestioN Info */ 
-exports.updateQuizInfoModifiedTime = async (quiz_id) => {
+exports.updateQuizInfoModifiedTime = async (quiz_id) => 
+{
 
   const query_string = 
   `UPDATE tb_quiz_info set modified_time = now()
     where quiz_id = $1;`;
 
   return sendQuery(query_string, [quiz_id]);
-}
+};
 
-exports.deleteQuestionInfo = async (question_id) => {
+exports.deleteQuestionInfo = async (question_id) => 
+{
   
   const query_string = 
   `delete from tb_question_info
@@ -224,9 +245,10 @@ exports.deleteQuestionInfo = async (question_id) => {
 
   return sendQuery(query_string, [question_id]);
 
-}
+};
 
-exports.insertLikeInfo = async (key_fields, value_fields) => {
+exports.insertLikeInfo = async (key_fields, value_fields) => 
+{
 
   let placeholders = '';
   for(let i = 1; i <= value_fields.length; ++i) 
@@ -237,9 +259,10 @@ exports.insertLikeInfo = async (key_fields, value_fields) => {
   `insert into tb_like_info (${key_fields}) values (${placeholders})`;
 
   return sendQuery(query_string, value_fields);
-}
+};
 
-exports.selectLikeInfo = async (value_fields) => {
+exports.selectLikeInfo = async (value_fields) => 
+{
 
   const query_string = 
   `select user_id from tb_like_info 
@@ -247,9 +270,10 @@ exports.selectLikeInfo = async (value_fields) => {
 
   return sendQuery(query_string, value_fields);
 
-}
+};
 
-exports.updateQuizLikeCount = async (quiz_id) => {
+exports.updateQuizLikeCount = async (quiz_id) => 
+{
 
   const query_string = 
   `UPDATE tb_quiz_info set like_count = (select count(user_id) from tb_like_info where tb_like_info.quiz_id = $1)
@@ -258,9 +282,10 @@ exports.updateQuizLikeCount = async (quiz_id) => {
 
   return sendQuery(query_string, [quiz_id]);
 
-}
+};
 
-exports.certifyQuiz = async (quiz_id, played_count_criteria) => {
+exports.certifyQuiz = async (quiz_id, played_count_criteria) => 
+{
 
   const query_string = 
   `UPDATE tb_quiz_info set certified = true
@@ -268,10 +293,11 @@ exports.certifyQuiz = async (quiz_id, played_count_criteria) => {
 
   return sendQuery(query_string, [quiz_id, played_count_criteria]);
 
-}
+};
 
-exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit) => {
-  
+exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value, limit, certified_filter) => 
+{
+
   const query_string =
   `
   WITH matching_quizzes AS (
@@ -281,14 +307,179 @@ exports.selectRandomQuestionListByTags = async (quiz_type_tags_value, tags_value
     and ($2 = 0 or (tags_value & $2) > 0)
     and is_private = false
     and is_use = true
-    and certified = true
+    ${certified_filter ? 'and certified = true' : ''}
   )
   SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value,
     COUNT(*) OVER() AS total_count
   FROM tb_question_info qu
   JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
+  WHERE qu.answer_type = 1 OR qu.answer_type IS NULL
   ORDER BY RANDOM()
-  LIMIT $3;`
+  LIMIT $3;`;
   
   return sendQuery(query_string, [quiz_type_tags_value, tags_value, limit]);
-}
+};
+
+exports.selectRandomQuestionListByBasket = async (basket_condition_query, limit) => 
+{
+  const query_string =
+  `
+  WITH matching_quizzes AS (
+    SELECT quiz_id, quiz_title, creator_name, creator_icon_url, simple_description, tags_value
+    FROM tb_quiz_info
+    WHERE quiz_id IN ${basket_condition_query}
+  )
+  SELECT qu.*, mq.quiz_id, mq.quiz_title, mq.creator_name, mq.creator_icon_url, mq.simple_description, mq.tags_value,
+    COUNT(*) OVER() AS total_count
+  FROM tb_question_info qu
+  JOIN matching_quizzes mq ON qu.quiz_id = mq.quiz_id
+  WHERE qu.answer_type = 1 OR qu.answer_type IS NULL
+  ORDER BY RANDOM()
+  LIMIT $1;`;
+  
+  return sendQuery(query_string, [limit]);
+};
+
+//#region 신고 처리 관련
+
+exports.insertChatInfo = async (key_fields, value_fields) =>
+{
+  const chat_id = 'chat_id';
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `
+  INSERT INTO tb_chat_info (${key_fields})
+  VALUES (${placeholders})
+  ON CONFLICT (${chat_id}) DO NOTHING;
+  `;
+    
+  return sendQuery(query_string, value_fields);
+};
+
+exports.insertReportInfo = async (key_fields, value_fields) =>
+{
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+
+  const query_string = 
+  `
+  INSERT INTO tb_report_info (${key_fields})
+  VALUES (${placeholders})
+  `;
+  
+  return sendQuery(query_string, value_fields);
+};
+
+exports.selectReportChatInfo = async (limit) => 
+{
+  
+  let query_string = 
+    `select * 
+      from tb_chat_info
+      where result = 0
+      limit $1`;
+  
+  return sendQuery(query_string, [limit]);
+};
+
+exports.selectReportLog = async (chat_id) => 
+{
+    
+  let query_string = 
+      `select * 
+        from tb_report_info
+        where target_id = $1`;
+    
+  return sendQuery(query_string, [chat_id]);
+};
+
+exports.selectBanHistory = async (user_id) => 
+{
+      
+  let query_string = 
+        `select * 
+          from tb_ban_history
+          where user_id = $1`;
+      
+  return sendQuery(query_string, [user_id]);
+};
+
+exports.updateBanHistory = async (user_id, ban_count, ban_expiration_timestamp) => 
+{
+  const query_string = 
+    `
+    INSERT INTO tb_ban_history (user_id, ban_count, ban_expiration_timestamp)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (user_id)
+    DO UPDATE SET 
+        ban_count = EXCLUDED.ban_count,
+        ban_expiration_timestamp = EXCLUDED.ban_expiration_timestamp;
+    `;
+    
+  return sendQuery(query_string, [user_id, ban_count, ban_expiration_timestamp]);
+};
+  
+exports.updateChatInfoResult = async (chat_id, result) => 
+{
+  const query_string = 
+  `
+  UPDATE tb_chat_info
+  SET result = $2
+  WHERE chat_id = $1;
+  `;
+        
+  return sendQuery(query_string, [chat_id, result]);
+};
+  
+exports.deleteReportedLog = async (target_id) => 
+{
+  const query_string = 
+    `
+    DELETE FROM tb_report_info
+    WHERE target_id = $1
+    RETURNING *;
+    `;
+            
+  return sendQuery(query_string, [target_id]);
+};
+  
+
+//#endregion
+
+//#region 스코어보드 관련
+
+exports.selectGlobalScoreboard = async (guild_id) =>
+{
+  const query_string = 
+  `SELECT * 
+    FROM tb_global_scoreboard
+    WHERE guild_id = $1`;
+
+  return sendQuery(query_string, [guild_id]);
+};
+
+exports.updateGlobalScoreboard = async (guild_id, win_add, lose_add, play_add, mmr_add) =>  
+{
+  const query_string = 
+      `
+      INSERT INTO tb_global_scoreboard (guild_id, win, lose, play, mmr)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (guild_id)
+      DO UPDATE SET 
+          win = tb_global_scoreboard.win + EXCLUDED.win,
+          lose = tb_global_scoreboard.lose + EXCLUDED.lose,
+          play = tb_global_scoreboard.play + EXCLUDED.play,
+          mmr = tb_global_scoreboard.mmr + EXCLUDED.mmr;
+      `;
+      
+  return sendQuery(query_string, [guild_id, win_add, lose_add, play_add, mmr_add]);
+};
+
+//#endregion

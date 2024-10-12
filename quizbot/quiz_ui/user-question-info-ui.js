@@ -30,6 +30,7 @@ const {
 //#endregion
 
 /** 퀴즈의 문제 정보 */
+/** 건드릴 엄두가 안난다... 우선 돌아가면 장땡 ㄱㄱ */
 class UserQuestionInfoUI extends QuizbotUI
 {
 
@@ -37,12 +38,25 @@ class UserQuestionInfoUI extends QuizbotUI
   {
     super();
 
+    this.question_index = question_index;
     this.quiz_info = quiz_info;
     this.question_list = quiz_info.question_list;
+    this.current_question_info = undefined;
+    this.current_question_index = question_index;
+
+    this.initializeEmbed();
+    this.initializeComponents();
+
+    this.displayQuestionInfo(question_index);
+  }
+
+  initializeEmbed() 
+  {
+    
 
     this.embed = {
       color: 0x05f1f1,
-      title: `**${question_index+1}번째 문제**`,
+      title: `**${this.question_index+1}번째 문제**`,
       description: '데이터를 불러오는 중...\n잠시만 기다려주세요.',
       image: { //문제 이미지 표시
         url: '',
@@ -51,18 +65,17 @@ class UserQuestionInfoUI extends QuizbotUI
         url: '',
       },
       footer: { //문제 번호 표시
-        text: `📦 ${question_index + 1} / ${this.question_list.length}`,
+        text: `📦 ${this.question_index + 1} / ${this.question_list.length}`,
       },
     };
+  }
 
-    this.current_question_info = undefined;
-    this.current_question_index = question_index;
+  initializeComponents() 
+  {
+    
 
     this.question_answer_type_select_menu = question_answer_type_select_menu;
-
     this.components = [question_edit_comp, this.question_answer_type_select_menu, cloneDeep(question_edit_comp2), question_control_btn_component]; //문제 관련 comp
-
-    this.displayQuestionInfo(question_index);
   }
 
   onInteractionCreate(interaction) 
@@ -85,15 +98,15 @@ class UserQuestionInfoUI extends QuizbotUI
 
   doModalSubmitEvent(modal_interaction)
   {
-    if(modal_interaction.customId == 'modal_question_info_edit'
-      || modal_interaction.customId == 'modal_question_additional_info'
-      || modal_interaction.customId == 'modal_question_answering_info')
+    if(modal_interaction.customId === 'modal_question_info_edit'
+      || modal_interaction.customId === 'modal_question_additional_info'
+      || modal_interaction.customId === 'modal_question_answering_info')
     {
       this.editQuestionInfo(this.current_question_info, modal_interaction);
       return;
     }
 
-    if(modal_interaction.customId == 'modal_question_info')
+    if(modal_interaction.customId === 'modal_question_info')
     {
       this.addQuestion(modal_interaction);
       return;
@@ -103,7 +116,7 @@ class UserQuestionInfoUI extends QuizbotUI
   doButtonEvent(interaction)
   {
     const question_info = this.current_question_info;
-    if(interaction.customId == 'request_modal_question_info_edit')
+    if(interaction.customId === 'request_modal_question_info_edit')
     {
       const modal_current_question_info_edit = cloneDeep(modal_question_info_edit);
 
@@ -115,27 +128,28 @@ class UserQuestionInfoUI extends QuizbotUI
 
       //정답 방식별로 툴팁 제공
       const answer_type = question_info.data.answer_type;
-      if(answer_type == ANSWER_TYPE.SHORT_ANSWER)
+      if(answer_type === ANSWER_TYPE.SHORT_ANSWER)
       {
-        modal_current_question_info_edit.components[0].components[0].setLabel('주관식 문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)')
+        modal_current_question_info_edit.components[0].components[0].setLabel('주관식 문제의 정답을 입력해주세요.(정답이 여러개면 , 로 구분)');
         modal_current_question_info_edit.components[0].components[0].setPlaceholder('카트라이더, 카트, kartrider');
       }
-      else if(answer_type == ANSWER_TYPE.OX)
+      else if(answer_type === ANSWER_TYPE.OX)
       {
-        modal_current_question_info_edit.components[0].components[0].setLabel('OX 문제의 정답을 입력해주세요. O 또는 X')
+        modal_current_question_info_edit.components[0].components[0].setLabel('OX 문제의 정답을 입력해주세요. O 또는 X');
         modal_current_question_info_edit.components[0].components[0].setPlaceholder('O, X');
       }
-      else if(answer_type == ANSWER_TYPE.MULTIPLE_CHOICE)
+      else if(answer_type === ANSWER_TYPE.MULTIPLE_CHOICE)
       {
-        modal_current_question_info_edit.components[0].components[0].setLabel('객관식 문제의 정답을 입력해주세요. 1, 2, 3, 4, 5 중 선택')
+        modal_current_question_info_edit.components[0].components[0].setLabel('객관식 문제의 정답을 입력해주세요. 1, 2, 3, 4, 5 중 선택');
         modal_current_question_info_edit.components[0].components[0].setPlaceholder('1, 2, 3, 4, 5');
       }
 
+      interaction.explicit_replied = true;
       interaction.showModal(modal_current_question_info_edit);
       return;
     }
 
-    if(interaction.customId == 'request_modal_question_additional_info')
+    if(interaction.customId === 'request_modal_question_additional_info')
     {
       const modal_current_question_additional_info = cloneDeep(modal_question_additional_info);
 
@@ -143,11 +157,12 @@ class UserQuestionInfoUI extends QuizbotUI
       modal_current_question_additional_info.components[1].components[0].setValue(question_info.data.hint_image_url ?? ''); 
       modal_current_question_additional_info.components[2].components[0].setValue(question_info.data.use_answer_timer === true ? '사용' : ''); 
 
+      interaction.explicit_replied = true;
       interaction.showModal(modal_current_question_additional_info);
       return;
     }
 
-    if(interaction.customId == 'request_modal_question_answering_info')
+    if(interaction.customId === 'request_modal_question_answering_info')
     {
       const modal_current_question_answering_info = cloneDeep(modal_question_answering_info);
 
@@ -156,26 +171,28 @@ class UserQuestionInfoUI extends QuizbotUI
       modal_current_question_answering_info.components[2].components[0].setValue(question_info.data.answer_image_url ?? ''); 
       modal_current_question_answering_info.components[3].components[0].setValue(question_info.data.answer_text ?? ''); 
 
+      interaction.explicit_replied = true;
       interaction.showModal(modal_current_question_answering_info);
       return;
     }
 
-    if(interaction.customId == 'question_refresh')
+    if(interaction.customId === 'question_refresh')
     {
       this.displayQuestionInfo(this.current_question_index);
       return this;
     }
 
-    if(interaction.customId == 'request_modal_question_add')
+    if(interaction.customId === 'request_modal_question_add')
     {
+      interaction.explicit_replied = true;
       interaction.showModal(modal_question_info);
       return;
     }
 
-    if(interaction.customId == 'question_delete')
+    if(interaction.customId === 'question_delete')
     {
       const index_to_remove = this.question_list.indexOf(this.current_question_info);
-      if(index_to_remove != -1)
+      if(index_to_remove !== -1)
       {
         this.question_list.splice(index_to_remove, 1); 
       }
@@ -188,7 +205,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
       this.current_question_info = undefined;
 
-      if(this.question_list.length == 0) //더 이상 표시할게 없다면
+      if(this.question_list.length === 0) //더 이상 표시할게 없다면
       {
         this.current_question_index = -1;
         this.goToBack();
@@ -201,12 +218,12 @@ class UserQuestionInfoUI extends QuizbotUI
       }
     }
 
-    if(interaction.customId == 'prev_question')
+    if(interaction.customId === 'prev_question')
     {
       return this.goToPrevQuestion();
     }
 
-    if(interaction.customId == 'next_question')
+    if(interaction.customId === 'next_question')
     {
       return this.goToNextQuestion();
     }
@@ -214,7 +231,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
   doSelectEvent(interaction)
   {
-    if(interaction.customId == 'question_answer_type_select_menu') //정답 유형 수정 버튼... 나중에 가서 함수로 빼자
+    if(interaction.customId === 'question_answer_type_select_menu') //정답 유형 수정 버튼... 나중에 가서 함수로 빼자
     {
       this.applyQuestionAnswerType(interaction);
       return;
@@ -254,13 +271,13 @@ class UserQuestionInfoUI extends QuizbotUI
     this.current_question_info = question_info;
 
     //url valid check, 값 없으면 true로
-    const is_valid_question_audio_url = ((question_info.data.question_audio_url ?? '').length == 0) || ytdl.validateURL(question_info.data.question_audio_url);
-    const is_valid_question_image_url = ((question_info.data.question_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.question_image_url);
+    const is_valid_question_audio_url = ((question_info.data.question_audio_url ?? '').length === 0) || ytdl.validateURL(question_info.data.question_audio_url);
+    const is_valid_question_image_url = ((question_info.data.question_image_url ?? '').length === 0) || utility.isValidURL(question_info.data.question_image_url);
 
-    const is_valid_hint_image_url = ((question_info.data.hint_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.hint_image_url);
+    const is_valid_hint_image_url = ((question_info.data.hint_image_url ?? '').length === 0) || utility.isValidURL(question_info.data.hint_image_url);
     
-    const is_valid_answer_audio_url = ((question_info.data.answer_audio_url ?? '').length == 0) || ytdl.validateURL(question_info.data.answer_audio_url);
-    const is_valid_answer_image_url = ((question_info.data.answer_image_url ?? '').length == 0) || utility.isValidURL(question_info.data.answer_image_url);
+    const is_valid_answer_audio_url = ((question_info.data.answer_audio_url ?? '').length === 0) || ytdl.validateURL(question_info.data.answer_audio_url);
+    const is_valid_answer_image_url = ((question_info.data.answer_image_url ?? '').length === 0) || utility.isValidURL(question_info.data.answer_image_url);
 
     //convert range row to string
     const question_audio_range_string = this.convertAudioRangeToString(question_info.data.audio_start, question_info.data.audio_end, 'question');
@@ -273,10 +290,10 @@ class UserQuestionInfoUI extends QuizbotUI
     this.embed.footer.text = `📦 ${question_index + 1} / ${this.question_list.length} 문제`;
 
     let description = '';
-    description += " \n------ 기본 정보 ------\n\n\`\`\`";
+    description += " \n------ 기본 정보 ------\n\n```";
     description += `🔸 정답: [${question_info.data.answers}]\n\n`;
     description += `🔸 문제 제출시 음악:\n[${question_info.data.question_audio_url ?? ''}]\n`;
-    if(is_valid_question_audio_url == false)
+    if(is_valid_question_audio_url === false)
     {
       description += '❗ 해당 오디오 URL은 사용이 불가능합니다.';
     }
@@ -285,7 +302,7 @@ class UserQuestionInfoUI extends QuizbotUI
     description += `🔸 음악 재생 구간: ${question_audio_range_string}\n\n`;
 
     description += `🔸 문제 제출시 이미지:\n[${question_info.data.question_image_url ?? ''}]\n`;
-    if(is_valid_question_image_url == false)
+    if(is_valid_question_image_url === false)
     {
       description += '❗ 해당 이미지 URL은 사용이 불가능합니다.';
     }
@@ -303,10 +320,10 @@ class UserQuestionInfoUI extends QuizbotUI
     description += `🔸 문제 제출시 텍스트:\n[${question_info.data.question_text ?? ''}]\n`;
 
 
-    description += " \`\`\`\n------ 추가 정보 ------\n\n\`\`\`";
-    description += `🔸 힌트: [${ ( (question_info.data.hint ?? '').length == 0 ? '자동 지정' : question_info.data.hint) }]\n\n`;
+    description += " ```\n------ 추가 정보 ------\n\n```";
+    description += `🔸 힌트: [${ ( (question_info.data.hint ?? '').length === 0 ? '자동 지정' : question_info.data.hint) }]\n\n`;
     description += `🔸 힌트용 이미지:\n[${question_info.data.hint_image_url ?? ''}]\n`;
-    if(is_valid_hint_image_url == false)
+    if(is_valid_hint_image_url === false)
     {
       description += '❗ 해당 이미지 URL은 사용이 불가능합니다.';
     }
@@ -317,11 +334,11 @@ class UserQuestionInfoUI extends QuizbotUI
     }
     description += "\n\n";
 
-    description += `🔸 정답 여유 시간 여부: [${(question_info.data.use_answer_timer == true ? '예' : '아니요')}]\n`;
+    description += `🔸 정답 여유 시간 여부: [${(question_info.data.use_answer_timer === true ? '예' : '아니요')}]\n`;
 
-    description += " \`\`\`\n------ 정답 이벤트 정보 ------\n\n\`\`\`";
+    description += " ```\n------ 정답 이벤트 정보 ------\n\n```";
     description += `🔸 정답용 음악:\n[${question_info.data.answer_audio_url ?? ''}]\n`;
-    if(is_valid_answer_audio_url == false)
+    if(is_valid_answer_audio_url === false)
     {
       description += '❗ 해당 오디오 URL은 사용이 불가능합니다.';
     }
@@ -330,7 +347,7 @@ class UserQuestionInfoUI extends QuizbotUI
     description += `🔸 정답용 음악 재생 구간: ${answer_audio_range_string}\n\n`;
 
     description += `🔸 정답용 이미지:\n[${question_info.data.answer_image_url ?? ''}]\n`;
-    if(is_valid_answer_image_url == false)
+    if(is_valid_answer_image_url === false)
     {
       description += '❗ 해당 이미지 URL은 사용이 불가능합니다.';
     }
@@ -361,11 +378,11 @@ class UserQuestionInfoUI extends QuizbotUI
   {
     let audio_range_string = '[랜덤 구간 재생]'; //이게 디폴트
 
-    if(audio_start != undefined)
+    if(audio_start !== undefined)
     {
       audio_range_string = `[${audio_start}초 ~ `;
 
-      if(audio_end == undefined)
+      if(audio_end === undefined)
       {
         audio_range_string += '음악 끝까지]';
       }
@@ -374,7 +391,7 @@ class UserQuestionInfoUI extends QuizbotUI
         audio_range_string += `${audio_end}초]`;
       }
 
-      audio_range_string += `\n(이 구간 내에서 무작위로 최대 ${type == 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생)`;
+      audio_range_string += `\n(이 구간 내에서 무작위로 최대 ${type === 'question' ? SYSTEM_CONFIG.max_question_audio_play_time : SYSTEM_CONFIG.max_answer_audio_play_time}초만 재생)`;
     }
 
     return audio_range_string;
@@ -396,9 +413,9 @@ class UserQuestionInfoUI extends QuizbotUI
     user_question_info.data.audio_range_row = input_question_audio_range; //row 값도 저장
 
     // 필요 없다
-    // if(input_question_audio_range != undefined
-    //   && input_question_audio_range != ''
-    //   && input_question_audio_range.split("~").length == 1) //~ 안치고 숫자 1개만 쳤다면
+    // if(input_question_audio_range !== undefined
+    //   && input_question_audio_range !== ''
+    //   && input_question_audio_range.split("~").length === 1) //~ 안치고 숫자 1개만 쳤다면
     // {
     //   user_question_info.data.audio_range_row += " ~ "; //물결 붙여줌
     // }
@@ -423,7 +440,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
     user_question_info.data.hint = input_hint ?? "";
     user_question_info.data.hint_image_url = input_hint_image_url ?? "";
-    user_question_info.data.use_answer_timer = (input_use_answer_timer.length == 0 ? false : true);
+    user_question_info.data.use_answer_timer = (input_use_answer_timer.length === 0 ? false : true);
   }
 
   applyQuestionAnsweringInfo(user_question_info, modal_interaction)
@@ -450,7 +467,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
   parseAudioRangePoints(audio_range_row)
   {
-    if(audio_range_row.undefined || audio_range_row.length == 0) //생략 시,
+    if(audio_range_row.undefined || audio_range_row.length === 0) //생략 시,
     {
       return [undefined, undefined, undefined];
     }
@@ -461,7 +478,7 @@ class UserQuestionInfoUI extends QuizbotUI
       audio_range_row = audio_range_row.slice(0, audio_range_row.length - 1);
     }
 
-    if(audio_range_row.length == 0) //정제하니깐 생략 시,
+    if(audio_range_row.length === 0) //정제하니깐 생략 시,
     {
       return [undefined, undefined, undefined];
     }
@@ -475,8 +492,8 @@ class UserQuestionInfoUI extends QuizbotUI
     let audio_start_value = (isNaN(audio_start) || audio_start < 0) ? undefined : Math.floor(audio_start); //소수점과 음수값일 경우 처리
     let audio_end_value = (isNaN(audio_end) || audio_end < 0) ? undefined : Math.floor(audio_end);
 
-    if(audio_start_value != undefined 
-      && audio_end_value != undefined) 
+    if(audio_start_value !== undefined 
+      && audio_end_value !== undefined) 
     {
       if(audio_start_value > audio_end_value) //start > end 처리
       {
@@ -493,25 +510,32 @@ class UserQuestionInfoUI extends QuizbotUI
 
   async addQuestion(modal_interaction)
   {
-    if(this.question_list != undefined && this.question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
+    if(this.question_list !== undefined && this.question_list.length >= 50) //최대 50개까지만 문제 만들 수 있음
     {
-        modal_interaction.reply({ content: `>>> 하나의 퀴즈에는 최대 50개까지만 문제를 만들 수 있습니다..`, ephemeral: true });
+      modal_interaction.explicit_replied = true;
+      modal_interaction.reply({ content: `\`\`\`하나의 퀴즈에는 최대 50개까지만 문제를 만들 수 있습니다.\`\`\``, ephemeral: true });
       return;
     }
 
     let user_question_info = new UserQuestionInfo();
     
     this.applyQuestionInfo(user_question_info, modal_interaction); //채우고 저장해주자
+
+    const previous_answer_type = this.current_question_info?.data?.answer_type ?? ANSWER_TYPE.SHORT_ANSWER;
+    user_question_info.data.answer_type = previous_answer_type; //보통 같은 정답 유형의 문제를 만들거니깐, ux고려해서 이전 선택한 정답 유형 그대로 만들게하자
+
     const question_id = await user_question_info.saveDataToDB();
 
-    if(question_id == undefined)
+    if(question_id === undefined)
     {
-      modal_interaction.reply({ content: `>>> ${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true });
+      modal_interaction.explicit_replied = true;
+      modal_interaction.reply({ content: `\`\`\`${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 생성하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.\`\`\``, ephemeral: true });
       return;
     }
 
     this.quiz_info.updateModifiedTime();
 
+    modal_interaction.explicit_replied = true;
     modal_interaction.deferUpdate();
     
     this.current_question_index = this.question_list.push(user_question_info) - 1; //새로 추가했으면 무조건 마지막에 넣었을테니
@@ -524,7 +548,7 @@ class UserQuestionInfoUI extends QuizbotUI
 
   async editQuestionInfo(user_question_info, modal_interaction)
   {
-    if(user_question_info == undefined)
+    if(user_question_info === undefined)
     {
       logger.info(`Failed edit Question info, current_question_info is undefined quiz_id: ${this.quiz_info.quiz_id}, current_question_index: ${this.current_question_index}`);
       return;
@@ -534,29 +558,31 @@ class UserQuestionInfoUI extends QuizbotUI
     //const previous_hint_image_url = user_question_info.data.hint_image_url; //어차피 hint 이미지는 미리보기 없으니 제외
     const previous_answer_image_url = user_question_info.data.answer_image_url;
 
-    if(modal_interaction.customId == 'modal_question_info_edit')
+    if(modal_interaction.customId === 'modal_question_info_edit')
     {
       this.applyQuestionInfo(user_question_info, modal_interaction);
     }
-    else if(modal_interaction.customId == 'modal_question_additional_info')
+    else if(modal_interaction.customId === 'modal_question_additional_info')
     {
       this.applyQuestionAdditionalInfo(user_question_info, modal_interaction);
     }
-    else if(modal_interaction.customId == 'modal_question_answering_info')
+    else if(modal_interaction.customId === 'modal_question_answering_info')
     {
       this.applyQuestionAnsweringInfo(user_question_info, modal_interaction);
     }
 
     const question_id = await user_question_info.saveDataToDB();
 
-    if(question_id == undefined)
+    if(question_id === undefined)
     {
-      modal_interaction.reply({content: `>>> ${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`, ephemeral: true});
+      modal_interaction.explicit_replied = true;
+      modal_interaction.reply({content: `\`\`\`${this.quiz_info.quiz_id} / ${modal_interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.\`\`\``, ephemeral: true});
       return;
     }
 
     this.quiz_info.updateModifiedTime();
 
+    modal_interaction.explicit_replied = true;
     modal_interaction.deferUpdate();
 
     this.displayQuestionInfo(this.current_question_index);
@@ -565,8 +591,8 @@ class UserQuestionInfoUI extends QuizbotUI
     //embed를 새로 생성하는 것이 아닌 edit을 했을 때, 새로운 이미지 url을 사용하면 이게 바로 바로 로드가 안된다.
     //백그라운드에서 로드는 되는데, 로드 완료 후 표시를 안하는 듯하다.
     //따라서 이미지 url 변경일 경우에는 resend
-    if(previous_question_image_url != user_question_info.data.question_image_url
-      || previous_answer_image_url != user_question_info.data.answer_image_url) //이미지 url이 뭐라도 바뀌었다면
+    if(previous_question_image_url !== user_question_info.data.question_image_url
+      || previous_answer_image_url !== user_question_info.data.answer_image_url) //이미지 url이 뭐라도 바뀌었다면
     {
       this.sendDelayedUI(this, true);
     }
@@ -581,32 +607,32 @@ class UserQuestionInfoUI extends QuizbotUI
   async applyQuestionAnswerType(interaction)
   {
     const user_question_info = this.current_question_info;
-    if(user_question_info == undefined)
+    if(user_question_info === undefined)
     {
-        logger.info(`Failed edit Question info from Select Event, current_question_info is undefined quiz_id: ${this.quiz_info.quiz_id}, current_question_index: ${this.current_question_index}`);
-        return;
+      logger.info(`Failed edit Question info from Select Event, current_question_info is undefined quiz_id: ${this.quiz_info.quiz_id}, current_question_index: ${this.current_question_index}`);
+      return;
     }
 
     const selected_answer_type = interaction.values[0];
 
-    if(selected_answer_type == 'answer_type_short_answer')
+    if(selected_answer_type === 'answer_type_short_answer')
     {
-      user_question_info.data.answer_type = ANSWER_TYPE.SHORT_ANSWER
+      user_question_info.data.answer_type = ANSWER_TYPE.SHORT_ANSWER;
     }
-    else if(selected_answer_type == 'answer_type_ox')
+    else if(selected_answer_type === 'answer_type_ox')
     {
-      user_question_info.data.answer_type = ANSWER_TYPE.OX
+      user_question_info.data.answer_type = ANSWER_TYPE.OX;
     }
-    else if(selected_answer_type == 'answer_type_multiple_choice')
+    else if(selected_answer_type === 'answer_type_multiple_choice')
     {
-      user_question_info.data.answer_type = ANSWER_TYPE.MULTIPLE_CHOICE
+      user_question_info.data.answer_type = ANSWER_TYPE.MULTIPLE_CHOICE;
     }
 
     const question_id = await user_question_info.saveDataToDB();
 
-    if(question_id == undefined)
+    if(question_id === undefined)
     {
-      interaction.channel.send({content: `>>> ${this.quiz_info.quiz_id} / ${interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.`});
+      interaction.channel.send({content: `\`\`\`${this.quiz_info.quiz_id} / ${interaction.user.id}에서 문제를 저장하는데 실패했습니다...😓.\n해당 문제가 지속될 경우 otter6975@gmail.com 이나 디스코드 DM으로 문의 바랍니다.\`\`\``});
       return;
     }
 

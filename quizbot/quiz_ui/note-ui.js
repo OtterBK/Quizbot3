@@ -26,17 +26,22 @@ class NoteUI extends QuizbotUI
 
     this.note_info = note_info;
 
-    const description = fs.readFileSync(note_info['note_path'], {encoding: 'utf8', flag:'r'});
+    this.initializeEmbed();
+  }
+
+  initializeEmbed() 
+  {
+    const description = fs.readFileSync(this.note_info['note_path'], {encoding: 'utf8', flag:'r'});
 
     this.embed = {
       color: 0xFED049,
-      title: `${note_info['name']}`,
+      title: `${this.note_info['name']}`,
       description: description,
       footer: { //내 이름 표시
         text: `제육보끔#1916`,
         icon_url: `https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png`,
       },
-      timestamp: new Date(note_info['mtime']).toISOString(),
+      timestamp: new Date(this.note_info['mtime']).toISOString(),
     };
 
     this.components = [only_back_comp]; //여기서는 component를 바꿔서 해주자

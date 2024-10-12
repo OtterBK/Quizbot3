@@ -24,6 +24,14 @@ class QuizToolGuideUI extends QuizbotUI
   {
     super();
 
+    this.initializeEmbed();
+    this.initializeComponents();
+  }
+
+  initializeEmbed() 
+  {
+    
+
     this.embed = {
       color: 0x05f1f1,
       title: text_contents.quiz_tool_guide_ui.title,
@@ -34,14 +42,15 @@ class QuizToolGuideUI extends QuizbotUI
         text_contents.quiz_tool_guide_ui.fields2,
       ]
     };
+  }
+
+  initializeComponents() 
+  {
+    
 
     this.components = [ only_back_comp ];
   }
 
-  onInteractionCreate()
-  {
-    return; //QuizToolGuide 에서는 이벤트 핸들링을 하지 않음
-  }
 }
 
 

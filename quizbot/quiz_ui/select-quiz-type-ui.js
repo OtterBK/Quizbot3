@@ -23,43 +23,61 @@ const { UserQuizSelectUI } = require("./user-quiz-select-ui.js");
 
 //#endregion
 
-/** 퀴즈 유형(개발자/유저) 선택 UI */
-class SelectQuizTypeUI extends QuizbotUI {
+/** 퀴즈 유형(개발자/유저/오마카세) 선택 UI */
+class SelectQuizTypeUI extends QuizbotUI 
+{
 
-    constructor()
+  constructor()
+  {
+    super();
+  
+    this.initializeEmbed();
+    this.initializeComponents();
+    
+  }
+
+  initializeEmbed() 
+  {
+    
+
+    this.embed = {
+      color: 0x87CEEB,
+      title: text_contents.select_quiz_type.title,
+      url: text_contents.select_quiz_type.url,
+      description: text_contents.select_quiz_type.description,
+    };
+  }
+
+  initializeComponents() 
+  {
+    
+
+    this.components = [select_btn_component, only_back_comp ]; //이게 기본 component임
+  }
+  
+  onInteractionCreate(interaction)
+  {
+    if(!interaction.isButton()) 
     {
-      super();
-  
-      this.embed = {
-        color: 0x87CEEB,
-        title: text_contents.select_quiz_type.title,
-        url: text_contents.select_quiz_type.url,
-        description: text_contents.select_quiz_type.description,
-      };
-  
-      this.components = [select_btn_component, only_back_comp ]; //이게 기본 component임
+      return;
     }
   
-    onInteractionCreate(interaction)
+    if(interaction.customId === '1') //개발자 퀴즈 눌렀을 때
     {
-      if(!interaction.isButton()) return;
-  
-      if(interaction.customId == '1') //개발자 퀴즈 눌렀을 때
-      {
-        return new DevQuizSelectUI();
-      }
+      return new DevQuizSelectUI(undefined);
+    }
       
-      if(interaction.customId == '2') //유저 제작 퀴즈 눌렀을 때
-      {
-        return new UserQuizSelectUI();
-      }
-  
-      if(interaction.customId == '3') //오마카세 제작 퀴즈 눌렀을 때
-      {
-        const omakase_quiz_info = OmakaseQuizRoomUI.createDefaultOmakaseQuizInfo(interaction);
-        return new OmakaseQuizRoomUI(omakase_quiz_info);
-      }
+    if(interaction.customId === '2') //유저 제작 퀴즈 눌렀을 때
+    {
+      return new UserQuizSelectUI();
     }
+  
+    if(interaction.customId === '3') //오마카세 퀴즈 눌렀을 때
+    {
+      const omakase_quiz_info = OmakaseQuizRoomUI.createDefaultOmakaseQuizInfo(interaction);
+      return new OmakaseQuizRoomUI(omakase_quiz_info);
+    }
+  }
   
 }
 
