@@ -65,7 +65,7 @@ const checkBanned = async (interaction, user_id) =>
   try
   {
     const ban_history_result = await db_manager.selectBanHistory(user_id);
-    if(!ban_history_result)
+    if(!ban_history_result || ban_history_result.rowCount === 0)
     {
       return false;
     }
