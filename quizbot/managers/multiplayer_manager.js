@@ -725,7 +725,7 @@ class MultiplayerGuildInfo
       logger.info(`Failed to load Stat. guild_id: ${this.guild_id}. err: ${err}`);
       return false;
     }
-    
+
     return true;
     
   }
@@ -1033,7 +1033,7 @@ class MultiplayerSession
 
   getRequestConfirmCriteria()
   {
-    return Math.ceil(this.participant_guilds.length);
+    return Math.ceil((this.participant_guilds.length + 1) / 2);
   }
 
   processLeaveGame(guild_id)
@@ -1135,7 +1135,7 @@ class MultiplayerSession
       }
       else
       {
-        if(this.syncFailedDetected.includes(guild_id))
+        if(this.sync_failed_list.includes(guild_id))
         {
           logger.debug(`${this.getSessionId()}'s loser is ${guild_id}. but this guild is sync failed`);
           continue;

@@ -231,13 +231,13 @@ class QuizInfoUI extends QuizbotUI
     if(selected_question_count_component !== undefined)
     {
       selected_question_count_component.setLabel(`몇 개의 문제를 제출할까요? (최대 ${this.quiz_info['quiz_size'] ?? this.max_quiz_count})`);
-      selected_question_count_component.setValue(`${this.quiz_info.selected_question_count}`);
+      selected_question_count_component.setValue(`${this.quiz_info.selected_question_count ?? this.quiz_info.quiz_size}`);
     }
 
     const custom_title_component = this.getComponentFromModalComponent(modal_current_quiz_setting, 'txt_input_custom_title');
     if(custom_title_component !== undefined)
     {
-      custom_title_component.setValue(`${this.quiz_info.title}`);
+      custom_title_component.setValue(`${this.quiz_info.title ?? ''}`);
     }
 
     const certified_filter_off_component = this.getComponentFromModalComponent(modal_current_quiz_setting, 'txt_input_certified_quiz_filter_off');

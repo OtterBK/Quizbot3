@@ -3804,6 +3804,12 @@ class Question extends QuizLifeCycleWithUtility
     };
     let description_message = text_contents.quiz_play_ui.description;
     description_message = description_message.replace("${quiz_question_num}", `${(game_data['question_num']+1)}`);
+
+    if(this.quiz_session.isMultiplayerSession())
+    {
+      description_message += `\n\`\`\`'🔖 [Tip]. /챗' 명령어로 전체 대화가 가능합니다.\`\`\``;
+    }
+
     quiz_ui.embed.description = description_message;
 
     let components = [quiz_ui.quiz_play_comp]; //기본 comp
@@ -4231,7 +4237,7 @@ class Question extends QuizLifeCycleWithUtility
     if(this.answer_type != ANSWER_TYPE.SHORT_ANSWER) return; //단답형 아니면 PASS
 
     const message_content = message.content ?? '';
-    const requester = this.quiz_session.isMultiplayerSession() ? message.author : message.member;
+    const requester = message.author;
 
     if(message_content == '') 
     {
