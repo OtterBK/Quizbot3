@@ -123,7 +123,7 @@ class QuizInfoUI extends QuizbotUI
     }
     else
     {
-      tag_info_text += `🔸 \`장바구니 모드 사용 중(베타)\`\n\n`;
+      tag_info_text += `🔸 \`장바구니 모드 사용 중\`\n\n`;
     }
     
     return tag_info_text;

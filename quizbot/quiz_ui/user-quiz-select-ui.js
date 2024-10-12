@@ -37,6 +37,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     this.basket_items = basket_items;
     this.use_basket_mode = this.basket_items !== undefined;
+    this.max_basket_size = 25;
     
     this.initializeEmbed();
     this.initializeComponents();
@@ -280,6 +281,12 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     {
       interaction.explicit_replied = true;
 
+      if(this.basket_items.length >= this.max_basket_size)
+      {
+        interaction.reply({content: `\`\`\`🔸 장바구니가 가득 찼습니다. 더 이상 퀴즈를 담을 수 없어요.\`\`\``});
+        return; 
+      }
+
       const quiz_id = user_quiz_info.quiz_id;
       if(quiz_id === undefined)
       {
@@ -294,7 +301,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
         title: quiz_title,
       };
    
-      interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈를 장바구니에 담았습니다. (${Object.keys(this.basket_items).length}개 / 25개)\`\`\``});
+      interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈를 장바구니에 담았습니다. (${Object.keys(this.basket_items).length}개 / ${this.max_basket_size}개)\`\`\``});
       return;
     }
 

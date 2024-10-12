@@ -51,6 +51,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName('채팅전환')
     .setDescription('전체 채팅 기능을 켜거나 끕니다.'),
+
+  new SlashCommandBuilder()
+    .setName('신고처리')
+    .setDescription('관리자 명령어'),
 ];
 
 //길드에 명령어 등록용

@@ -149,7 +149,7 @@ class ServerSettingUI extends QuizBotControlComponentUI
     this.embed.footer = undefined;
 
     interaction.explicit_replied = true;
-    interaction.reply({content: `옵션 값을 ${selected_value}로 설정했습니다.`, ephemeral: true});
+    interaction.reply({content: `\`\`\`🔸 옵션 값을 ${selected_value}로 설정했습니다.\`\`\``, ephemeral: true});
 
     return this;
   }

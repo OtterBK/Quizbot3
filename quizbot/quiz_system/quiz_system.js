@@ -4248,7 +4248,7 @@ class Question extends QuizLifeCycleWithUtility
     {
       if(remain_chance == 0) //라스트 찬스였으면
       {
-        message.reply({content: `땡! 이번 문제의 정답 제출 기회를 모두 사용했어요.`, ephemeral: true});
+        message.reply({content: `\`\`\`🔸 땡! 이번 문제의 정답 제출 기회를 모두 사용했어요.\`\`\``, ephemeral: true});
       }
 
       return;
@@ -4293,7 +4293,7 @@ class Question extends QuizLifeCycleWithUtility
       if(this.checkAnswerHit(message_content) == false) //오답
       {
         let reply_message = "```";
-        reply_message += `${requester.displayName}: [ ${message_content} ]... 오답입니다!`;
+        reply_message += `🔸 ${requester.displayName}: [ ${message_content} ]... 오답입니다!`;
 
         if(remain_chance == 0) //라스트 찬스였음
         {

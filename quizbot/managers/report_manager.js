@@ -151,23 +151,38 @@ const requestReportChatModal = (interaction) =>
   interaction.showModal(report_chat_modal);
 };
 
-const REPORT_CHAT_INFO_COLUMN = 
+const CHAT_INFO_COLUMN = 
 [
   "chat_id",
   "content",
   "sender_id",
+];
+
+const REPORT_INFO_COLUMN =
+[
+  "chat_id",
   "reporter_id",
   "report_detail",
 ];
 
-let report_chat_info_key_fields = '';
-REPORT_CHAT_INFO_COLUMN.forEach((field) =>
+let chat_info_key_fields = '';
+CHAT_INFO_COLUMN.forEach((field) =>
 {
-  if(report_chat_info_key_fields != '')
+  if(chat_info_key_fields != '')
   {
-    report_chat_info_key_fields += ', ';
+    chat_info_key_fields += ', ';
   }
-  report_chat_info_key_fields += `${field}`;
+  chat_info_key_fields += `${field}`;
+});
+
+let report_info_key_fields = '';
+REPORT_INFO_COLUMN.forEach((field) =>
+{
+  if(report_info_key_fields != '')
+  {
+    report_info_key_fields += ', ';
+  }
+  report_info_key_fields += `${field}`;
 });
 
 const submitReportChatModal = (interaction) =>
@@ -197,7 +212,8 @@ const submitReportChatModal = (interaction) =>
 
   interaction.reply({content: `\`\`\`🔸 신고가 접수되었습니다. 감사합니다.\`\`\``});
 
-  db_manager.insertReportInfo(report_chat_info_key_fields, [chat_id, content, sender_id, reporter_id, report_detail]);
+  db_manager.insertChatInfo(chat_info_key_fields, [chat_id, content, sender_id, ]);
+  db_manager.insertReportInfo(report_info_key_fields, [chat_id, reporter_id, report_detail]);
 };
 
 const checkReportEvent = (interaction) =>

@@ -44,7 +44,7 @@ const createMainUIHolder = (interaction) =>
     if(prev_uiHolder.isDisplayingMultiplayerLobby())
     {
       interaction.explicit_replied = true;
-      interaction.reply( { content:`현재 이 서버에서 멀티플레이 로비에 참가 중이기에 새로운 UI를 생성할 수 없습니다.\n만약 멀티플레이 로비에 참가 중이 아닌데도 해당 메시지가 표시된다면\n\`[/퀴즈정리]\` 명령어를 입력해보세요.`, ephemeral: true });
+      interaction.reply( { content:`\`\`\`🔸 현재 이 서버에서 멀티플레이 로비에 참가 중이기에 새로운 UI를 생성할 수 없습니다.\n만약 멀티플레이 로비에 참가 중이 아닌데도 해당 메시지가 표시된다면\n\`[/퀴즈정리]\` 명령어를 입력해보세요.\`\`\``, ephemeral: true });
       return;
     }
 

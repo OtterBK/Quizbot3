@@ -340,6 +340,24 @@ exports.selectRandomQuestionListByBasket = async (basket_condition_query, limit)
   return sendQuery(query_string, [limit]);
 };
 
+exports.insertChatInfo = async (key_fields, value_fields) =>
+{
+  const chat_id = 'chat_id';
+  let placeholders = '';
+  for(let i = 1; i <= value_fields.length; ++i) 
+  {
+    placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
+  }
+  const query_string = 
+  `
+  INSERT INTO tb_chat_info (${key_fields})
+  VALUES (${placeholders})
+  ON CONFLICT (${chat_id}) DO NOTHING;
+  `;
+    
+  return sendQuery(query_string, value_fields);
+};
+
 exports.insertReportInfo = async (key_fields, value_fields) =>
 {
   let placeholders = '';
@@ -347,8 +365,12 @@ exports.insertReportInfo = async (key_fields, value_fields) =>
   {
     placeholders += `$${i}` + (i == value_fields.length ? '' : ',');
   }
+
   const query_string = 
-  `insert into tb_report_chat_info (${key_fields}) values (${placeholders})`;
+  `
+  INSERT INTO tb_report_info (${key_fields})
+  VALUES (${placeholders})
+  `;
   
   return sendQuery(query_string, value_fields);
 };

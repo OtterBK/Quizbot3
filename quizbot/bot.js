@@ -247,7 +247,7 @@ const start_quiz_handler = async (interaction) =>
   if (interaction.guild == undefined) 
   {
     interaction.reply({
-      content: `\`\`\`🔸 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.`,
+      content: `\`\`\`🔸 개인 메시지 채널에서는 퀴즈 플레이가 불가능합니다.\`\`\``,
       ephemeral: true,
     });
     return;
@@ -344,6 +344,12 @@ const clear_quiz_handler = (interaction) =>
 // 상호작용 이벤트
 client.on(CUSTOM_EVENT_TYPE.interactionCreate, async (interaction) => 
 {
+  if(SYSTEM_CONFIG.maintenance_mode && PRIVATE_CONFIG.ADMIN_ID !== interaction.user.id) //점검 모드에서는 어드민만 가능 
+  {
+    interaction.reply({content: `\`\`\`⚠ ${SYSTEM_CONFIG.maintenance_alert}\`\`\``, ephemeral: true});
+    return;
+  }
+
   const main_command = interaction.commandName;
   if (main_command === '퀴즈' || main_command === 'quiz') 
   {

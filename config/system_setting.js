@@ -4,6 +4,8 @@ exports.SYSTEM_CONFIG = {
   language: 'kor', //사용 언어
 
   develop_mode: true, //개발자 모드 활성화, console 로깅 등
+  maintenance_mode: false, //점검 모드, 어드민만 봇 사용 가능
+  maintenance_alert: '현재 퀴즈봇을 점검하고 있습니다.', //점검 모드 시, 안내 문구
 
   use_inline_volume: false, //성능 많이 잡아먹음, 렉 많으면 끌 것, false 설정 시, fade in,out 효과 없음 
   fade_interval: 500, //fade in,out 시 사용할 interval(ms), 값이 낮을수록 부드러운 fade 효과를 얻을 수 있으나 리소스를 많이 잡아먹음
