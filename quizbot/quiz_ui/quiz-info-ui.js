@@ -256,7 +256,7 @@ class QuizInfoUI extends QuizbotUI
   {
     const need_refresh = this.applyQuizSettings(interaction);
 
-    if(!interaction.explicit_replied === false)
+    if(!interaction.explicit_replied)
     {
       interaction.explicit_replied = true;
       interaction.deferUpdate();
