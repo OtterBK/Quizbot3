@@ -265,7 +265,11 @@ const start_quiz_handler = async (interaction) =>
       encoding: 'utf8',
       flag: 'r',
     });
-    interaction.channel.send({ content: '```' + current_notice + '```' });
+
+    if(current_notice.length >= 0)
+    {
+      interaction.channel.send({ content: `\`\`\`${current_notice}\`\`\`` });
+    }
   }
 
   const uiHolder = quizbot_ui.createMainUIHolder(interaction); //메인 메뉴 전송
@@ -302,7 +306,7 @@ const create_quiz_handler = async (interaction) =>
     }
   }
 
-  if (interaction.guild != undefined && interaction.guild !== null) 
+  if(interaction.guild)
   {
     //샤딩돼 있어서 길드에서 요청할경우 ui_holder_map 주소가 달라 못찾음
     interaction.explicit_replied = true; 

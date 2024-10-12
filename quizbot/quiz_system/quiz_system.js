@@ -2763,7 +2763,7 @@ class InitializeOmakaseQuiz extends Initialize
       custom_quiz_count = Math.round(limit / 2);
     }
 
-    logger.info(`Omakase Question count of this session. dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
+    logger.info(`Omakase Question count of this session. use_basket_mode=${use_basket_mode}, dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
     
         
     //좀 더 세부적으로 섞어야할 것 같은데...너무 귀찮다 우선 걍 이렇게 ㄱㄱ하자

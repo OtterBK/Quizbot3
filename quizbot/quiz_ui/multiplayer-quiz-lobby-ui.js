@@ -51,7 +51,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['icon'] = '🌐';
 
     multiplayer_quiz_info['type_name'] = "**멀티플레이 퀴즈**"; 
-    multiplayer_quiz_info['description'] = `\`\`\`🌐 장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n'/챗' 명령어로 전체 대화가 가능합니다.\n\`\`\``; 
+    multiplayer_quiz_info['description'] = `\`\`\`선택 메뉴에서 플레이하실 퀴즈 장르나 항목을 선택해주세요!\n선택하신 퀴즈에서 무작위로 문제를 제출합니다.\n\n'/챗' 명령어로 전체 대화가 가능합니다.\n\`\`\``; 
 
     multiplayer_quiz_info['author'] = guild.name ?? guild.id;
     multiplayer_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -301,12 +301,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.quiz_info['basket_mode'] = false;
 
+    this.sendEditLobbySignal(interaction);
+
     interaction.explicit_replied = true;
     interaction.reply({content: `\`\`\`🔸 장르 선택 모드를 사용합니다.\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\`\`\``, ephemeral: true});
 
-    
-    this.refreshUI();
-    return this;
+    // this.refreshUI();
+    // return this;
   }
 
   initializeMultiplayerQuizLobbyUIEventHandler()
@@ -334,7 +335,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     if(this.checkTagSelected() === false)
     {
       interaction.explicit_replied = true;
-      interaction.reply({content: `\`\`\`🌐 시작하시려면 퀴즈 유형 및 장르를 1개라도 선택해주세요!\`\`\``, ephemeral: true});
+      interaction.reply({content: `\`\`\`🌐 시작하시려면 퀴즈 유형 및 항목을 1개라도 선택해주세요!\`\`\``, ephemeral: true});
       return;
     }
 

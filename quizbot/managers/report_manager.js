@@ -1,5 +1,7 @@
 const cloneDeep = require("lodash/cloneDeep.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder} = require('discord.js');
 
+const PRIVATE_CONFIG = require('../../config/private_config.json');
 const logger = require('../../utility/logger.js')('ReportManager');
 const db_manager = require('./db_manager.js');
 const {
@@ -103,6 +105,16 @@ const isReportChatModal = (interaction) =>
   return false;
 };
 
+const isReportManageCommand = (interaction) =>
+{
+  if(interaction.isCommand() && interaction.customId === '신고처리')
+  {
+    return true;
+  }
+
+  return false;
+};
+
 const getChatId = (custom_id) =>
 {
   let chat_id = custom_id.replace('modal_chat_report_', '');
@@ -156,6 +168,7 @@ const CHAT_INFO_COLUMN =
   "chat_id",
   "content",
   "sender_id",
+  "result",
 ];
 
 const REPORT_INFO_COLUMN =
@@ -163,6 +176,7 @@ const REPORT_INFO_COLUMN =
   "chat_id",
   "reporter_id",
   "report_detail",
+  "report_type",
 ];
 
 let chat_info_key_fields = '';
@@ -201,6 +215,8 @@ const submitReportChatModal = (interaction) =>
   const sender_id = chat_info.user_id;
   const reporter_id = interaction.user.id;
   const report_detail = interaction.fields.getTextInputValue('txt_input_report_detail');
+  const result = 0;
+  const report_type = 0;
 
   // const chat_report_info = {
   //     chat_id: chat_id,
@@ -212,8 +228,127 @@ const submitReportChatModal = (interaction) =>
 
   interaction.reply({content: `\`\`\`🔸 신고가 접수되었습니다. 감사합니다.\`\`\``});
 
-  db_manager.insertChatInfo(chat_info_key_fields, [chat_id, content, sender_id, ]);
-  db_manager.insertReportInfo(report_info_key_fields, [chat_id, reporter_id, report_detail]);
+  db_manager.insertChatInfo(chat_info_key_fields, [chat_id, content, sender_id, result]);
+  db_manager.insertReportInfo(report_info_key_fields, [chat_id, reporter_id, report_detail, report_type]);
+};
+
+const sendReportLog = async (interaction) =>
+{
+  const user = interaction.user;
+
+  if(isAdmin(user.id) === false) //어드민 아니면 일부러 응답 안줌
+  {
+    return;
+  }
+
+  if(interaction.guild)
+  {
+    interaction.reply({content: `\`\`\`개인 메시지 채널에서만 사용 가능합니다.\`\`\``, ephemeral: true});
+    return;
+  }
+
+  let reported_chat_info_list = undefined;
+  try
+  {
+    reported_chat_info_list = await db_manager.selectReportedChatInfo(10); //10개씩 조회하자
+  }
+  catch(err)
+  {
+    const err_message = `select reported chat info list error. err: ${err.stack}`;
+
+    logger.error(err_message);
+    user.send({content: `\`\`\`${err_message}\`\`\``, ephemeral: true});
+
+    return;
+  }
+
+  if(reported_chat_info_list === undefined)
+  {
+    const err_message = `reported_chat_info_list is undefined error`;
+
+    logger.error(err_message);
+    user.send({content: `\`\`\`${err_message}\`\`\``, ephemeral: true});
+
+    return;
+  }
+
+  for(const target_info of reported_chat_info_list)
+  {
+    await this.sendReportProcessingUI(user, target_info);
+  }
+};
+
+const sendReportProcessingUI = async (user, target_info) =>
+{
+  const target_id = target_info.chat_id;
+  const sender_id = target_info.sender_id;
+
+  let target_report_log_list = undefined;
+
+  try
+  {
+    target_report_log_list = await db_manager.selectReportedChatLog(target_id);
+  }
+  catch(err)
+  {
+    const err_message = `select reported chat log error. err: ${err.stack}`;
+
+    logger.error(err_message);
+    user.send({content: `\`\`\`${err_message}\`\`\``, ephemeral: true});
+
+    return;
+  }
+
+  if(target_report_log_list === undefined)
+  {
+    const err_message = `target_report_log_list is undefined error`;
+
+    logger.error(err_message);
+    user.send({content: `\`\`\`${err_message}\`\`\``, ephemeral: true});
+
+    return;
+  }
+
+  const embed = {
+    color: 0x8B0000,
+    title: `${target_id}`,
+    description: `${target_info.content}`,
+    footer: {
+      text: `${sender_id}`,
+    },
+  };
+
+  let timestamp;
+  const split_temp = (timestamp || '').split('-');
+  if (split_temp.length === 2 && !isNaN(new Date(split_temp[1]).getTime())) 
+  {
+    embed.timestamp = split_temp[1];
+  }
+  
+  const reported_log_detail_menu = new StringSelectMenuBuilder().
+    setCustomId('reported_log_detail_menu').
+    setPlaceholder('신고 내역');
+
+  for(const target_report_log of target_report_log_list)
+  {
+    reported_log_detail_menu.addOptions(
+      new StringSelectMenuOptionBuilder()
+        .setLabel(`${target_report_log.reporter_id}`)
+        .setDescription(`${target_report_log.report_detail}`)
+        .setValue('report_detail_temp'),
+    );
+  }
+
+  const reported_log_detail_row = new ActionRowBuilder()
+    .addComponents(reported_log_detail_menu);
+
+  //이제 보내기만하면됨
+
+};
+
+const isAdmin = (user_id) =>
+{
+  return PRIVATE_CONFIG.ADMIN_ID === user_id;
 };
 
 const checkReportEvent = (interaction) =>
@@ -227,6 +362,12 @@ const checkReportEvent = (interaction) =>
   if(isReportChatModal(interaction))
   {
     submitReportChatModal(interaction);
+    return true;
+  }
+
+  if(isReportManageCommand(interaction))
+  {
+    sendReportLog(interaction);
     return true;
   }
 };

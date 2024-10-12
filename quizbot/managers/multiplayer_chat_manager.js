@@ -1,6 +1,7 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getQuizSession } = require('../quiz_system/quiz_system.js');
 const utility = require('../../utility/utility.js');
+const { SYSTEM_CONFIG } = require('../../config/system_setting.js');
 const logger = require('../../utility/logger.js')('MultiplayerChatManager');
 
 const agree_comp = new ActionRowBuilder()
@@ -21,7 +22,7 @@ const vote_validation_time = 24 * 60 * 60 * 1000; //1일 유효
 let voted_cache = {};
 const checkVote = async (user_id) =>
 {
-  if(koreanbots === undefined)
+  if(koreanbots === undefined || SYSTEM_CONFIG.check_korean_bot_vote === false)
   {
     return true;
   }

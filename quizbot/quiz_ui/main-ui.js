@@ -85,8 +85,8 @@ class MainUI extends QuizbotUI
       // },
       // timestamp: new Date().toISOString(),
       footer: {
-        text: `제육보끔#1916`, 
-        icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
+        text: `${text_contents.main_menu.footer}`, 
+        // icon_url: 'https://user-images.githubusercontent.com/28488288/208116143-24828069-91e7-4a67-ac69-3bf50a8e1a02.png',
       },
     };
 
@@ -100,6 +100,12 @@ class MainUI extends QuizbotUI
       const version_info = fs.readFileSync(SYSTEM_CONFIG.version_info_path, {encoding: 'utf8', flag:'r'});
       this.embed.footer.text = `${text_contents.main_menu.footer} ${version_info}`;
       this.embed.footer.icon_url = undefined;
+    }
+
+    if(fs.existsSync(SYSTEM_CONFIG.fixed_notice_path)) 
+    {
+      const fixed_notice = fs.readFileSync(SYSTEM_CONFIG.fixed_notice_path, {encoding: 'utf8', flag:'r'});
+      this.embed.description += `\`\`\`${fixed_notice}\`\`\``;
     }
   }
 

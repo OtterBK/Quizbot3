@@ -121,7 +121,7 @@ class UserQuizInfoUI extends QuizInfoUI
     let description = '';
     description += `⚒️ 퀴즈 제작: **${(user_quiz_info.data.creator_name ?? '')}**\n`;
   
-    description += `🏷 한줄 소개: **${user_quiz_info.data.simple_description}**\n`;
+    description += `🏷 한줄 소개: **${user_quiz_info.data.simple_description ?? ''}**\n`;
     if(this.readonly)
     {
       const selected_question_count = this.quiz_info['selected_question_count'] ?? user_quiz_info.question_list.length;
@@ -133,7 +133,7 @@ class UserQuizInfoUI extends QuizInfoUI
     }
     description += "\n\n\n";
   
-    description += `📖 퀴즈 설명:\n${user_quiz_info.data.description}\n\n\n\n`;
+    description += `📖 퀴즈 설명:\n${user_quiz_info.data.description ?? ''}\n\n\n\n`;
   
     description += "`만들어진 날짜: " + user_quiz_info.data.birthtime.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";
     description += "`업데이트 날짜: " + user_quiz_info.data.modified_time.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) + "`\n";

@@ -37,7 +37,8 @@ exports.SYSTEM_CONFIG = {
   log_path: `${__dirname}/../log`, //LOG 저장할 위치
   notices_path: `${__dirname}/../resources/notices`, //공지사항 파일 위치
   current_notice_path: `${__dirname}/../resources/current_notice.txt`, //실시간 공지
-  version_info_path: `${__dirname}/../resources/version_info.txt`, //실시간 버전
+  // fixed_notice_path: `${__dirname}/../resources/fixed_notice.txt`, //고정 공지...애매하네 걍 쓰지말자
+  // version_info_path: `${__dirname}/../resources/version_info.txt`, //실시간 버전. 24.10.12 -> 이제 안쓴다.
   banned_user_path: `${__dirname}/../resources/banned_user.txt`, //퀴즈만들기 밴
   tagged_dev_quiz_info: `${__dirname}/../resources/tagged_dev_quiz_info.json`, //공식 퀴즈 태그 설정값
 
@@ -65,6 +66,8 @@ exports.SYSTEM_CONFIG = {
 
   certify_like_criteria: 10, //인증된 퀴즈 전환을 위한 추천 수 기준
   certify_played_count_criteria: 50, //인증된 퀴즈 전환을 위한 플레이 수 기준
+
+  check_korean_bot_vote: false,
 };
 
 exports.CUSTOM_EVENT_TYPE = {

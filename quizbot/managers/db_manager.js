@@ -374,3 +374,26 @@ exports.insertReportInfo = async (key_fields, value_fields) =>
   
   return sendQuery(query_string, value_fields);
 };
+
+exports.selectReportedChatInfo = async (limit) => 
+{
+  
+  let query_string = 
+    `select * 
+      from tb_chat_info
+      where result = 0
+      limit $1`;
+  
+  return sendQuery(query_string, [limit]);
+};
+
+exports.selectReportedChatLog = async (chat_id) => 
+{
+    
+  let query_string = 
+      `select * 
+        from tb_report_info
+        where target_id = $1`;
+    
+  return sendQuery(query_string, [chat_id]);
+};

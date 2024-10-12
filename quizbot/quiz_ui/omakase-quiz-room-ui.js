@@ -42,7 +42,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     omakase_quiz_info['icon'] = '🍴';
 
     omakase_quiz_info['type_name'] = "**퀴즈봇 마음대로 퀴즈!**"; 
-    omakase_quiz_info['description'] = `\`\`\`🔸 장르 선택 메뉴에서 플레이하실 퀴즈 장르를 선택해주세요!\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\`\`\``; 
+    omakase_quiz_info['description'] = `\`\`\`선택 메뉴에서 플레이하실 퀴즈 장르나 항목을 선택해주세요!\n선택하신 퀴즈에서 무작위로 문제를 제출합니다.\n\n장르는 여러 개 선택 가능하여 문제 개수도 지정할 수 있습니다.\n\`\`\``; 
 
     omakase_quiz_info['author'] = guild.name ?? guild.id;
     omakase_quiz_info['author_icon'] = guild.iconURL() ?? '';
@@ -183,8 +183,6 @@ class OmakaseQuizRoomUI extends QuizInfoUI
 
     interaction.explicit_replied = true;
     interaction.reply({content: `\`\`\`🔸 장르 선택 모드를 사용합니다.\n선택하신 장르에 따라 퀴즈봇이 문제를 제출합니다.\`\`\``, ephemeral: true});
-
-    this.sendEditLobbySignal(interaction);
 
     this.refreshUI();
     return this;

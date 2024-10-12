@@ -91,7 +91,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
 
     for(let user_quiz_info of user_quiz_list) 
     {
-      user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n🔸) ${user_quiz_info.data.simple_description}`;
+      user_quiz_info.name = `**${user_quiz_info.data.quiz_title}**\n🔸) ${user_quiz_info.data.simple_description ?? ''}`;
     }
 
     this.all_user_quiz_contents = user_quiz_list ?? [];
@@ -281,20 +281,26 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
     {
       interaction.explicit_replied = true;
 
-      if(this.basket_items.length >= this.max_basket_size)
-      {
-        interaction.reply({content: `\`\`\`🔸 장바구니가 가득 찼습니다. 더 이상 퀴즈를 담을 수 없어요.\`\`\``});
-        return; 
-      }
-
       const quiz_id = user_quiz_info.quiz_id;
+      const quiz_title = user_quiz_info.data.quiz_title;
       if(quiz_id === undefined)
       {
-        interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈에서 Quiz id 값을 찾을 수 없습니다.\`\`\``});
+        interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈에서 Quiz id 값을 찾을 수 없습니다.\`\`\``, ephemeral: true});
         return; 
       }
 
-      const quiz_title = user_quiz_info.data.quiz_title;
+      if(this.basket_items[quiz_id] !== undefined)
+      {
+        interaction.reply({content: `\`\`\`🔸 [${quiz_title}] 퀴즈는 이미 담겼습니다.\`\`\``, ephemeral: true});
+        return;
+      }
+
+      if(this.basket_items.length >= this.max_basket_size)
+      {
+        interaction.reply({content: `\`\`\`🔸 장바구니가 가득 찼습니다. 더 이상 퀴즈를 담을 수 없어요.\`\`\``, ephemeral: true});
+        return; 
+      }
+
       this.basket_items[quiz_id] = 
       {
         quiz_id: quiz_id,
