@@ -350,7 +350,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     {
       interaction.explicit_replied = true;
       interaction.reply({content: `\`\`\`🌐 시작하시려면 적어도 참가 중인 서버가 2개 이상이어야 합니다.\`\`\``, ephemeral: true});
-      // return;
+      return;
     }
 
     interaction.explicit_replied = true;
