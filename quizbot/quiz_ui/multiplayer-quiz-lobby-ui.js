@@ -58,6 +58,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['thumbnail'] = ''; //썸네일은 고정 이미지가 있지롱 ㅎ
 
     multiplayer_quiz_info['quiz_size'] = 50; //default, 멀티플레이에서 100문제는 너무 많소
+    multiplayer_quiz_info['min_quiz_size'] = 20; //최소 퀴즈 수, 멀티는 이게 필요
     multiplayer_quiz_info['selected_question_count'] = 30; //default
     multiplayer_quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
     multiplayer_quiz_info['winner_nickname'] = "플레이어";
@@ -68,7 +69,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['quiz_id'] = undefined;  //omasakse quiz는 quiz_id 불필요
 
     //오마카세 퀴즈용 추가 설정 값
-    multiplayer_quiz_info['basket_mode'] = false; //장바구니 모드
+    multiplayer_quiz_info['basket_mode'] = true; //장바구니 모드
     multiplayer_quiz_info['basket_items'] = {}; //장바구니 모드
 
     multiplayer_quiz_info['dev_quiz_tags'] = 0;
@@ -281,7 +282,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       basket_items = this.quiz_info['basket_items'];
     }
 
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
     if(use_basket_mode === true) //이미 사용 중이다?
     {
       return new UserQuizSelectUI(basket_items); //그럼 다시 담을 수 있게 ㄱㄱ
@@ -474,12 +475,18 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.initializeComponents(); //컴포넌트 초기화하고
 
-    if(this.readonly) //readonly면 불필요
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
+
+    if(this.readonly) //readonly면 불필요. 
     {
+      if(use_basket_mode)
+      {
+        this.setupBasketSelectMenu(); //이거정도는 필요 ㅋ
+        this.components.push(this.basket_select_component);
+      }
+      
       return;
     }
-
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
 
     if(use_basket_mode === false)
     {
@@ -541,13 +548,17 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     }
   }
   
-  applyMultiplayerLobbyInfo(lobby_info)
+  applyMultiplayerLobbyInfo(lobby_info, do_send=true)
   {
     this.quiz_info = lobby_info.quiz_info;
     this.participant_guilds_info = lobby_info.participant_guilds_info;
 
     this.refreshUI();
-    this.sendDelayedUI(this, false);
+
+    if(do_send)
+    {
+      this.sendDelayedUI(this, false);
+    }
 
     logger.debug(`Applying lobby info to ${this.guild_id}`);
   }
@@ -627,16 +638,16 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return; // 참가자가 자신일 경우 무시
     }
 
-    const stat = joined_guild_info?.stat;
+    this.applyMultiplayerLobbyInfo(signal.lobby_info); 
+    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\`\`\``});
 
-    this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다. 전적: ${stat.win}승 ${stat.lose}패\`\`\``});
   }
 
   // LEAVED_LOBBY 처리
   onReceivedLeavedLobby(signal)
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
+    
     this.sendMessageReply({content: `\`\`\`🌐 ${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\`\`\``});
   }
 
@@ -657,11 +668,13 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   // STAT 로드됨 처리
   onReceivedUpdatedStat(signal)
   {
-    const lobby_info = {
-      quiz_info: this.quiz_info,
-      participant_guilds_info: signal.participant_guilds_info
-    };
-    this.applyMultiplayerLobbyInfo(lobby_info);
+    this.applyMultiplayerLobbyInfo(signal.lobby_info);
+
+    const updated_guild_info = signal.updated_guild_info;
+    if(updated_guild_info !== undefined)
+    {
+      this.channel.send({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패\`\`\``});
+    }
   }
 
   // KICKED_PARTICIPANT 처리

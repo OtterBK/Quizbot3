@@ -59,7 +59,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     omakase_quiz_info['quiz_id'] = undefined;  //omasakse quiz는 quiz_id 불필요
 
     //오마카세 퀴즈용 추가 설정 값
-    omakase_quiz_info['basket_mode'] = false; //장바구니 모드
+    omakase_quiz_info['basket_mode'] = true; //장바구니 모드
     omakase_quiz_info['basket_items'] = {}; //장바구니 모드
 
     omakase_quiz_info['dev_quiz_tags'] = 0;
@@ -163,7 +163,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
       basket_items = this.quiz_info['basket_items'];
     }
 
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
     if(use_basket_mode === true) //이미 사용 중이다?
     {
       return new UserQuizSelectUI(basket_items); //그럼 다시 담을 수 있게 ㄱㄱ
@@ -203,7 +203,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
   {
     this.initializeComponents(); //컴포넌트 초기화하고
 
-    const use_basket_mode = this.quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = this.quiz_info['basket_mode'] ?? true;
 
     if(use_basket_mode === false)
     {

@@ -203,6 +203,9 @@ exports.forceStopSession = (guild) =>
 
   const guild_id = guild.id;
   const quiz_session = quiz_session_map[guild_id];
+
+  delete quiz_session_map[guild_id];
+
   if(quiz_session != undefined)
   {
     quiz_session.forceStop();
@@ -869,7 +872,7 @@ const MULTIPLAYER_COMMON_OPTION =
     audio_play_time: 35000,
     hint_type: OPTION_TYPE.HINT_TYPE.VOTE, 
     skip_type: OPTION_TYPE.SKIP_TYPE.VOTE,
-    use_similar_answer: OPTION_TYPE.ENABLED,
+    use_similar_answer: OPTION_TYPE.DISABLED,
     score_type: OPTION_TYPE.SCORE_TYPE.TIME,
     improved_audio_cut: OPTION_TYPE.ENABLED,
     use_message_intent: OPTION_TYPE.ENABLED,
@@ -1006,7 +1009,12 @@ const MultiplayerSessionMixin = Base => class extends Base
   syncFailed()
   {
     this.sendMessage({content:`\`\`\`🌐 멀티플레이 동기화에 실패하였습니다. (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})\n퇴장으로 처리되지만, 패배 처리는 되지 않습니다.\`\`\``});
-    logger.error(`Multiplayer quiz session sync client timeout. guild_id: ${this.guild_id}, (timeout/ sync_ready: ${this.sync_ready} / sequence_num: ${this.sync_done_sequence_num})`);
+    logger.error(`Multiplayer quiz session sync client timeout. 
+      guild_id: ${this.guild_id},  /
+      sequence_info: (timeout/ sync_ready: ${this.sync_ready}, sequence_num: ${this.sync_done_sequence_num}) /
+      prepared question queue length: ${this.game_data.prepared_question_queue.length} /   
+      remaining question list length: ${this.quiz_data.question_list.length} /   
+    `);
 
     this.sync_failed = true;
     
@@ -1299,6 +1307,12 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       await utility.sleep(100);
       ++wait_sync_ready_time_sec;
 
+      if(this.game_data.prepared_question_queue?.length !== 0)
+      {
+        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip sync ready`);
+        break;
+      }
+
       if(wait_sync_ready_time_sec === 50) //5초
       {
         this.sendMessage({content:`\`\`\`🌐 제출할 문제 데이터를 동기화 하는 중\`\`\``});
@@ -1519,6 +1533,8 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     logger.debug(`Applying new host session id ${this.session_id} -> ${new_session_id}`);
 
     this.session_id = new_session_id;
+
+    this.sendMessage({ content: `\`\`\`🌐 호스트 서버가 나갔습니다. 이 세션의 호스트가 ${signal.new_host_guild_info?.guild_name} 서버로 변경됐습니다.\`\`\`` });
   }
 
   onReceivedNoticeMessage(signal)
@@ -1849,7 +1865,7 @@ class QuizLifeCycle
           interaction.channel.send({content: reject_message});
           return;
         }
-        this.forceStop();
+        this.quiz_session.forceStop();
         let force_stop_message = text_contents.quiz_play_ui.force_stop;
         force_stop_message = force_stop_message.replace("${who_stopped}", interaction.member.user.username);
         interaction.channel.send({content: force_stop_message});
@@ -2731,7 +2747,7 @@ class InitializeOmakaseQuiz extends Initialize
     let question_list = [];
 
     //오마카세 퀴즈 설정 값
-    const use_basket_mode = quiz_info['basket_mode'] ?? false;
+    const use_basket_mode = quiz_info['basket_mode'] ?? true;
 
     let total_dev_question_count = undefined;
     let dev_question_list = undefined;
@@ -2766,11 +2782,20 @@ class InitializeOmakaseQuiz extends Initialize
       [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
 
       const basket_items = quiz_info['basket_items'];
-      const basket_condition_query = '(' + Object.values(basket_items)
-        .map(basket_item => basket_item.quiz_id)
-        .join(',') + ')';  
 
-      [total_custom_question_count, custom_question_list] = await loadQuestionListByBasket(basket_condition_query, limit);
+      const basket_items_value = Object.values(basket_items);
+      if(basket_items_value.length > 0)
+      {
+        const basket_condition_query = '(' + basket_items_value
+          .map(basket_item => basket_item.quiz_id)
+          .join(',') + ')';  
+
+        [total_custom_question_count, custom_question_list] = await loadQuestionListByBasket(basket_condition_query, limit);
+      }
+      else
+      {
+        [total_custom_question_count, custom_question_list] = [0, []];
+      }
 
       //장바구니 모드는 각각 반반씩 문제를 limit을 나눠 갖는다.
       dev_quiz_count = Math.round(limit / 2);
@@ -3819,7 +3844,7 @@ class Question extends QuizLifeCycleWithUtility
 
     if(this.quiz_session.isMultiplayerSession())
     {
-      description_message += `\n\`\`\`'🔖 [Tip]. /챗' 명령어로 전체 대화가 가능합니다.\`\`\``;
+      description_message += `\n\`\`\`🔖 [Tip]. /챗' 명령어로 전체 대화가 가능합니다.\`\`\``;
     }
 
     quiz_ui.embed.description = description_message;
@@ -4248,8 +4273,10 @@ class Question extends QuizLifeCycleWithUtility
 
     if(this.answer_type != ANSWER_TYPE.SHORT_ANSWER) return; //단답형 아니면 PASS
 
+    if(message.member === undefined) return; //이건 길드 메시지 아니면 pass
+
     const message_content = message.content ?? '';
-    const requester = message.author;
+    const requester = message.member;
 
     if(message_content == '') 
     {
@@ -5175,17 +5202,15 @@ class QuestionOmakase extends Question
     if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
     {
       logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.");
-      this.next_cycle = CYCLE_TYPE.QUESTIONING;
+      this.next_cycle = CYCLE_TYPE.CLEARING;
       game_data['question_num'] -= 1;
       utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
-      await utility.sleep(11000); //Failover 브금 11초임 
-
-      let error_message = '```';
-      error_message += `❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: `;
-      error_message += this.progress_bar_fixed_text?.trim();
-      error_message += '```';
+      
+      const error_message = `\`\`\`❗ 문제 제출 중 오디오 에러가 발생하여 다른 문제로 다시 제출합니다. 잠시만 기다려주세요.\n에러 메시지: ${this.progress_bar_fixed_text?.trim()}\`\`\``;
 
       this.quiz_session.sendMessage({content: error_message});
+
+      await utility.sleep(11000); //Failover 브금 11초임 
             
       return;
     }
@@ -5537,7 +5562,16 @@ class Clearing extends QuizLifeCycleWithUtility
 
     delete game_data['processing_question'];
 
-    if(this.quiz_session.hasMoreQuestion() === false) //모든 퀴즈 제출됐음
+    let has_more_question = this.quiz_session.hasMoreQuestion();
+    if(has_more_question && this.quiz_session.quiz_data.question_list.length === 0) //has more question 인데 question_list가 empty다.
+    {
+      logger.warn(`has more question. but question list is empty. stop quiz`);
+      has_more_question = false;
+
+      this.quiz_session.sendMessage(`\`\`\`🔸 더 이상 제출할 문제가 없어 퀴즈가 마무리 됩니다.\`\`\``);
+    }
+
+    if(has_more_question === false) //모든 퀴즈 제출됐음
     {
       this.next_cycle = CYCLE_TYPE.ENDING;
       logger.info(`All Question Submitted on Clearing, guild_id:${this.quiz_session.guild_id}`);
@@ -5751,7 +5785,7 @@ class Finish extends QuizLifeCycle
       }
     }
 
-    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession() && this.quiz_session.isIngame())
+    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession() && this.quiz_session.isIngame() && this.quiz_session.force_stop === false)
     {
       this.quiz_session.sendFinished(); //호스트는 서버에 게임 끝났다고 알림
     }
