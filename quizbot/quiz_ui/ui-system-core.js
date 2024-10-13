@@ -230,6 +230,8 @@ class UIHolder
     this.prev_ui_stack = undefined; //뒤로가기용 UI스택
 
     logger.info(`Free UI Holder holder_id:${this.holder_id}`);
+
+    delete ui_holder_map[holder_id];
   }
 
   getUI()

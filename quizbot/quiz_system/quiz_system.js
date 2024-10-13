@@ -1222,6 +1222,8 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
   constructor(guild, owner, channel, quiz_info)
   {
     super(guild, owner, channel, quiz_info, QUIZ_SESSION_TYPE.MULTIPLAYER);
+
+    this.multiplayer_state = MULTIPLAYER_STATE.INITIALIZING;
     
     this.sync_done_sequence_num = 0;
 
