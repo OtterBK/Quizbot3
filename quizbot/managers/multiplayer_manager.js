@@ -108,7 +108,8 @@ function handleRequestLobbyList(signal)
       session_id: session.getSessionId(),
       participant_count: session.getParticipantCount(),
       session_name: session.getSessionName(),
-      host_name: session.owner_guild_info.guild_name,
+      host_name: session.getHostName(),
+      is_ingame: session.isIngame(),
     };
         
     lobby_session_list.push(simple_session_info);
@@ -163,6 +164,11 @@ function handleJoinLobby(signal)
   if(session === undefined)
   {
     return { state: false, reason: '더 이상 존재하지 않는 로비 세션입니다.' };
+  }
+
+  if(session.getState() === SESSION_STATE.INGAME)
+  {
+    return { state: false, reason: '이미 퀴즈가 시작된 세션입니다.' };
   }
 
   if(session.getState() !== SESSION_STATE.LOBBY)
@@ -839,6 +845,16 @@ class MultiplayerSession
   getSessionName()
   {
     return this.quiz_info.title;
+  }
+
+  getHostName()
+  {
+    return this.owner_guild_info?.guild_name;
+  }
+
+  isIngame()
+  {
+    return this.state === SESSION_STATE.INGAME;
   }
 
   getParticipant(target_guild_id)

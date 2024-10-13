@@ -92,7 +92,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
 
     for(let multiplayer_lobby_info of multiplayer_lobby_info_list) 
     {
-      multiplayer_lobby_info.name = `**${multiplayer_lobby_info.session_name}**\n🔸) 참여 중: ${multiplayer_lobby_info.participant_count}개 | 호스트: ${multiplayer_lobby_info.host_name}`;
+      multiplayer_lobby_info.name = `**${multiplayer_lobby_info.session_name}**\n🔸) ${multiplayer_lobby_info.is_ingame ? '게임' : '대기'} 중: ${multiplayer_lobby_info.participant_count}서버 | 호스트: ${multiplayer_lobby_info.host_name}`;
     }
 
     this.cur_contents = multiplayer_lobby_info_list ?? [];
