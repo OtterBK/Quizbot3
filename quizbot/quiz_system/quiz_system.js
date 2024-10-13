@@ -203,6 +203,9 @@ exports.forceStopSession = (guild) =>
 
   const guild_id = guild.id;
   const quiz_session = quiz_session_map[guild_id];
+
+  delete quiz_session_map[guild_id];
+
   if(quiz_session != undefined)
   {
     quiz_session.forceStop();
@@ -1306,7 +1309,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
       if(this.game_data.prepared_question_queue?.length !== 0)
       {
-        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip skip ready`);
+        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip sync ready`);
         break;
       }
 
@@ -2780,9 +2783,10 @@ class InitializeOmakaseQuiz extends Initialize
 
       const basket_items = quiz_info['basket_items'];
 
-      if(basket_items.length > 0)
+      const basket_items_value = Object.values(basket_items);
+      if(basket_items_value.length > 0)
       {
-        const basket_condition_query = '(' + Object.values(basket_items)
+        const basket_condition_query = '(' + basket_items_value
           .map(basket_item => basket_item.quiz_id)
           .join(',') + ')';  
 

@@ -1120,9 +1120,10 @@ class MultiplayerSession
 
     //이제 승리자 구해보자. 이긴 사람만이 점수를 받는거다.
     const sorted_scoreboard = utility.sortMapByProperty(this.scoreboard, 'score');
+    const iter = sorted_scoreboard.entries();
     for(let i = 0; i < sorted_scoreboard.size; ++i)
     {
-      const [guild_id, winner_info] = sorted_scoreboard.entries().next().value;
+      const [guild_id, winner_info] = iter.next().value;
 
       if(i === 0)
       {
