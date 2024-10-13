@@ -4273,8 +4273,10 @@ class Question extends QuizLifeCycleWithUtility
 
     if(this.answer_type != ANSWER_TYPE.SHORT_ANSWER) return; //단답형 아니면 PASS
 
+    if(message.member === undefined) return; //이건 길드 메시지 아니면 pass
+
     const message_content = message.content ?? '';
-    const requester = message.author;
+    const requester = message.member;
 
     if(message_content == '') 
     {

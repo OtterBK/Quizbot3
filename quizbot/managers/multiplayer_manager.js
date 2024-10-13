@@ -1234,9 +1234,13 @@ class MultiplayerSession
     }
   
     const leaved_guild_info = this.removeParticipant(guild_id);
-    if(leaved_guild_info === undefined && this.checkBanned(guild_id) === false)
+    if(leaved_guild_info === undefined)
     {
-      logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
+      if(this.checkBanned(guild_id) === false)
+      {
+        logger.warn(`but ${guild_id} is not participant of ${this.getSessionId()}`);
+      }
+
       return true;
     }
 
