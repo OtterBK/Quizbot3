@@ -528,7 +528,7 @@ class UIHolder
       return;
     }
 
-    this.base_message.reply(message);
+    return this.base_message.reply(message);
   }
 }
 

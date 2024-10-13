@@ -708,7 +708,7 @@ class MultiplayerGuildInfo
       
       if(scoreboard_info_result === undefined || scoreboard_info_result.rowCount === 0)
       {
-        return;
+        return this;
       }
 
       const scoreboard_info = scoreboard_info_result.rows[0];
@@ -1546,7 +1546,7 @@ class MultiplayerSession
 
     const signal = {
       signal_type: SERVER_SIGNAL.PARTICIPANT_INFO_UPDATE,
-      participant_guilds_info: guilds_info_list,
+      lobby_info: this.getLobbyInfo(),
       updated_guild_info: updated_guild_info,
     };
     this.sendSignal(signal);

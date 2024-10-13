@@ -233,7 +233,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
     }
 
     const user_quiz_info_ui = new UserQuizInfoUI(user_quiz_info, false);
-    this.sendDelayedUI(user_quiz_info_ui, true); //ui 업데이트 요청, 메시지 resend를 위해서
+    return this.sendDelayedUI(user_quiz_info_ui, true); //ui 업데이트 요청, 메시지 resend를 위해서
   }
 
   sendQuizPlayedInfo()

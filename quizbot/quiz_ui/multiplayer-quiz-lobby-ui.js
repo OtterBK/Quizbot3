@@ -548,13 +548,17 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     }
   }
   
-  applyMultiplayerLobbyInfo(lobby_info)
+  applyMultiplayerLobbyInfo(lobby_info, do_send=true)
   {
     this.quiz_info = lobby_info.quiz_info;
     this.participant_guilds_info = lobby_info.participant_guilds_info;
 
     this.refreshUI();
-    this.sendDelayedUI(this, false);
+
+    if(do_send)
+    {
+      this.sendDelayedUI(this, false);
+    }
 
     logger.debug(`Applying lobby info to ${this.guild_id}`);
   }
@@ -634,19 +638,17 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
       return; // 참가자가 자신일 경우 무시
     }
 
-    this.applyMultiplayerLobbyInfo(signal.lobby_info);
+    this.applyMultiplayerLobbyInfo(signal.lobby_info); 
     this.sendMessageReply({content: `\`\`\`🌐 ${signal.joined_guild_info?.guild_name} 서버가 참가하였습니다.\`\`\``});
 
-    this.sendDelayedUI(this, true);
   }
 
   // LEAVED_LOBBY 처리
   onReceivedLeavedLobby(signal)
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
+    
     this.sendMessageReply({content: `\`\`\`🌐 ${signal.leaved_guild_info?.guild_name} 서버가 퇴장하였습니다.\`\`\``});
-
-    this.sendDelayedUI(this, true);
   }
 
   // EXPIRED_SESSION 처리
@@ -666,17 +668,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   // STAT 로드됨 처리
   onReceivedUpdatedStat(signal)
   {
-    const lobby_info = {
-      quiz_info: this.quiz_info,
-      participant_guilds_info: signal.participant_guilds_info
-    };
-    
-    this.applyMultiplayerLobbyInfo(lobby_info);
+    this.applyMultiplayerLobbyInfo(signal.lobby_info);
 
     const updated_guild_info = signal.updated_guild_info;
     if(updated_guild_info !== undefined)
     {
-      this.sendMessageReply({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패\`\`\``});
+      this.channel.send({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패\`\`\``});
     }
   }
 

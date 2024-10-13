@@ -1530,6 +1530,8 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     logger.debug(`Applying new host session id ${this.session_id} -> ${new_session_id}`);
 
     this.session_id = new_session_id;
+
+    this.sendMessage({ content: `\`\`\`🌐 호스트 서버가 나갔습니다. 이 세션의 호스트가 ${signal.new_host_guild_info?.guild_name} 서버로 변경됐습니다.\`\`\`` });
   }
 
   onReceivedNoticeMessage(signal)
@@ -1860,7 +1862,7 @@ class QuizLifeCycle
           interaction.channel.send({content: reject_message});
           return;
         }
-        this.forceStop();
+        this.quiz_session.forceStop();
         let force_stop_message = text_contents.quiz_play_ui.force_stop;
         force_stop_message = force_stop_message.replace("${who_stopped}", interaction.member.user.username);
         interaction.channel.send({content: force_stop_message});
@@ -2777,11 +2779,19 @@ class InitializeOmakaseQuiz extends Initialize
       [total_dev_question_count, dev_question_list] = tagged_dev_quiz_manager.getQuestionListByTags(dev_quiz_tags, limit);
 
       const basket_items = quiz_info['basket_items'];
-      const basket_condition_query = '(' + Object.values(basket_items)
-        .map(basket_item => basket_item.quiz_id)
-        .join(',') + ')';  
 
-      [total_custom_question_count, custom_question_list] = await loadQuestionListByBasket(basket_condition_query, limit);
+      if(basket_items.length > 0)
+      {
+        const basket_condition_query = '(' + Object.values(basket_items)
+          .map(basket_item => basket_item.quiz_id)
+          .join(',') + ')';  
+
+        [total_custom_question_count, custom_question_list] = await loadQuestionListByBasket(basket_condition_query, limit);
+      }
+      else
+      {
+        [total_custom_question_count, custom_question_list] = [0, []];
+      }
 
       //장바구니 모드는 각각 반반씩 문제를 limit을 나눠 갖는다.
       dev_quiz_count = Math.round(limit / 2);
@@ -5769,7 +5779,7 @@ class Finish extends QuizLifeCycle
       }
     }
 
-    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession() && this.quiz_session.isIngame())
+    if(this.quiz_session.isMultiplayerSession() && this.quiz_session.isHostSession() && this.quiz_session.isIngame() && this.quiz_session.force_stop === false)
     {
       this.quiz_session.sendFinished(); //호스트는 서버에 게임 끝났다고 알림
     }

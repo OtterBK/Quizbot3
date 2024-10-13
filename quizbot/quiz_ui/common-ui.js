@@ -113,7 +113,7 @@ class QuizbotUI
       return;
     }
     
-    this.holder.sendMessageReply(message);
+    return this.holder.sendMessageReply(message);
   }
   
   freeHolder()
