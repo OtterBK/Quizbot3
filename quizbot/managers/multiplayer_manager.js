@@ -1276,7 +1276,7 @@ class MultiplayerSession
       win_rate = win / (win + lose);
     }
   
-    const base_mmr = 100; // 기본 100
+    const base_mmr = 90; // 기본 00
     const max_question_size = 60; // 최대 60문제
     const current_quiz_size = this.question_num + 1;
   
@@ -1288,7 +1288,7 @@ class MultiplayerSession
     const question_ratio = current_quiz_size / max_question_size;
     mmr_add *= question_ratio; // 문제 수 비율만큼 점수 계산
   
-    // 승률 보너스는 최대 얻는 점수의 1/4 (base_mmr을 초과하지 않음)
+    // 승률 보너스는 최대 얻는 점수의 1/2 (base_mmr을 초과하지 않음)
     const win_rate_bonus_max = Math.min(base_mmr, mmr_add * 0.5);
     const win_rate_bonus = win_rate >= 0.5 ? Math.min(win_rate_bonus_max, win_rate * win_rate_bonus_max) : 0;
   

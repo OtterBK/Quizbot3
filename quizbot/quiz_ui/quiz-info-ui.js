@@ -30,6 +30,8 @@ const { cloneDeep } = require('lodash');
 /** 퀴즈 정보 표시 UI, Dev퀴즈/User퀴즈 둘 다 사용 */
 class QuizInfoUI extends QuizbotUI
 {
+  static BASKET_CACHE = {}; //guild id, basket item
+
   constructor(quiz_info={})
   {
     super();
@@ -73,6 +75,7 @@ class QuizInfoUI extends QuizbotUI
       'modal_quiz_setting': this.handleSubmitModalQuizSetting.bind(this),
       'use_tag_mode': this.handleRequestUseTagMode.bind(this), 
       'use_basket_mode': this.handleRequestUseBasketMode.bind(this), 
+      'load_basket_items': this.handleLoadBasketItems.bind(this), 
       'basket_select_menu': this.handleBasketSelected.bind(this), 
     };
   }
@@ -456,6 +459,11 @@ class QuizInfoUI extends QuizbotUI
   }
 
   handleRequestUseTagMode(interaction)
+  {
+    //일반적으로 지원하지 않음
+  }
+
+  handleLoadBasketItems(interaction)
   {
     //일반적으로 지원하지 않음
   }

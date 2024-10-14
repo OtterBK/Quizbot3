@@ -735,6 +735,10 @@ const request_basket_reopen_comp = new ActionRowBuilder()
       .setCustomId('use_basket_mode')
       .setLabel('장바구니에 퀴즈 더 담기')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('load_basket_items')
+      .setLabel('최근 장바구니 불러오기')
+      .setStyle(ButtonStyle.Primary),
   );
 
 //오마카세 퀴즈용
