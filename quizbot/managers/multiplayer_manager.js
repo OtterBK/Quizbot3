@@ -1177,7 +1177,7 @@ class MultiplayerSession
 
   getRequestConfirmCriteria()
   {
-    return Math.ceil((this.participant_guilds.length + 1) / 2);
+    return Math.floor((this.participant_guilds.length + 1) / 2);
   }
 
   processLeaveGame(guild_id)
@@ -1222,7 +1222,7 @@ class MultiplayerSession
       this.sendSignal(signal);
       logger.info(`${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
 
-      const trigger_guild_id = new_host_guild_info ? new_host_guild_info : this.session_owner_guild_id;
+      const trigger_guild_id = new_host_guild_info ? new_host_guild_info.guild_id : this.session_owner_guild_id;
       this.finishUp(trigger_guild_id);
       this.finish(trigger_guild_id);
     }
