@@ -57,7 +57,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     multiplayer_quiz_info['author_icon'] = guild.iconURL() ?? '';
     multiplayer_quiz_info['thumbnail'] = ''; //썸네일은 고정 이미지가 있지롱 ㅎ
 
-    multiplayer_quiz_info['quiz_size'] = 50; //default, 멀티플레이에서 100문제는 너무 많소
+    multiplayer_quiz_info['quiz_size'] = 60; //default, 멀티플레이에서 100문제는 너무 많소
     multiplayer_quiz_info['min_quiz_size'] = 20; //최소 퀴즈 수, 멀티는 이게 필요
     multiplayer_quiz_info['selected_question_count'] = 30; //default
     multiplayer_quiz_info['repeat_count'] = 1; //실제로는 안쓰는 값
@@ -100,7 +100,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
 
     this.readonly = is_readonly;
 
-    this.max_quiz_count = 50; //멀티플레이에서는 최대 50까지만
+    this.max_quiz_count = 60; //멀티플레이에서는 최대 60까지만
 
     this.session_id = session_id;
     this.participant_guilds_info = []; //guild_id, guild_name //참여 중인 길드 정보
@@ -317,6 +317,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     {
       'multiplayer_start': this.requestStartLobby.bind(this),
       'multiplayer_lobby_kick_select_menu': this.requestKick.bind(this),
+      'multiplayer_ready': this.requestReadyLobby.bind(this),
     };
   }
 
@@ -373,6 +374,29 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
         else
         { 
           interaction.reply({ content: `\`\`\`🌐 게임 시작에 실패했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
+        }
+      });
+  }
+
+  requestReadyLobby(interaction)
+  {
+    interaction.explicit_replied = true;
+    ipc_manager.sendMultiplayerSignal(
+      {
+        signal_type: CLIENT_SIGNAL.REQUEST_READY,
+        guild_id: this.guild_id,
+        session_id: this.session_id,
+      }
+    )
+      .then(result => 
+      {
+        if(result.state === true)
+        {
+          interaction.reply({ content: `\`\`\`🌐 준비 완료했습니다.\`\`\``, ephemeral: true});
+        }
+        else
+        { 
+          interaction.reply({ content: `\`\`\`🌐 준비 요청에 실패했습니다.\n원인: ${result.reason}\`\`\``, ephemeral: true });
         }
       });
   }
@@ -532,7 +556,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     {
       const guilds_info = this.participant_guilds_info[i];
       const stat = guilds_info.stat;
-      const option = { label: `${guilds_info.guild_name}`, description: `전적: ${stat.win}승 ${stat.lose}패`, value: `${i}` };
+      const option = { label: `${guilds_info.guild_name}`, description: `전적: ${stat.win}승 ${stat.lose}패. MMR: ${stat.mmr}`, value: `${i}` };
       
       // if (this.session_id === guilds_info.guild_id) 
       // {
@@ -622,6 +646,10 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     case SERVER_SIGNAL.STARTED_LOBBY:
       this.onReceivedStartedLobby(signal);
       break;
+    
+    case SERVER_SIGNAL.CONFIRM_READY:
+      this.onReceivedConfirmReady(signal);
+      break;
 
     default:
       // 다른 신호 처리
@@ -662,7 +690,15 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   onReceivedEditedLobby(signal)
   {
     this.applyMultiplayerLobbyInfo(signal.lobby_info);
-    this.sendMessageReply({ content: `\`\`\`🌐 로비 정보가 변경되었습니다.\`\`\`` });
+
+    if(this.guild_id === signal.session_id) //호스트면
+    {
+      this.sendMessageReply({ content: `\`\`\`🌐 로비 정보가 변경되었습니다.\`\`\`` });
+    }
+    else
+    {
+      this.sendMessageReply({ content: `\`\`\`🌐 로비 정보가 변경되었습니다. 준비 완료 상태가 해제됩니다.\`\`\`` });
+    }
   }
 
   // STAT 로드됨 처리
@@ -673,7 +709,7 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
     const updated_guild_info = signal.updated_guild_info;
     if(updated_guild_info !== undefined)
     {
-      this.channel.send({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패\`\`\``});
+      this.channel.send({ content: `\`\`\`🌐 [${updated_guild_info.guild_name}] 서버의 현 시즌 전적: ${updated_guild_info.stat.win}승 ${updated_guild_info.stat.lose}패. MMR: ${updated_guild_info.stat.mmr}\`\`\``});
     }
   }
 
@@ -697,6 +733,12 @@ class MultiplayerQuizLobbyUI extends QuizInfoUI
   {
     this.startLobby(signal.lobby_info, signal.owner_name);
     this.channel.send({content: `\`\`\`🌐 호스트가 게임을 시작하였습니다.\`\`\``});
+  }
+
+  // CONFIRM_READY 처리
+  onReceivedConfirmReady(signal)
+  {
+    this.sendMessageReply({ content: `\`\`\`🌐 ${signal.ready_guild_info.guild_name} 서버 준비 완료.\`\`\`` });
   }
 
   sendEditLobbySignal(interaction=undefined)

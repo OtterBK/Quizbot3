@@ -45,6 +45,7 @@ const signalHandlers =
   [CLIENT_SIGNAL.FINISH_UP]: handleFinishUp,
   [CLIENT_SIGNAL.FINISHED]: handleFinished,
   [CLIENT_SIGNAL.REQUEST_CHAT]: handleRequestChat,  
+  [CLIENT_SIGNAL.REQUEST_READY]: handleRequestReady,  
 };
 
 exports.onSignalReceived = (signal) => 
@@ -84,7 +85,27 @@ function isClientSignal(signal)
   return (signal & 0x80) === 0;  // 최상위 비트가 0이면 클라이언트 시그널
 }
 
+function sendMultiplayerLobbyCount()
+{
+  let lobby_count = 0;
+  for(const session of Object.values(multiplayer_sessions))
+  {
+    if(session.isIngame())
+    {
+      continue;
+    }
 
+    ++lobby_count;
+  }
+
+  const signal = {
+    signal_type: SERVER_SIGNAL.UPDATED_LOBBY_COUNT,
+    lobby_count: lobby_count,
+  };
+  broadcast(signal);
+
+  logger.info(`Sending Update lobby count: ${lobby_count}`);
+}
 
 function handleRequestLobbyList(signal) 
 {
@@ -92,13 +113,13 @@ function handleRequestLobbyList(signal)
     
   //TODO 사실 캐싱해두는게 성능상 제일 좋긴할텐데... 내가 귀찮다. 나중에 바꿔두자
   //세션이 많아봤자 얼마나 많겠는가?
-  //세션 객체 자체를 넘기려고 했는데 솔직히 말이 안된다. hybrid 라이브러리가 IPC에서 객체 자체를 넘길 수 있게 해두진 않았을 것 같다.
+  //세션 객체 자체를 넘기려고 했는데 솔직히 말이 안된다. hybrid 라이브러리가 IPC에서 객체 자체를 넘길 수 있게 해두진 않았을 것 같다. -> 실험해보니 discord hybrid 라이브러리에서 Object 변환 에러남
   //통신은 무조건 json으로 하도록 하자
 
   let lobby_session_list = [];
   for(const session of Object.values(multiplayer_sessions))
   {
-    if(session.getState() !== SESSION_STATE.LOBBY)
+    if(session.getState() === SESSION_STATE.PREPARE)
     {
       continue;
     }
@@ -108,8 +129,9 @@ function handleRequestLobbyList(signal)
       session_id: session.getSessionId(),
       participant_count: session.getParticipantCount(),
       session_name: session.getSessionName(),
-      host_name: session.getHostName(),
+      host_name: session.getHostGuildName(),
       is_ingame: session.isIngame(),
+      mmr_avg: session.getAverageMMR(),
     };
         
     lobby_session_list.push(simple_session_info);
@@ -148,6 +170,8 @@ function handleCreateLobby(signal)
 
   multiplayer_sessions[new_multiplayer_session.getSessionId()] = new_multiplayer_session;
   logger.info(`New multiplayer lobby has been registered ${guild_id} = ${quiz_info.title}`);
+
+  sendMultiplayerLobbyCount(); //캐싱용 대기 중인 로비 수 전송
 
   return { state: true,  lobby_info: new_multiplayer_session.getLobbyInfo(), session_id: new_multiplayer_session.getSessionId() };
 }
@@ -312,6 +336,12 @@ function handleStartLobby(signal)
   {
     logger.error(`${guild_id} requests to start ${session_id}. but this session's state is ${session.getState()}!`);
     return { state: false, reason: `대기 중인 로비가 아닙니다.` };
+  }
+
+  if(session.checkAllReady() === false)
+  {
+    logger.info(`${guild_id} requests to start ${session_id}. but this session is not all ready`);
+    return { state: false, reason: `모든 참여자가 준비 완료 상태여야합니다.` };
   }
 
   const result = session.acceptStartRequest(guild_id);
@@ -589,6 +619,34 @@ function handleRequestChat(signal)
   return { state: result };
 }
 
+function handleRequestReady(signal) 
+{
+  const guild_id = signal.guild_id;
+
+  const session_id = signal.session_id;
+  const session = multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    logger.error(`${guild_id} request ready ${session_id}. but this session is not exists`);
+    return { state: true, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` }; 
+  }
+
+  const guild_info = session.getParticipant(guild_id);
+  if(guild_info === undefined)
+  {
+    logger.error(`${guild_id} request ready ${session_id}. but this session does not include this guild`);
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
+  }
+
+  if(guild_info.isReady())
+  {
+    return { state: false, reason: `이미 준비하셨습니다.` };
+  }
+
+  const result = session.acceptReady(guild_id);
+  return { state: result };
+}
 
 
 const broadcast = (signal) => 
@@ -620,6 +678,8 @@ class MultiplayerGuildInfo
     this.guild_id = guild_id;
     this.guild_name = guild_name;
 
+    this.ready = false;
+
     this.syncing = false;
 
     this.hint = false;
@@ -628,6 +688,8 @@ class MultiplayerGuildInfo
     this.stat = {
       win: 0,
       lose: 0,
+      play: 0,
+      mmr: 0,
     };
 
     this.member_count = 0;
@@ -640,6 +702,7 @@ class MultiplayerGuildInfo
       guild_name: this.guild_name,
       member_count: this.member_count,
       stat: this.stat,
+      ready: this.ready,
     };
   }
 
@@ -722,6 +785,7 @@ class MultiplayerGuildInfo
       this.stat = {
         win: scoreboard_info.win,
         lose: scoreboard_info.lose,
+        play: scoreboard_info.play,
         mmr: scoreboard_info.mmr,
       };
 
@@ -736,6 +800,16 @@ class MultiplayerGuildInfo
     return this;
     
   }
+
+  setReady(value)
+  {
+    return this.ready = value;
+  }
+
+  isReady()
+  {
+    return this.ready;
+  }
 }
 
 class MultiplayerSession
@@ -745,6 +819,7 @@ class MultiplayerSession
     // this.uuid = utility.generateUUID(); //ID. 중복검사는 하지 않겠다. 설마 겹치겠어? -> 필요 없을 듯
 
     const owner_guild_info  = new MultiplayerGuildInfo(guild_id, guild_name);
+    owner_guild_info.setReady(true);
 
     this.session_owner_guild_id = guild_id;
     this.owner_guild_info = owner_guild_info; //방장 길드
@@ -767,13 +842,14 @@ class MultiplayerSession
 
     this.scoreboard = new Map(); //scoreboard 
     this.mvp_scoreboard = new Map(); //vip 맴버 scoreboard 용
+    this.top_score = 0; //최종 점수 계산 시, top score의 점수
 
     this.sync_failed_list = []; //sync 실패한 목록들
 
-    setTimeout(() => // return true;대충 1.5초 정도는 기다리도록(별 의미는 없고 ui띄워지는 시간도 있으니)
+    setTimeout(() => // return true;대충 1초 정도는 기다리도록(별 의미는 없고 ui띄워지는 시간도 있으니)
     {
       this.state = SESSION_STATE.LOBBY;
-    }, 1500);
+    }, 1000);
   }
 
   free()
@@ -801,6 +877,8 @@ class MultiplayerSession
     this.mvp_scoreboard = null;
 
     this.sync_failed_list = null;
+
+    this.top_score = null;
   }
 
   getState()
@@ -847,9 +925,21 @@ class MultiplayerSession
     return this.quiz_info.title;
   }
 
-  getHostName()
+  getHostGuildName()
   {
     return this.owner_guild_info?.guild_name;
+  }
+
+  getAverageMMR()
+  {
+    let mmr_avg = 0;
+
+    for(const guild_info of this.participant_guilds)
+    {
+      mmr_avg += guild_info.stat.mmr;
+    }
+
+    return Math.round(mmr_avg / this.getParticipantCount());
   }
 
   isIngame()
@@ -885,6 +975,40 @@ class MultiplayerSession
     return false;
   }
 
+  checkAllReady()
+  {
+    let all_ready = true;    
+    const guilds_info_list = [];
+    this.participant_guilds.forEach(g => 
+    {
+      if(g.isReady() === false)
+      {
+        all_ready = false;
+      }
+
+      guilds_info_list.push(g.toJsonObject());
+    });
+
+    if(all_ready === true)
+    {
+      return all_ready;
+    }
+
+    let ready_state_notice = '🌐 게임을 시작할 수 없습니다. 아직 준비되지 않은 서버가 존재합니다.\n\n📑 [준비 현황]\n';
+    for(const guild_info of guilds_info_list)
+    {
+      ready_state_notice += `${guild_info.ready ? '⭕' : '❌'} ${guild_info.guild_name}: ${guild_info.ready ? '준비 완료' : '준비되지 않음'}\n`;
+    }
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.NOTICE_MESSAGE,
+      notice: `\`\`\`${ready_state_notice}\`\`\``
+    };
+    this.sendSignal(signal);
+
+    return all_ready;
+  }
+
   removeParticipant(target_guild_id)
   {
     let target_guild_info = undefined;
@@ -906,6 +1030,8 @@ class MultiplayerSession
   delete()
   {
     delete multiplayer_sessions[this.getSessionId()];
+
+    sendMultiplayerLobbyCount();
 
     this.free();
   }
@@ -1040,6 +1166,7 @@ class MultiplayerSession
       signal_type: SERVER_SIGNAL.SYNC_DONE,
       sequence_num: this.sync_done_sequence_num,
       participant_guilds_info: guilds_info_list,
+      question_num: this.question_num
       
     };
     this.sendSignal(signal);
@@ -1093,27 +1220,121 @@ class MultiplayerSession
       };
 
       this.sendSignal(signal);
-      logger.info(`The host of ${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
+      logger.info(`${guild_id} has been leaved from ingame. and only one guilds left. expiring this session`);
 
-      const new_host_guild_id = new_host_guild_info?.guild_id;
-      this.finishUp(new_host_guild_id);
-      this.finish(new_host_guild_id);
+      const trigger_guild_id = new_host_guild_info ? new_host_guild_info : this.session_owner_guild_id;
+      this.finishUp(trigger_guild_id);
+      this.finish(trigger_guild_id);
     }
   }
 
   processWinner(guild_id)
   {
-    logger.info(`Processing winner ${guild_id}`);
+    let win_add = 1;
+    let lose_add = 0;
+    let play_add = 1;
+    let mmr_add = 0;
 
-    db_manager.updateGlobalScoreboard(guild_id, 1, 0, 1, 0);
+    const guild_info = this.getParticipant(guild_id);
+    mmr_add = this.calcWinnerMMR(guild_info);
+
+    logger.info(`Processing winner ${guild_id}. win_add: ${win_add}, lose_add: ${lose_add}, play_add: ${play_add}, mmr_add: ${mmr_add}`);
+
+    db_manager.updateGlobalScoreboard(guild_id, win_add, lose_add, play_add, mmr_add, (guild_info ? guild_info.guild_name : ''));
   }
 
-  processLoser(guild_id)
+  processLoser(guild_id, score)
   {
-    logger.info(`Processing loser ${guild_id}`);
+    let win_add = 0;
+    let lose_add = 1;
+    let play_add = 1;
+    let mmr_add = 0;
 
-    db_manager.updateGlobalScoreboard(guild_id, 0, 1, 1, 0);
+    const guild_info = this.getParticipant(guild_id);
+    mmr_add = this.calcLoserMMR(guild_info, score);
+
+    logger.info(`Processing loser ${guild_id}. win_add: ${win_add}, lose_add: ${lose_add}, play_add: ${play_add}, mmr_add: ${mmr_add}`);
+
+    db_manager.updateGlobalScoreboard(guild_id, win_add, lose_add, play_add, mmr_add, (guild_info ? guild_info.guild_name : ''));
   }
+
+  calcWinnerMMR(guild_info) 
+  {
+    if (!guild_info) 
+    { // 예외 처리
+      return 0;
+    }
+  
+    const stat = guild_info.stat;
+    const win = stat.win;
+    const lose = stat.lose;
+  
+    // 승률 계산
+    let win_rate = 0;
+    if (win + lose !== 0) 
+    {
+      win_rate = win / (win + lose);
+    }
+  
+    const base_mmr = 100; // 기본 100
+    const max_question_size = 60; // 최대 60문제
+    const current_quiz_size = this.question_num + 1;
+  
+    // 3명부터 0.5배씩 보너스
+    const participant_bonus = Math.max(0, this.scoreboard.size - 2) * 0.5;
+    let mmr_add = base_mmr * (1 + participant_bonus);
+  
+    // 진행된 문제 수 비율 계산
+    const question_ratio = current_quiz_size / max_question_size;
+    mmr_add *= question_ratio; // 문제 수 비율만큼 점수 계산
+  
+    // 승률 보너스는 최대 얻는 점수의 1/4 (base_mmr을 초과하지 않음)
+    const win_rate_bonus_max = Math.min(base_mmr, mmr_add * 0.5);
+    const win_rate_bonus = win_rate >= 0.5 ? Math.min(win_rate_bonus_max, win_rate * win_rate_bonus_max) : 0;
+  
+    mmr_add += win_rate_bonus; // 승률 보너스 추가
+  
+    return Math.round(mmr_add); // 소수점 반올림
+  }
+  
+  calcLoserMMR(guild_info, score = 0) 
+  {
+    const base_mmr = -100; // 기본 -100
+    if (!guild_info) 
+    { // 탈주 처리
+      return base_mmr; // 탈주 시 최대치 패널티
+    }
+  
+    let mmr_add = base_mmr;
+  
+    const max_question_size = 60; // 최대 60문제
+    const current_quiz_size = this.question_num;
+  
+    // 우선 끝까지 했으면 80퍼만 감소
+    mmr_add *= 0.80;
+
+    // 진행된 문제 수 비율 계산
+    const question_ratio = Math.min(0.5, current_quiz_size / max_question_size);
+    mmr_add *= question_ratio; // 문제 수 비율만큼 감소(적게 했으면 적게) 최대 50퍼 감면
+  
+    // 최고 점수 대비 자신의 점수 비율 계산
+    let score_ratio = 0;
+    if (score > this.top_score || this.top_score === 0) 
+    {
+      score_ratio = 0;
+    }
+    else 
+    {
+      score_ratio = (score / (this.top_score !== 0 ? this.top_score : 1)) * 0.3;
+    }
+  
+    // 점수 차이에 따른 보너스
+    const score_bonus = (mmr_add * -1) * score_ratio;
+    mmr_add += score_bonus;
+  
+    return Math.round(mmr_add); // 소수점 반올림
+  }
+  
   
   finishUp(guild_id)
   {
@@ -1134,17 +1355,23 @@ class MultiplayerSession
       logger.debug(`${this.getSessionId()}'s mvp is ${mvp_info.name}/${mvp_info.score}`);
     }
 
+    if(this.quiz_size < 20) //문제 수가 20개 미만이면 전적 반영하지 않는다.
+    {
+      logger.info(`Question length is less than 20 ${this.getSessionId()}. do not apply scoreboard.`);
+      return;
+    }
+
     //이제 승리자 구해보자. 이긴 사람만이 점수를 받는거다.
     const sorted_scoreboard = utility.sortMapByProperty(this.scoreboard, 'score');
     const iter = sorted_scoreboard.entries();
     for(let i = 0; i < sorted_scoreboard.size; ++i)
     {
-      const [guild_id, winner_info] = iter.next().value;
+      const [guild_id, answerer_info] = iter.next().value;
 
       if(i === 0)
       {
         this.processWinner(guild_id);
-        logger.debug(`${this.getSessionId()}'s winner is ${guild_id}/${winner_info.score}`);
+        logger.debug(`${this.getSessionId()}'s winner is ${guild_id}/${answerer_info.score}`);
       }
       else
       {
@@ -1154,7 +1381,7 @@ class MultiplayerSession
           continue;
         }
 
-        this.processLoser(guild_id);
+        this.processLoser(guild_id, answerer_info.score);
       }
       
     }
@@ -1165,6 +1392,19 @@ class MultiplayerSession
     logger.info(`${this.getSessionId()} finished game. by ${guild_id}`);
 
     this.delete();
+  }
+
+  initScoreboard()
+  {
+    for(const guild_info of this.participant_guilds)
+    {
+      const guild_answerer_info = {
+        name: guild_info.guild_name,
+        score: 0
+      };
+  
+      this.scoreboard.set(guild_info.guild_id, guild_answerer_info);
+    }
   }
 
   convertToTimeString(time)
@@ -1278,6 +1518,13 @@ class MultiplayerSession
 
     logger.debug(`session ${this.getSessionId()}'s quiz info edited by ${guild_id}`);
 
+    for(const guild_info of this.participant_guilds) //로비 변경됐으면 준비 완료 해제.
+    {
+      guild_info.setReady(false);
+    }
+
+    this.owner_guild_info.setReady(true); //방장은 자동 레디
+
     return true;
   }
 
@@ -1317,6 +1564,10 @@ class MultiplayerSession
     this.state = SESSION_STATE.INGAME;
 
     logger.info(`Multiplayer session ${this.getSessionId()}/${this.getSessionName()} started by ${guild_id}`);
+
+    sendMultiplayerLobbyCount();
+
+    this.initScoreboard();
 
     return true;
   }
@@ -1568,9 +1819,26 @@ class MultiplayerSession
     const signal = {
       signal_type: SERVER_SIGNAL.PARTICIPANT_INFO_UPDATE,
       lobby_info: this.getLobbyInfo(),
-      updated_guild_info: updated_guild_info,
+      updated_guild_info: updated_guild_info.toJsonObject(),
     };
     this.sendSignal(signal);
   }
+
+  acceptReady(guild_id)
+  {
+    const ready_guild_info = this.getParticipant(guild_id);
+    ready_guild_info.setReady(true);
+
+    const signal = {
+      signal_type: SERVER_SIGNAL.CONFIRM_READY,
+      ready_guild_info: ready_guild_info.toJsonObject(),
+    };
+    this.sendSignal(signal);
+
+    logger.info(`Ready Accepted guild_id ${guild_id}, session_id: ${this.getSessionId()}`);
+
+    return true;
+  }
+  
 }
 

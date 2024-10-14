@@ -465,21 +465,37 @@ exports.selectGlobalScoreboard = async (guild_id) =>
   return sendQuery(query_string, [guild_id]);
 };
 
-exports.updateGlobalScoreboard = async (guild_id, win_add, lose_add, play_add, mmr_add) =>  
+exports.updateGlobalScoreboard = async (guild_id, win_add, lose_add, play_add, mmr_add, guild_name) =>  
 {
   const query_string = 
-      `
-      INSERT INTO tb_global_scoreboard (guild_id, win, lose, play, mmr)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (guild_id)
-      DO UPDATE SET 
-          win = tb_global_scoreboard.win + EXCLUDED.win,
-          lose = tb_global_scoreboard.lose + EXCLUDED.lose,
-          play = tb_global_scoreboard.play + EXCLUDED.play,
-          mmr = tb_global_scoreboard.mmr + EXCLUDED.mmr;
-      `;
+  `
+  INSERT INTO tb_global_scoreboard (guild_id, win, lose, play, mmr, guild_name)
+  VALUES ($1, $2, $3, $4, GREATEST($5, 0), $6)
+  ON CONFLICT (guild_id)
+  DO UPDATE SET 
+      win = tb_global_scoreboard.win + EXCLUDED.win,
+      lose = tb_global_scoreboard.lose + EXCLUDED.lose,
+      play = tb_global_scoreboard.play + EXCLUDED.play,
+      mmr = GREATEST(tb_global_scoreboard.mmr + EXCLUDED.mmr, 0),
+      guild_name = CASE WHEN EXCLUDED.guild_name <> '' THEN EXCLUDED.guild_name ELSE tb_global_scoreboard.guild_name END;
+
+  `;
       
-  return sendQuery(query_string, [guild_id, win_add, lose_add, play_add, mmr_add]);
+  return sendQuery(query_string, [guild_id, win_add, lose_add, play_add, mmr_add, guild_name]);
 };
 
+exports.selectTop10Scoreboard = async () =>
+{
+  const query_string =
+  `
+    SELECT * 
+    FROM tb_global_scoreboard
+    WHERE mmr != 0
+    ORDER BY mmr DESC
+    LIMIT 10;
+  `;
+
+  return sendQuery(query_string);
+
+};
 //#endregion

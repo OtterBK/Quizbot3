@@ -23,7 +23,7 @@ const utility = require('../../utility/utility.js');
 const logger = require('../../utility/logger.js')('QuizSystem');
 const { SeekStream } = require('../../utility/SeekStream/SeekStream.js');
 const feedback_manager = require('../managers/feedback_manager.js');
-const { loadQuestionListFromDBByTags, loadQuestionListByBasket } = require('../managers/user_quiz_info_manager.js');
+const { loadQuestionListFromDBByTags, loadQuestionListByBasket, addPlayedCountByQuiz } = require('../managers/user_quiz_info_manager.js');
 const tagged_dev_quiz_manager = require('../managers/tagged_dev_quiz_manager.js');
 const audio_cache_manager = require('../managers/audio_cache_manager.js');
 const {
@@ -523,6 +523,8 @@ class QuizSession
     this.quiz_session_type = quiz_session_type;
 
     this.is_multiplayer_session = false;
+
+    this.preparing = false;
   }
 
   free() //자원 해제
@@ -1097,6 +1099,10 @@ const MultiplayerSessionMixin = Base => class extends Base
     {
       return this.onReceivedConfirmChat(event_object);
     }
+    else if(signal_type === SERVER_SIGNAL.NOTICE_MESSAGE)
+    {
+      return this.onReceivedNoticeMessage(event_object);
+    }
 
     super.on(event_name, event_object);
   }
@@ -1114,6 +1120,12 @@ const MultiplayerSessionMixin = Base => class extends Base
     //신고 버튼에 ID 설정해줘야함
 
     this.sendMessage({ content: signal.chat_message, components: [custom_chat_component]});
+  }
+
+  onReceivedNoticeMessage(signal)
+  {
+    this.sendMessage({ content: `${signal.notice}` });
+    logger.debug(`Sending notice message to ${this.guild_id}, message: ${signal.notice}`);
   }
 
 };
@@ -1311,7 +1323,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
       if(this.game_data.prepared_question_queue?.length !== 0)
       {
-        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip sync ready`);
+        logger.warn(`Syncing ready. but prepared question queue length is ${this.game_data.prepared_question_queue.length}. skip sync ready. ${this.guild_id}`);
         break;
       }
 
@@ -1345,7 +1357,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
     let wait_sync_done_time_sec = 0;
     const current_sequence = this.sync_done_sequence_num;
-    while(current_sequence == this.sync_done_sequence_num)
+    while(current_sequence === this.sync_done_sequence_num)
     {
       await utility.sleep(100);
       ++wait_sync_done_time_sec;
@@ -1480,10 +1492,6 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     {
       return this.onReceivedHostChanged(signal);
     }
-    else if(signal_type === SERVER_SIGNAL.NOTICE_MESSAGE)
-    {
-      return this.onReceivedNoticeMessage(signal);
-    }
     else if(signal_type === SERVER_SIGNAL.APPLY_QUESTION_LIST)
     {
       return this.onReceivedApplyQuestionList(signal);
@@ -1539,12 +1547,6 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     this.sendMessage({ content: `\`\`\`🌐 호스트 서버가 나갔습니다. 이 세션의 호스트가 ${signal.new_host_guild_info?.guild_name} 서버로 변경됐습니다.\`\`\`` });
   }
 
-  onReceivedNoticeMessage(signal)
-  {
-    this.sendMessage({ content: `${signal.notice}` });
-    logger.debug(`Sending notice message to ${this.guild_id}, message: ${signal.notice}`);
-  }
-
   onReceivedApplyQuestionList(signal)
   {
     if(this.multiplayer_state !== MULTIPLAYER_STATE.INITIALIZING &&
@@ -1554,8 +1556,8 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       return;
     }
 
-    this.quiz_data.question_list = signal.question_list;
-    this.quiz_data.quiz_size = signal.quiz_size;
+    this.quiz_data.question_list = cloneDeep(signal.question_list);
+    this.quiz_data.quiz_size = cloneDeep(signal.quiz_size);
 
     logger.debug(`Applying question list signal. call Prepare Cycle quiz_size: ${signal.quiz_size}/${signal.question_list.length}, guild_id: ${this.guild_id}`);
     
@@ -1566,6 +1568,11 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       this.forceStop();
 
       return;
+    }
+
+    if(this.quiz_data.quiz_size < 20)
+    {
+      this.sendMessage({content: `\`\`\`🌐 이 멀티플레이에서 생성된 문제 수가 20개 미만입니다.\n해당 게임의 결과는 전적에 반영되지 않습니다.\`\`\``, ephemeral: true});
     }
 
     this.multiplayer_state = MULTIPLAYER_STATE.QUESTION_LIST_READY;
@@ -1581,8 +1588,8 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
     //   return;
     // }
 
-    const question_num = signal.question_num;
-    this.game_data['question_num'] = question_num;
+    // const question_num = cloneDeep(signal.question_num);
+    // this.game_data['question_num'] = question_num; //이 타이밍에 하면 안된다. Apply가 먼저오고 Prepare 들어가면 실질적으로 question_num이 +2가 돼서 꼬인다.
 
     const prepared_question = cloneDeep(signal.prepared_question); 
     //!!! cloneDeep을 꼭 해줘야한다. signal 객체는 기본적으로 모든 클라이언트에 대해 공유라서 prepared_question['audio_resource'] 로 덮어씌우면 이게 공유돼서
@@ -1590,19 +1597,21 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
 
     Prepare.fillAudioResource(prepared_question);
     
+    this.sync_ready = true;
+
     this.game_data.prepared_question_queue.push(prepared_question);
 
     this.multiplayer_state = MULTIPLAYER_STATE.NEXT_QUESTION_READY;
-    this.sync_ready = true;
 
     logger.debug(`Applying next question signal. set sync ready. guild_id: ${this.guild_id}`);
   }
 
   onReceivedSyncDone(signal)
   {
-    this.sync_done_sequence_num = signal.sequence_num;
+    this.sync_done_sequence_num = cloneDeep(signal.sequence_num);
     
     this.participant_guilds_info = signal.participant_guilds_info;
+    this.game_data['question_num'] = signal.question_num;
 
     logger.debug(`Received Sync Done signal ${this.sync_done_sequence_num}. calling Questioning Cycle.`);
 
@@ -1667,7 +1676,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       return;
     }
         
-    const answerer_info = signal.answerer_info;
+    const answerer_info = cloneDeep(signal.answerer_info);
     if(answerer_info === undefined)
     {
       logger.error(`Received Confirm answer hit signal ${this.guild_id}. but answerer info is undefined`);
@@ -1704,7 +1713,7 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
   onReceivedConfirmMVP(signal)
   {
     this.multiplayer_state = MULTIPLAYER_STATE.FINISH_UP; //mvp 정해졌다는 신호 받은거면 finish up인거임
-    this.mvp_info = signal.mvp_info;
+    this.mvp_info = cloneDeep(signal.mvp_info);
 
     logger.debug(`Received MVP Info signal ${this.guild_id}. name: ${this.mvp_info.name}, score: ${this.mvp_info.score}`);
   }
@@ -2802,6 +2811,13 @@ class InitializeOmakaseQuiz extends Initialize
       //장바구니 모드는 각각 반반씩 문제를 limit을 나눠 갖는다.
       dev_quiz_count = Math.round(limit / 2);
       custom_quiz_count = Math.round(limit / 2);
+
+      for(const basket_item of basket_items_value) //장바구니 모드에서 선택된 퀴즈들도 플레이된 횟수 +1
+      {
+        addPlayedCountByQuiz(basket_item.quiz_id);
+      }
+
+      // this.quiz_session.already_liked = false; //장바구니 모드면 추천하기를 무조건 띄운다. -> 안띄운다 우선
     }
 
     logger.info(`Omakase Question count of this session. use_basket_mode=${use_basket_mode}, dev=${dev_quiz_count}, custom=${custom_quiz_count}, limit=${limit}`);
@@ -3010,6 +3026,8 @@ class Prepare extends QuizLifeCycle
     {
       return;
     }
+
+    this.quiz_session.has_current_question = true;
 
     //다음에 문제낼 퀴즈 꺼내기
     let quiz_data = this.quiz_session.quiz_data;
@@ -3780,6 +3798,8 @@ class Question extends QuizLifeCycleWithUtility
 
   exit()
   {
+    this.quiz_session.has_current_question = false;
+    
     if(this.progress_bar_timer != undefined)
     {
       clearInterval(this.progress_bar_timer);
@@ -5157,7 +5177,11 @@ class QuestionOmakase extends Question
 
     //오마카세 퀴즈 전용
     quiz_ui.setTitle(`[ ${quiz_data['icon']} ${current_question['question_title']} ]`);
-        
+    
+    if(question_id !== undefined) //question_id가 있다면 커스텀 퀴즈다
+    {
+      // quiz_ui.components.push(feedback_manager.quiz_feedback_comp); //추천 버튼 추가
+    }
 
     if(image_resource != undefined)
     {
@@ -5565,7 +5589,7 @@ class Clearing extends QuizLifeCycleWithUtility
     delete game_data['processing_question'];
 
     let has_more_question = this.quiz_session.hasMoreQuestion();
-    if(has_more_question && this.quiz_session.quiz_data.question_list.length === 0) //has more question 인데 question_list가 empty다.
+    if(has_more_question && this.quiz_session.has_current_question === false && this.quiz_session.quiz_data.question_list.length === 0) //has more question 인데 현재 퀴즈도 없고 question_list가 empty다.
     {
       logger.warn(`has more question. but question list is empty. stop quiz`);
       has_more_question = false;
