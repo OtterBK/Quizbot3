@@ -112,8 +112,6 @@ class MainUI extends QuizbotUI
 
   initializeComponents() 
   {
-    
-
     this.components = [select_btn_component, main_ui_component]; //MAIN UI에서는 control component는 필요없다.
   }
 
@@ -150,6 +148,12 @@ class MainUI extends QuizbotUI
     {
       return new NotesSelectUI();
     }
+  }
+
+  onAwaked()
+  {
+    this.initializeEmbed();
+    this.update();
   }
 
 }
