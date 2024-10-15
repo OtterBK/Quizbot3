@@ -1120,6 +1120,11 @@ const MultiplayerSessionMixin = Base => class extends Base
     //신고 버튼에 ID 설정해줘야함
 
     this.sendMessage({ content: signal.chat_message, components: [custom_chat_component]});
+
+    if(this.isIngame() === false)
+    {
+      utility.playBGM(this.audio_player, BGM_TYPE.CHAT);
+    }
   }
 
   onReceivedNoticeMessage(signal)
@@ -1209,7 +1214,7 @@ class MultiplayerLobbySession extends MultiplayerSessionMixin(DummyQuizSession) 
 
   onReceivedJoinedLobby(signal)
   {
-    utility.playBGM(this.audio_player, BGM_TYPE.MATCHING);
+    utility.playBGM(this.audio_player, BGM_TYPE.DOOR_BELL);
   }
 
   onReceivedLeavedLobby(signal)

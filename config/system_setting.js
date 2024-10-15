@@ -115,6 +115,8 @@ exports.BGM_TYPE = {
   SCORE_ALARM: "SCORE_ALARM.webm",
   SUCCESS: "SUCCESS.webm",
   FAILOVER: "FAILOVER.webm",
+  DOOR_BELL: "DOOR_BELL.webm",
+  CHAT: "CHAT.webm",
 };
 
 exports.QUIZ_MAKER_TYPE = {
