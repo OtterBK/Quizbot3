@@ -458,7 +458,7 @@ const processReportLog = async (interaction) =>
     ban_history.ban_count += 1;
 
     const ban_count = ban_history.ban_count;
-    ban_history.ban_expiration_timestamp = Date.now() + ((24 * 60 * 60 * 1000) * (ban_count * ban_count)); //ban_count 의 제곱 * 1일 만큼 제제(초단위)
+    ban_history.ban_expiration_timestamp = Date.now() + ((24 * 60 * 60 * 1000) * (ban_count * ban_count * ban_count)); //ban_count 의 3제곱 * 1일 만큼 제제(초단위)
 
     db_manager.updateBanHistory(ban_history.user_id, ban_history.ban_count, ban_history.ban_expiration_timestamp);
 
