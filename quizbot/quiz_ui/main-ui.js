@@ -51,7 +51,7 @@ class MainUI extends QuizbotUI
         //   icon_url: 'https://i.imgur.com/AfFp7pu.png',
         //   url: 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg',
       },
-      description: `🔹서버원들과 함께 다양한 퀴즈를 즐겨보세요!\n\n\n1️⃣)  **서버원과 게임하기**\n\n2️⃣)  **다른 서버와 경쟁하기 (대기 중: ${MainUI.MULTIPLAYER_LOBBY_COUNT})**\n\n3️⃣)  **퀴즈 만들기**\n\n4️⃣)  **서버 옵션 설정**\n\n5️⃣)  **공지/패치노트**\n\n\n`,
+      description: `🔹서버원들과 함께 다양한 퀴즈를 즐겨보세요!\n\n\n1️⃣)  **서버원과 게임하기**\n\n2️⃣)  **다른 서버와 경쟁하기 [대기 중: ${MainUI.MULTIPLAYER_LOBBY_COUNT}]**\n\n3️⃣)  **퀴즈 만들기**\n\n4️⃣)  **서버 옵션 설정**\n\n5️⃣)  **공지/패치노트**\n\n\n`,
       thumbnail: {
         url: 'https://user-images.githubusercontent.com/28488288/106536426-c48d4300-653b-11eb-97ee-445ba6bced9b.jpg',
       },
