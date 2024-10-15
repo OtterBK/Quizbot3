@@ -214,7 +214,7 @@ class UserQuizListUI extends QuizBotControlComponentUI
 
     // 그냥 페이지 계산해서 content 가져오자
     const index = (this.count_per_page * this.cur_page) + selected_index - 1; //실제로 1번을 선택했으면 0번 인덱스를 뜻함
-    if(index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
+    if(this.cur_contents === undefined || index >= this.cur_contents.length) //범위 넘어선걸 골랐다면
     {
       return;
     }

@@ -8,9 +8,11 @@ const { RESTJSONErrorCodes} = require('discord.js');
 const { SYSTEM_CONFIG, CUSTOM_EVENT_TYPE } = require('../../config/system_setting.js');
 const logger = require('../../utility/logger.js')('QuizUI');
 
+const { QuizbotUI } = require('./common-ui.js');
 const { MainUI } = require("./main-ui.js");
 const { UserQuizListUI } = require("./user-quiz-list-ui.js");
 const { MultiplayerQuizLobbyUI } = require('./multiplayer-quiz-lobby-ui.js');
+const { SERVER_SIGNAL } = require('../managers/multiplayer_signal.js');
 
 //#endregion
 
@@ -92,6 +94,7 @@ const getUIHolder = (holder_id) =>
 const relayMultiplayerSignal = (multiplayer_signal) => //관련 세션에 멀티플레이 신호 전달
 {
   let handled = false; //한 곳이라도 handle 했으면 한거임
+
   const guild_ids = multiplayer_signal.guild_ids;
   for(const guild_id of guild_ids)
   {
@@ -110,6 +113,11 @@ const relayMultiplayerSignal = (multiplayer_signal) => //관련 세션에 멀티
   }
 
   return handled;
+};
+
+const setGlobalLobbyCount = (lobby_count) =>
+{
+  MainUI.MULTIPLAYER_LOBBY_COUNT = lobby_count;
 };
 
 const eraseUIHolder = (guild) => 
@@ -230,6 +238,8 @@ class UIHolder
     this.prev_ui_stack = undefined; //뒤로가기용 UI스택
 
     logger.info(`Free UI Holder holder_id:${this.holder_id}`);
+
+    delete ui_holder_map[holder_id];
   }
 
   getUI()
@@ -534,4 +544,4 @@ class UIHolder
 
 //#endregion
 
-module.exports = { initialize, createMainUIHolder, createQuizToolUIHolder, getUIHolder, relayMultiplayerSignal, eraseUIHolder, startUIHolderAgingManager, uiHolderAgingManager, UIHolder };
+module.exports = { initialize, createMainUIHolder, createQuizToolUIHolder, getUIHolder, relayMultiplayerSignal, setGlobalLobbyCount, eraseUIHolder, startUIHolderAgingManager, uiHolderAgingManager, UIHolder };

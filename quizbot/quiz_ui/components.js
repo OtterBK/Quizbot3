@@ -735,6 +735,10 @@ const request_basket_reopen_comp = new ActionRowBuilder()
       .setCustomId('use_basket_mode')
       .setLabel('장바구니에 퀴즈 더 담기')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('load_basket_items')
+      .setLabel('최근 장바구니 불러오기')
+      .setStyle(ButtonStyle.Primary),
   );
 
 //오마카세 퀴즈용
@@ -808,7 +812,7 @@ const modal_omakase_quiz_setting = new ModalBuilder()
       .addComponents(
         new TextInputBuilder()
           .setCustomId('txt_input_certified_quiz_filter_off')
-          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setLabel('인증된 퀴즈 필터를 끌까요? (웬만해선 끄지 마세요.)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setMaxLength(1)
@@ -936,7 +940,7 @@ const modal_multiplayer_create_lobby = new ModalBuilder()
       .addComponents(
         new TextInputBuilder()
           .setCustomId('txt_input_certified_quiz_filter_off')
-          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setLabel('인증된 퀴즈 필터를 끌까요? (웬만해선 끄지 마세요.)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setMaxLength(1)
@@ -978,7 +982,7 @@ const modal_multiplayer_quiz_setting = new ModalBuilder()
       .addComponents(
         new TextInputBuilder()
           .setCustomId('txt_input_certified_quiz_filter_off')
-          .setLabel('인증된 퀴즈 필터를 끌까요?')
+          .setLabel('인증된 퀴즈 필터를 끌까요? (웬만해선 끄지 마세요.)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setMaxLength(1)
@@ -1045,6 +1049,10 @@ const multiplayer_lobby_host_basket_comp = new ActionRowBuilder()
 
 const multiplayer_lobby_participant_comp = new ActionRowBuilder()
   .addComponents(
+    new ButtonBuilder()
+      .setCustomId('multiplayer_ready')
+      .setLabel('준비')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('back')
       .setLabel('나가기')

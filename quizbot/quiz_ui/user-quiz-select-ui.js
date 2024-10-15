@@ -21,6 +21,7 @@ const {
 } = require("./common-ui.js");
 
 const { UserQuizInfoUI } = require("./user-quiz-info.ui.js");
+const { QuizInfoUI } = require("./quiz-info-ui.js");
 //#endregion
 
 /** 유저 퀴즈 선택 UI */
@@ -308,6 +309,10 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
       };
    
       interaction.reply({content: `\`\`\`🔸 [${user_quiz_info.data.quiz_title}] 퀴즈를 장바구니에 담았습니다. (${Object.keys(this.basket_items).length}개 / ${this.max_basket_size}개)\`\`\``});
+
+      const guild_id = interaction.guild.id;
+      QuizInfoUI.BASKET_CACHE[guild_id] = this.basket_items;
+
       return;
     }
 

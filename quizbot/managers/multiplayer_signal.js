@@ -19,6 +19,8 @@ const SERVER_SIGNAL =
   HOST_CHANGED: 0x90,            // 10010000 - 호스트 변경됨. 
   NOTICE_MESSAGE: 0x91,          // 10010001 - 전체 메시지. (완료)
   PARTICIPANT_INFO_UPDATE: 0x92, // 10010010 - 참여자 정보 갱신(전적 로드 완료). (완료)
+  UPDATED_LOBBY_COUNT: 0x93,     // 00010011 - 대기 중인 로비 수 업뎃. (완료)
+  CONFIRM_READY: 0x94,           // 00010100 - 준비 완료됨. (완료)
 };
 
 const CLIENT_SIGNAL = 
@@ -41,6 +43,7 @@ const CLIENT_SIGNAL =
   FINISH_UP: 0x0F,                  // 00001111 - 게임 마무리 알림. (완료)
   FINISHED: 0x10,                   // 00010000 - 게임 종료 알림. (완료)
   REQUEST_CHAT: 0x11,               // 00010001 - 채팅 요청. (완료)
+  REQUEST_READY: 0x12,               // 00010010 - 준비 요청. (완료)
 };
 
 

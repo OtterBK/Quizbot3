@@ -23,6 +23,7 @@ const {
 } = require("./common-ui.js");
 
 const { MultiplayerQuizLobbyUI } = require("./multiplayer-quiz-lobby-ui.js");
+const { ScoreboardUI } = require("./scoreboard-ui.js");
 
 //#endregion
 
@@ -92,7 +93,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
 
     for(let multiplayer_lobby_info of multiplayer_lobby_info_list) 
     {
-      multiplayer_lobby_info.name = `**${multiplayer_lobby_info.session_name}**\n🔸) ${multiplayer_lobby_info.is_ingame ? '게임' : '대기'} 중: ${multiplayer_lobby_info.participant_count}서버 | 호스트: ${multiplayer_lobby_info.host_name}`;
+      multiplayer_lobby_info.name = `**${multiplayer_lobby_info.session_name}**\n🔸) ${multiplayer_lobby_info.is_ingame ? '게임' : '대기'} 중: ${multiplayer_lobby_info.participant_count} | 평균 MMR: ${multiplayer_lobby_info.mmr_avg} | 호스트: ${multiplayer_lobby_info.host_name} `;
     }
 
     this.cur_contents = multiplayer_lobby_info_list ?? [];
@@ -161,9 +162,7 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
 
   handleRequestScoreboard(interaction)
   {
-    interaction.explicit_replied = true;
-    interaction.reply({content: `\`\`\`🔸 랭킹 기능은 11월에 추가될 예정입니다...😥\`\`\``, ephemeral: true});
-    return undefined;
+    return new ScoreboardUI(interaction.guild);
   }
 
   handleSubmitModalCreateLobby(interaction)
@@ -229,6 +228,12 @@ class MultiplayerQuizSelectUI extends QuizBotControlComponentUI
 
   tryJoinLobby(interaction, multiplayer_lobby_info)
   {
+    if(multiplayer_lobby_info.is_ingame)
+    {
+      interaction.channel.send({content: `\`\`\`🌐 ${multiplayer_lobby_info.session_name} 은 이미 게임 중입니다.\`\`\``});
+      return undefined;
+    }
+
     if(this.is_joining)
     {
       interaction.channel.send({content: `\`\`\`🌐 이미 ${multiplayer_lobby_info.session_name}에 참여 시도 중입니다.\n잠시 후 다시 시도해보세요.\`\`\``});

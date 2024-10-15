@@ -35,8 +35,7 @@ const tagged_dev_quiz_manager = require('./managers/tagged_dev_quiz_manager.js')
 const audio_cache_manager = require('./managers/audio_cache_manager.js');
 const multiplayer_chat_manager = require('./managers/multiplayer_chat_manager.js');
 const report_manager = require('./managers/report_manager.js');
-const { stdin } = require('process');
-const { dirname } = require('path');
+const { SERVER_SIGNAL } = require('./managers/multiplayer_signal.js');
 
 /** global 변수 **/
 
@@ -531,6 +530,12 @@ const createCleanUp = function ()
 
 const relayMultiplayerSignal = (signal) =>
 {
+  if(signal.signal_type === SERVER_SIGNAL.UPDATED_LOBBY_COUNT) //이것만 예외
+  {
+    quizbot_ui.setGlobalLobbyCount(signal.lobby_count); //캐싱해둠
+    return;
+  }
+
   const quiz_session_handled = quiz_system.relayMultiplayerSignal(signal);
   const quiz_ui_handled = quizbot_ui.relayMultiplayerSignal(signal);
 

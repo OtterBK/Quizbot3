@@ -370,4 +370,9 @@ const loadQuestionListByBasket = async (basket_condition_query, limit) =>
   return [total_question_count, question_list];
 };
 
-module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags, loadQuestionListByBasket };
+const addPlayedCountByQuiz = (quiz_id) =>
+{
+  db_manager.addQuizInfoPlayedCount(quiz_id);
+}
+
+module.exports = { UserQuizInfo, UserQuestionInfo, loadUserQuizListFromDB, QuizInfoColumn, loadQuestionListFromDBByTags, loadQuestionListByBasket, addPlayedCountByQuiz };

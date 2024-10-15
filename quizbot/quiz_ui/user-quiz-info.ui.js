@@ -238,7 +238,7 @@ class UserQuizInfoUI extends QuizInfoUI
         const reason_message = text_contents.quiz_info_ui.failed_start.replace("${reason}", reason);
 
         interaction.explicit_replied = true;
-        interaction.reply({content: `\`\`\`🔸 ${reason_message}\`\`\``, ephemeral: true});
+        interaction.reply({content: reason_message, ephemeral: true});
         return;
       }
         
