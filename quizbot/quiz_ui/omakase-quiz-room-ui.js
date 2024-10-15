@@ -192,7 +192,7 @@ class OmakaseQuizRoomUI extends QuizInfoUI
     this.quiz_info['basket_items'] = cloneDeep(cached_basket_items);
 
     interaction.explicit_replied = true;
-    interaction.reply({content: `\`\`\`🔸 ${Object.keys(this.quiz_info.basket_items)} 개의 장바구니 데이터를 불러왔어요.\`\`\``, ephemeral: true});
+    interaction.reply({content: `\`\`\`🔸 ${Object.keys(this.quiz_info.basket_items).length} 개의 장바구니 데이터를 불러왔어요.\`\`\``, ephemeral: true});
 
     this.refreshUI();
     return this;
