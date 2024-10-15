@@ -1276,12 +1276,12 @@ class MultiplayerSession
       win_rate = win / (win + lose);
     }
   
-    const base_mmr = 90; // 기본 00
+    const base_mmr = 80; // 기본 80
     const max_question_size = 60; // 최대 60문제
     const current_quiz_size = this.question_num + 1;
   
-    // 3명부터 0.5배씩 보너스
-    const participant_bonus = Math.max(0, this.scoreboard.size - 2) * 0.5;
+    // 3명부터 0.3배씩 보너스
+    const participant_bonus = Math.max(0, this.scoreboard.size - 2) * 0.3;
     let mmr_add = base_mmr * (1 + participant_bonus);
   
     // 진행된 문제 수 비율 계산
