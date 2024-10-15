@@ -519,7 +519,13 @@ class QuizInfoUI extends QuizbotUI
     let remove_count = 0;
     for(const key of selected_values)
     {
-      delete basket_items[key];
+      const quiz_id = parseInt(key);
+      if(isNaN(quiz_id))
+      {
+        continue;
+      }
+
+      delete basket_items[parseInt(quiz_id)];
       ++remove_count;
     }
 
