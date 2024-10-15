@@ -296,7 +296,7 @@ class UserQuizSelectUI extends QuizBotControlComponentUI
         return;
       }
 
-      if(this.basket_items.length >= this.max_basket_size)
+      if(Object.keys(this.basket_items ?? []).length >= this.max_basket_size)
       {
         interaction.reply({content: `\`\`\`🔸 장바구니가 가득 찼습니다. 더 이상 퀴즈를 담을 수 없어요.\`\`\``, ephemeral: true});
         return; 

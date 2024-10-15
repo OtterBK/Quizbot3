@@ -5049,7 +5049,7 @@ class QuestionCustom extends Question
         
     if(audio_error_occurred == true) //에러 발생 시, 음악만 바꾼다. (오디오 용도가 그냥 브금이었을 수도 있으니깐)
     {
-      logger.warn("Audio error occurred on Custom Quiz! Play failover bgm.");
+      logger.warn(`Audio error occurred on Custom Quiz! Play failover bgm. guild_id: ${this.quiz_session.guild_id}`);
 
       this.progress_bar_fixed_text += `\n😭 오디오 추출에 실패하여 임시 BGM을 대신 재생합니다.`;
 
@@ -5227,7 +5227,7 @@ class QuestionOmakase extends Question
 
     if(audio_error_occurred == true) //오마카세 퀴즈에서는 에러 발생 시, 다음 문제로 다시 ㄱㄱ
     {
-      logger.warn("Audio error occurred on Omakase Quiz! Skip to next question.");
+      logger.warn(`Audio error occurred on Omakase Quiz! Skip to next question. guild_id: ${this.quiz_session.guild_id}`);
       this.next_cycle = CYCLE_TYPE.CLEARING;
       game_data['question_num'] -= 1;
       utility.playBGM(audio_player, BGM_TYPE.FAILOVER); //failover용 브금(오디오 다운로드할 시간 벌기)
