@@ -1976,7 +1976,7 @@ class QuizLifeCycleWithUtility extends QuizLifeCycle //여러 기능을 포함�
       // },
     );
 
-    const show_count = option_data.quiz.score_show_max == OPTION_TYPE.UNLIMITED ? scoreboard.size : option_data.quiz.score_show_max;
+    const show_count = option_data.quiz.score_show_max == OPTION_TYPE.UNLIMITED ? scoreboard.size : Math.min(option_data.quiz.score_show_max, scoreboard.size);
 
     const iter = scoreboard.entries();
     for(let i = 0; i < show_count; ++i)
