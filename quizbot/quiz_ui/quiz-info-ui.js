@@ -484,6 +484,7 @@ class QuizInfoUI extends QuizbotUI
     {
       const option = { label: `장바구니가 비어있습니다.`, description: `.`, value: `basket_select_temp` };
       basket_select_menu_for_current.addOptions(option);
+      this.basket_select_component.components[0] = basket_select_menu_for_current;
       return;
     }
   
