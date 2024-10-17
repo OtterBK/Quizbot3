@@ -470,7 +470,7 @@ exports.updateGlobalScoreboard = async (guild_id, win_add, lose_add, play_add, m
   const query_string = 
   `
   INSERT INTO tb_global_scoreboard (guild_id, win, lose, play, mmr, guild_name)
-  VALUES ($1, $2, $3, $4, GREATEST($5, 0), $6)
+  VALUES ($1, $2, $3, $4, $5, $6)
   ON CONFLICT (guild_id)
   DO UPDATE SET 
       win = tb_global_scoreboard.win + EXCLUDED.win,
