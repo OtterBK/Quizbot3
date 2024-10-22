@@ -19,7 +19,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-## 목차
+## 📖 목차
 
 - [📘 소개](#📘-소개)
 - [📋 명령어](#📋-명령어)
@@ -92,7 +92,7 @@
 ---
 
 ### [서버원과 게임하기]
-서버원들과 함께 퀴즈를 풀며 경쟁할 수 있는 퀴즈봇의 가장 기본적인 기능으로 3가지 유형의 퀴즈를 제공합니다.
+🔖 서버원들과 함께 퀴즈를 풀며 경쟁할 수 있는 퀴즈봇의 가장 기본적인 기능으로 3가지 유형의 퀴즈를 제공합니다.
 
 <div style="display: flex; justify-content: space-between;">
   <img src="https://github.com/user-attachments/assets/d20b1e00-65f8-4bf4-9cc9-dbc5d345df96" width="350" height="500">
@@ -103,19 +103,16 @@
   <img src="https://github.com/user-attachments/assets/e7350e14-3e50-4850-9607-e74347901b8e" width="350" height="500">
 </div>
 
-* 공식 퀴즈
-개발자가 미리 제작해둔 퀴즈들로, 장기 지원되는 퀴즈들입니다.
+* 공식 퀴즈: 개발자가 미리 제작해둔 퀴즈들로, 장기 지원되는 퀴즈들입니다.
 
-* 유저 제작 퀴즈
-퀴즈봇의 유저분들이 `퀴즈만들기` 기능을 통해 직접 제작한 퀴즈들입니다.
+* 유저 제작 퀴즈: 퀴즈봇의 유저분들이 `퀴즈만들기` 기능을 통해 직접 제작한 퀴즈들입니다.
 
-* 오마카세 퀴즈
-퀴즈 장르나, 원하는 퀴즈들을 선택하면 퀴즈 봇이 그 중에서 무작위로 일정 수의 퀴즈를 제출하는 방식입니다.
+* 오마카세 퀴즈: 퀴즈 장르나, 원하는 퀴즈들을 선택하면 퀴즈 봇이 그 중에서 무작위로 일정 수의 퀴즈를 제출하는 방식입니다.
 
 ---
 
 ### [다른 서버와 경쟁하기]
-서버원들과 협력해 다른 서버와 퀴즈 대결을 진행하는 모드로, 멀티플레이 퀴즈라고 부릅니다.
+🔖 서버원들과 협력해 다른 서버와 퀴즈 대결을 진행하는 모드로, 멀티플레이 퀴즈라고 부릅니다.
 
 <div style="display: flex; justify-content: space-between;">
   <img src="https://github.com/user-attachments/assets/97bd6c23-de08-4475-9079-ee7d6576edb2" width="350" height="500">
@@ -131,8 +128,8 @@
 ---
 
 ### [퀴즈 만들기]
-직접 자신만의 퀴즈를 제작하고 모두와 공유할 수 있는 기능입니다.
-`/퀴즈만들기` 명령어를 입력하여 디스코드에서 퀴즈 제작 화면을 요청할 수 있습니다.
+🔖 직접 자신만의 퀴즈를 제작하고 모두와 공유할 수 있는 기능입니다.
+🔖 `/퀴즈만들기` 명령어를 입력하여 디스코드에서 퀴즈 제작 화면을 요청할 수 있습니다.
 
 <div style="display: flex; justify-content: space-between;">
   <img src="https://github.com/user-attachments/assets/565360a8-2681-4640-b816-412e26a99085" width="350" height="500">
@@ -151,7 +148,7 @@
 ---
 
 ### [서버 설정 옵션 제공]
-서버 설정 옵션을 통해 노래 재생 시간, 점수 채점 방식 등을 조정할 수 있습니다.
+🔖 서버 설정 옵션을 통해 노래 재생 시간, 점수 채점 방식, 힌트 요청 방식 등을 조정할 수 있습니다.
 
 </div>
   <img src="https://github.com/user-attachments/assets/60712ebc-cf4f-436c-b600-6f27da0b4f4c" width="350" height="500">
@@ -161,7 +158,7 @@
 ---
 
 ### [공지/패치노트 확인]
-새로운 기능이나 업데이트를 실시간으로 공지사항에서 확인할 수 있습니다.
+🔖 새로운 기능이나 업데이트를 실시간으로 공지사항에서 확인할 수 있습니다.
 
 </div>
   <img src="https://github.com/user-attachments/assets/bdd368b1-58a1-4154-9f3f-c705b1301183" width="350" height="500">
@@ -170,9 +167,11 @@
 
 ## 📑 봇 사용 예시
 
-
+작성 중
 
 ## 💻 개발자용-서버구축
+
+작성 중
 
 - Follow the [React Native Guide](https://facebook.github.io/react-native/docs/getting-started.html) for getting started building a project with native code. **A Mac is required if you wish to develop for iOS.**
 - Clone or download the repo
