@@ -256,6 +256,17 @@ const submitReportChatModal = (interaction) =>
   db_manager.insertReportInfo(report_info_key_fields, [chat_id, reporter_id, report_detail, report_type]);
 
   logger.info(`${sender_id} Reported Message ${content}`);
+
+  if(PRIVATE_CONFIG.ADMIN_ID)
+  {
+    bot_client.users.fetch(PRIVATE_CONFIG.ADMIN_ID).then((instance) => 
+    {
+      if (instance) 
+      {
+        instance.send(`\`\`\`새로운 신고가 접수되었습니다.\`\`\``);
+      }
+    });
+  }
 };
 
 const sendReportLog = async (interaction) =>

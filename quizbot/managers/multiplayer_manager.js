@@ -1177,7 +1177,7 @@ class MultiplayerSession
 
   getRequestConfirmCriteria()
   {
-    return Math.floor((this.participant_guilds.length + 1) / 2);
+    return Math.floor((this.participant_guilds.length + 1) / 2) + 1;
   }
 
   processLeaveGame(guild_id)
