@@ -19,27 +19,24 @@
 
 ## 📖 목차
 
-- [📖 목차](#-목차)
-- [소개](#소개)
-    - [🎮 **디스코드 서버에서 즐길 수 있는 최고의 퀴즈 봇!**](#-디스코드-서버에서-즐길-수-있는-최고의-퀴즈-봇)
-- [명령어](#명령어)
-  - [🎮 **기본 명령어**](#-기본-명령어)
-  - [🌐 **멀티플레이 관련 명령어**](#-멀티플레이-관련-명령어)
-- [기능](#기능)
-  - [\[기본화면\]](#기본화면)
-  - [\[서버원과 게임하기\]](#서버원과-게임하기)
-  - [\[다른 서버와 경쟁하기\]](#다른-서버와-경쟁하기)
-  - [\[퀴즈 만들기\]](#퀴즈-만들기)
-  - [\[서버 설정 옵션 제공\]](#서버-설정-옵션-제공)
-  - [\[공지/패치노트 확인\]](#공지패치노트-확인)
-- [📑 봇 사용 예시](#-봇-사용-예시)
-- [💻 개발자용-서버구축](#-개발자용-서버구축)
-- [🛠️ 설치 과정 요약](#️-설치-과정-요약)
-  - [주요 설치 단계:](#주요-설치-단계)
+- [📖 **목차**](#-목차)
+- [📘 **소개**](#-소개)
+- [📋 **명령어**](#-명령어)
+  - [🎮 기본 명령어](#-기본-명령어)
+  - [🌐 멀티플레이 관련 명령어](#-멀티플레이-관련-명령어)
+- [**🔧 기능**](#-기능)
+  - [기본화면](#기본화면)
+  - [서버원과 게임하기](#서버원과-게임하기)
+  - [다른 서버와 경쟁하기](#다른-서버와-경쟁하기)
+  - [퀴즈 만들기](#퀴즈-만들기)
+  - [서버 설정 옵션 제공](#서버-설정-옵션-제공)
+  - [공지/패치노트 확인](#공지패치노트-확인)
+- [📑 **봇 사용 예시**](#-봇-사용-예시)
+- [💻 **개발자용-서버구축**](#-개발자용-서버구축)
 
 ---
 
-## 소개
+## 📘 소개
 
 #### 🎮 **디스코드 서버에서 즐길 수 있는 최고의 퀴즈 봇!**
 
@@ -63,7 +60,7 @@
 
 ---
 
-## 명령어
+## 📋 명령어
 
 ### 🎮 **기본 명령어**
 
@@ -83,7 +80,7 @@
 | `/채팅전환`      | 전체 채팅 기능을 켜거나 끕니다.               | `/채팅전환`   |
 
 
-## 기능
+## 🔧 기능
 
 퀴즈봇은 **NodeJS** 기반으로 개발되었으며, **DiscordJS** 라이브러리를 사용합니다.  
 아래 기능을 통해 퀴즈봇을 최대한 활용해 보세요!
@@ -106,8 +103,8 @@
 🔖 서버원들과 함께 퀴즈를 풀며 경쟁할 수 있는 퀴즈봇의 가장 기본적인 기능입니다.
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; width: 150px; margin: 0 auto;">
-    📷 스냅샷 보기
+  <summary>
+    📷 [스냅샷 보기]
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -131,8 +128,8 @@
 🔖 서버원들과 협력해 다른 서버와 퀴즈 대결을 진행하는 **멀티플레이 퀴즈 모드**입니다.
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; width: 150px; margin: 0 auto;">
-    📷 스냅샷 보기
+  <summary>
+    📷 [스냅샷 보기]
   </summary>
   <div style="display: flex; justify-content: space-between;" align="left">
     <img src="https://github.com/user-attachments/assets/97bd6c23-de08-4475-9079-ee7d6576edb2" width="330" height="450">
@@ -153,8 +150,8 @@
 🔖 `/퀴즈만들기` 명령어를 입력하여 퀴즈 제작 메뉴를 호출하세요.
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; width: 150px; margin: 0 auto;">
-    📷 스냅샷 보기
+  <summary>
+    📷 [스냅샷 보기]
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -182,8 +179,8 @@
 🔖 노래 재생 시간, 점수 채점 방식, 힌트 요청 방식 등 다양한 **서버 설정 옵션**을 제공합니다.
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; width: 150px; margin: 0 auto;">
-    📷 스냅샷 보기
+  <summary>
+    📷 [스냅샷 보기]
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -198,8 +195,8 @@
 🔖 새로운 기능이나 업데이트 소식을 **공지사항**에서 확인하세요!
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; width: 150px; margin: 0 auto;">
-    📷 스냅샷 보기
+  <summary>
+    📷 [스냅샷 보기]
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -218,8 +215,8 @@
 ## 💻 개발자용-서버구축  
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; display: inline-block; margin: 0;">
-    📋 시스템 요구사항
+  <summary>
+    📋 [시스템 요구사항]
   </summary>
 
 | 요구사항          | 세부 내용                                                                                      |
@@ -237,8 +234,8 @@
 
 ---
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; display: inline-block; margin: 0;">
-    📦 자동 설치 방법
+  <summary>
+    📦 [자동 설치 방법]
   </summary>
 
 
@@ -274,8 +271,8 @@
    ![Quizbot3 설치 확인](https://github.com/user-attachments/assets/3943c9bf-a2d7-4496-914c-30679c99ce41)
 
   <details>
-    <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; display: inline-block; margin: 0;">
-      ⚙ 스크립트 옵션 설명
+    <summary>
+      ⚙ [스크립트 옵션 설명]
     </summary>
 
     1. **설치 경로 설정** (`--install-path`):  
@@ -320,8 +317,8 @@
 ---
 
 <details>
-  <summary style="background-color: #607D8B; color: white; padding: 3px 8px; font-size: 0.8em; border-radius: 5px; cursor: pointer; text-align: center; display: inline-block; margin: 0;">
-    📦 수동 설치 방법
+  <summary>
+    📦 [수동 설치 방법]
   </summary>
 
 
