@@ -8,4 +8,4 @@ node index.js
 psql -U quizbot -d quizbot3 -c "DROP SCHEMA quizbot CASCADE";
 psql -U quizbot -d quizbot3 -a -f backup_20240115_133014.sql;
 
-sudo sh auto_script/setup_quizbot3.sh --install-path=/home/ubuntu/quizbot3/ --node=18 --cron --dump=/home/ubuntu/base.sql --swap=8G 
+sudo sh /home/ubuntu/setup_quizbot3.sh --install-path=/home/ubuntu/quizbot3/ --node=18 --cron --dump=/home/ubuntu/base.sql --swap=8G 
