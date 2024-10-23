@@ -144,7 +144,7 @@ print_emphasized "Quizbot3 has been Installed!!!!!!!!!!!!!!!!!!!!"
 # Setting the QUIZBOT_PATH environment variable to INSTALL_PATH
 echo "Setting QUIZBOT_PATH environment variable to $INSTALL_PATH"
 echo "export QUIZBOT_PATH=\"$INSTALL_PATH\"" >> ~/.bashrc
-source ~/.bashrc
+. ~/.bashrc
 
 print_emphasized "QUIZBOT_PATH has been set to: $QUIZBOT_PATH"
 
