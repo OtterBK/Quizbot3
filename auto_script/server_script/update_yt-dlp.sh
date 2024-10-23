@@ -1,10 +1,13 @@
 #!/bin/bash
 
-# Get the directory of the current script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the INSTALL_PATH environment variable (QUIZBOT_PATH)
+if [ -z "$QUIZBOT_PATH" ]; then
+    echo "QUIZBOT_PATH is not set. Please set it before running the script."
+    exit 1
+fi
 
-# Define the target path based on the script's location
-TARGET_PATH="$SCRIPT_DIR/../../node_modules/youtube-dlp-exec/bin"
+# Define the target path using QUIZBOT_PATH
+TARGET_PATH="$QUIZBOT_PATH/node_modules/youtube-dlp-exec/bin"
 
 # Check if the directory exists, create if it doesn't
 if [ ! -d "$TARGET_PATH" ]; then
