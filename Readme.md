@@ -19,7 +19,6 @@
 
 ## 📖 목차
 
-- [📖 **목차**](#-목차)
 - [📘 **소개**](#-소개)
 - [📋 **명령어**](#-명령어)
   - [🎮 기본 명령어](#-기본-명령어)
@@ -104,7 +103,7 @@
 
 <details>
   <summary>
-    📷 [스냅샷 보기]
+    <a>📷 [스냅샷 보기]</a>
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -129,7 +128,7 @@
 
 <details>
   <summary>
-    📷 [스냅샷 보기]
+    <a>📷 [스냅샷 보기]</a>
   </summary>
   <div style="display: flex; justify-content: space-between;" align="left">
     <img src="https://github.com/user-attachments/assets/97bd6c23-de08-4475-9079-ee7d6576edb2" width="330" height="450">
@@ -151,7 +150,7 @@
 
 <details>
   <summary>
-    📷 [스냅샷 보기]
+    <a>📷 [스냅샷 보기]</a>
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -180,7 +179,7 @@
 
 <details>
   <summary>
-    📷 [스냅샷 보기]
+    <a>📷 [스냅샷 보기]</a>
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
@@ -196,7 +195,7 @@
 
 <details>
   <summary>
-    📷 [스냅샷 보기]
+    <a>📷 [스냅샷 보기]</a>
   </summary>
   
   <div style="display: flex; justify-content: space-between;" align="left">
