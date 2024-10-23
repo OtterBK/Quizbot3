@@ -269,47 +269,42 @@
    ![설치 완료](https://github.com/user-attachments/assets/af803c4f-cd53-4402-a1e0-233c5b8dee8a)  
    ![Quizbot3 설치 확인](https://github.com/user-attachments/assets/3943c9bf-a2d7-4496-914c-30679c99ce41)
 
-  <details>
-    <summary>
-      ⚙ [스크립트 옵션 설명]
-    </summary>
+### 스크립트 옵션 설명
 
-    1. **설치 경로 설정** (`--install-path`):  
-      Quizbot3를 설치할 경로를 지정합니다.
-      
-      ```bash
-      --install-path=/your/install/directory
-      ```
+ * **설치 경로 설정** (`--install-path`):  
+   Quizbot3를 설치할 경로를 지정합니다.
+   
+   ```bash
+   --install-path=/your/install/directory
+   ```
 
-    2. **Node.js 버전 선택** (`--node`):  
-      기본적으로 Node.js 18 버전이 설치되며, 16 또는 17 버전도 선택할 수 있습니다.
-      
-      ```bash
-      --node=16  # Node.js 16 설치
-      ```
+ * **Node.js 버전 선택** (`--node`):  
+   기본적으로 Node.js 18 버전이 설치되며, 16 또는 17 버전도 선택할 수 있습니다.
+   
+   ```bash
+   --node=16  # Node.js 16 설치
+   ```
 
-    3. **크론 스케줄러 설정** (`--cron` 옵션):  
-      이 옵션을 통해 정기적으로 서버를 시작, 중지하거나 백업 등의 작업을 예약할 수 있습니다.
-      
-      ```bash
-      --cron
-      ```
+ * **크론 스케줄러 설정** (`--cron` 옵션):  
+   이 옵션을 통해 정기적으로 서버를 시작, 중지하거나 백업 등의 작업을 예약할 수 있습니다.
+   
+   ```bash
+   --cron
+   ```
 
-    4. **데이터베이스 백업 복원** (`--dump`):  
-      기존 데이터베이스 백업 파일이 있을 경우 해당 경로를 지정하면 복원합니다.
-      
-      ```bash
-      --dump=/path/to/base.sql
-      ```
+ * **데이터베이스 백업 복원** (`--dump`):  
+   기존 데이터베이스 백업 파일이 있을 경우 해당 경로를 지정하면 복원합니다.
+   
+   ```bash
+   --dump=/path/to/base.sql
+   ```
 
-    5. **스왑 메모리 설정** (`--swap`):  
-      메모리가 부족할 때를 대비하여 추가적인 SWAP 메모리를 설정할 수 있습니다. 예를 들어 8GB의 SWAP을 설정하려면:
-      
-      ```bash
-      --swap=8  # 8GB 스왑 설정
-      ```
-
-  </details>
+ * **스왑 메모리 설정** (`--swap`):  
+   메모리가 부족할 때를 대비하여 추가적인 SWAP 메모리를 설정할 수 있습니다. 예를 들어 8GB의 SWAP을 설정하려면:
+   
+   ```bash
+   --swap=8  # 8GB 스왑 설정
+   ```
 
 </details>
 
@@ -319,8 +314,6 @@
   <summary>
     📦 [수동 설치 방법]
   </summary>
-
-
 
 ### Quizbot3 수동 설치 가이드
 
