@@ -160,7 +160,7 @@ if [ "$REGISTER_CRON" = true ]; then
     (crontab -l -u ubuntu 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 * * * * sudo -E sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | sudo crontab -u ubuntu -
-    (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/update-yt-dlp.sh") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/update_yt-dlp.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "1 9,21 * * * sh $SCRIPT_PATH/server_script/quizbot_start.sh") | sudo crontab -u ubuntu -
 
     (crontab -l -u ubuntu 2>/dev/null; echo "0 0 * * 1 sudo -E sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | sudo crontab -u ubuntu -
