@@ -141,6 +141,12 @@ sudo npm install
 sudo cp -R custom_node_modules/* node_modules/
 print_emphasized "Quizbot3 has been Installed!!!!!!!!!!!!!!!!!!!!"
 
+# Setting the QUIZBOT_PATH environment variable to INSTALL_PATH
+echo "Setting QUIZBOT_PATH environment variable to $INSTALL_PATH"
+echo "export QUIZBOT_PATH=\"$INSTALL_PATH\"" >> ~/.bashrc
+source ~/.bashrc
+
+print_emphasized "QUIZBOT_PATH has been set to: $QUIZBOT_PATH"
 
 # Setting Cron Scheduler
 if [ "$REGISTER_CRON" = true ]; then
@@ -152,12 +158,13 @@ if [ "$REGISTER_CRON" = true ]; then
     print_emphasized "Executing Register cron script"
     SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
     (crontab -l -u ubuntu 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | sudo crontab -u ubuntu -
-    (crontab -l -u ubuntu 2>/dev/null; echo "0 * * * * sudo sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 * * * * sudo -E sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/update_yt-dlp.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "1 9,21 * * * sh $SCRIPT_PATH/server_script/quizbot_start.sh") | sudo crontab -u ubuntu -
 
-    (crontab -l -u ubuntu 2>/dev/null; echo "0 0 * * 1 sudo sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | sudo crontab -u ubuntu -
-    (crontab -l -u ubuntu 2>/dev/null; echo "0 8,20 * * * sudo sh $SCRIPT_PATH/db_script/backup_script.sh") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 0 * * 1 sudo -E sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 8,20 * * * sudo -E sh $SCRIPT_PATH/db_script/backup_script.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 */3 * * * sudo sync && echo 3 > /proc/sys/vm/drop_caches") | sudo crontab -u ubuntu -
 fi
 
