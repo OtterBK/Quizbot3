@@ -248,9 +248,16 @@
 
 1. **Quizbot 자동 설치 스크립트를 홈 경로에 다운로드합니다**.  
    [setup_quizbot3.sh 다운로드](https://github.com/OtterBK/Quizbot3/blob/develop/auto_script/setup_quizbot3.sh)
+   ```bash
+   wget https://raw.githubusercontent.com/OtterBK/Quizbot3/refs/heads/develop/auto_script/setup_quizbot3.sh
+   ```
 
 2. **DB 스키마 구성을 위한 `base.sql`을 홈 경로에 다운로드합니다**.  
    [base.sql 다운로드](https://github.com/OtterBK/Quizbot3/blob/master/auto_script/db_backup/base.sql)
+   ```bash
+   wget https://raw.githubusercontent.com/OtterBK/Quizbot3/refs/heads/master/auto_script/db_backup/base.sql
+   ```
+   
 
 3. **퀴즈봇을 설치할 디렉터리를 홈 경로에 생성합니다**.
    ```bash
