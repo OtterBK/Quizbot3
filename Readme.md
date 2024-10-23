@@ -258,6 +258,7 @@
    ```
 
 4. **현재 디렉터리 구조는 다음과 같을 것입니다**:
+	<br>
    ![디렉터리 구조](https://github.com/user-attachments/assets/47fe14a9-6a7f-4d13-ace2-561e899f21de)
 
 5. **다음 명령어를 실행하여 퀴즈봇을 설치합니다**:
