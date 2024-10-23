@@ -247,16 +247,16 @@
 ### 설치 단계:
 
 1. **Quizbot 자동 설치 스크립트를 홈 경로에 다운로드합니다**.  
-   [setup_quizbot3.sh 다운로드](https://github.com/OtterBK/Quizbot3/blob/develop/auto_script/setup_quizbot3.sh)
    ```bash
    wget https://raw.githubusercontent.com/OtterBK/Quizbot3/refs/heads/develop/auto_script/setup_quizbot3.sh
    ```
+   [setup_quizbot3.sh 다운로드](https://github.com/OtterBK/Quizbot3/blob/develop/auto_script/setup_quizbot3.sh)
 
 2. **DB 스키마 구성을 위한 `base.sql`을 홈 경로에 다운로드합니다**.  
-   [base.sql 다운로드](https://github.com/OtterBK/Quizbot3/blob/master/auto_script/db_backup/base.sql)
    ```bash
    wget https://raw.githubusercontent.com/OtterBK/Quizbot3/refs/heads/master/auto_script/db_backup/base.sql
    ```
+   [base.sql 다운로드](https://github.com/OtterBK/Quizbot3/blob/master/auto_script/db_backup/base.sql)
    
 
 3. **퀴즈봇을 설치할 디렉터리를 홈 경로에 생성합니다**.
@@ -473,6 +473,56 @@ sudo swapon --show
 ```bash
 # 데이터베이스 복원 (백업 파일 경로는 변경 필요)
 sudo -u postgres psql -d quizbot3 -f /path/to/base.sql
+```
+
+</details>
+
+---
+<details>
+  <summary>
+    🔌 [봇 실행 방법]
+  </summary>
+
+### Quizbot3 실행 가이드
+
+### 1. private_config.json 설정
+
+Quizbot3가 설치된 경로에서 `config/private_config.json` 파일을 엽니다.
+
+```bash
+vim /home/ubuntu/quizbot3/config/private_config.json
+```
+
+* DB 접속 계정의 기본 PASSWORD는 `changepasswd` 입니다.
+* TOKEN, CLIENT_ID 값에는 Discord Developer Portal 에서 발급 받으신 토큰 및 ID를 넣어주세요.
+* KOREANBOT_TOKEN은 생략 가능합니다.
+* ADMIN_ID는 본인의 Discord User ID를 넣어주시면 됩니다.(생략 가능합니다.)
+
+```plane
+{
+    "BOT": {
+        "TOKEN" : "INPUT_BOT_TOKEN",
+        "CLIENT_ID" : "INPUT_BOT_CLIENT_ID",
+        "KOREANBOT_TOKEN" : "INPUT_KOREAN_BOT_TOKEN"
+    },
+    "DB": {
+        "HOST" : "localhsot",
+        "USER" : "quizbot",
+        "PASSWORD" : "changepasswd",
+        "DATABASE" : "quizbot3",
+        "PORT" : "5432"
+    },
+    "ADMIN_ID": "INPUT_YOUR_DISCORD_USER_ID"
+}
+
+```
+
+### 2. 봇 실행
+
+봇 실행은 index.js를 실행하여 활성화 가능합니다.
+
+```bash
+node /home/ubuntu/quizbot3/index.js
 ```
 
 </details>
