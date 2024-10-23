@@ -1360,25 +1360,25 @@ class MultiplayerQuizSession extends MultiplayerSessionMixin(QuizSession)
       }
     );
 
-    let wait_sync_done_time_sec = 0;
+    let wait_sync_done_time_count = 0;
     const current_sequence = this.sync_done_sequence_num;
     while(current_sequence === this.sync_done_sequence_num)
     {
-      await utility.sleep(100);
-      ++wait_sync_done_time_sec;
+      await utility.sleep(10); //공정한 게임을 위해 제일 중요한 구간임
+      ++wait_sync_done_time_count;
 
-      if(wait_sync_done_time_sec === 50) //5초
+      if(wait_sync_done_time_count === 500) //5초
       {
         this.sendMessage({content:`\`\`\`🌐 다른 서버의 동기화 완료를 기다리는 중\`\`\``});
       }
 
-      if(wait_sync_done_time_sec === 200) //20초
+      if(wait_sync_done_time_count === 2000) //20초
       {
         this.sendMessage({content:`\`\`\`🌐 동기화가 지연되고 있습니다. 잠시만 기다려주세요...\`\`\``});
         logger.warn(`Multiplayer quiz session sync done delayed. guild_id: ${this.guild_id}`);
       }
 
-      if(wait_sync_done_time_sec >= 450) //45초. 이정도면 그냥 뭔가 문제가 있음
+      if(wait_sync_done_time_count >= 4500) //45초. 이정도면 그냥 뭔가 문제가 있음
       {
         this.syncFailed();
         return;
