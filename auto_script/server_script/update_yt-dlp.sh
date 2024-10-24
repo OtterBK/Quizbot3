@@ -7,7 +7,7 @@ if [ -z "$QUIZBOT_PATH" ]; then
 fi
 
 # Define the target path using QUIZBOT_PATH
-TARGET_PATH="$QUIZBOT_PATH/node_modules/youtube-dlp-exec/bin"
+TARGET_PATH="$QUIZBOT_PATH/node_modules/youtube-dl-exec/bin"
 
 # Check if the directory exists, create if it doesn't
 if [ ! -d "$TARGET_PATH" ]; then
