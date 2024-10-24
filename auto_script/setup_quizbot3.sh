@@ -165,7 +165,7 @@ if [ "$REGISTER_CRON" = true ]; then
 
     (crontab -l -u ubuntu 2>/dev/null; echo "0 0 * * 1 sudo -E sh $SCRIPT_PATH/db_script/reset_played_count_of_week.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 8,20 * * * sudo -E sh $SCRIPT_PATH/db_script/backup_script.sh") | sudo crontab -u ubuntu -
-    (crontab -l -u ubuntu 2>/dev/null; echo "0 */3 * * * sudo sync && echo 3 > /proc/sys/vm/drop_caches") | sudo crontab -u ubuntu -
+    (crontab -l -u ubuntu 2>/dev/null; echo "0 */3 * * * sudo sync && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'") | sudo crontab -u ubuntu -
 fi
 
 # Setting Swap Memory
