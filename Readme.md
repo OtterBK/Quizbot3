@@ -264,8 +264,7 @@
    mkdir /home/ubuntu/quizbot3
    ```
 
-4. **현재 디렉터리 구조는 다음과 같을 것입니다**:
-	<br>
+4. **현재 디렉터리 구조는 다음과 같을 것입니다**:<br>
    ![디렉터리 구조](https://github.com/user-attachments/assets/47fe14a9-6a7f-4d13-ace2-561e899f21de)
 
 5. **다음 명령어를 실행하여 퀴즈봇을 설치합니다**:
@@ -273,7 +272,7 @@
    sudo sh /home/ubuntu/setup_quizbot3.sh --install-path=/home/ubuntu/quizbot3/ --node=18 --cron --dump=/home/ubuntu/base.sql --swap=8G
    ```
 
-6. **스크립트 실행이 완료되면 Quizbot3가 성공적으로 설치됩니다**:
+6. **스크립트 실행이 완료되면 Quizbot3가 성공적으로 설치됩니다**:<br>
    ![설치 완료](https://github.com/user-attachments/assets/af803c4f-cd53-4402-a1e0-233c5b8dee8a)  
    ![Quizbot3 설치 확인](https://github.com/user-attachments/assets/3943c9bf-a2d7-4496-914c-30679c99ce41)
 
