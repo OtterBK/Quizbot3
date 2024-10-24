@@ -156,7 +156,7 @@ if [ "$REGISTER_CRON" = true ]; then
     sudo service cron start
 
     print_emphasized "Executing Register cron script"
-    SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
+    SCRIPT_PATH="$QUIZBOT_PATH/auto_script"
     (crontab -l -u ubuntu 2>/dev/null; echo "CRON_TZ=Asia/Seoul") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 * * * * sudo -E sh $SCRIPT_PATH/server_script/drop_ffmpeg.sh") | sudo crontab -u ubuntu -
     (crontab -l -u ubuntu 2>/dev/null; echo "0 9,21 * * * sh $SCRIPT_PATH/server_script/quizbot_stop.sh") | sudo crontab -u ubuntu -
