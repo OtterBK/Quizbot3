@@ -1969,3 +1969,36 @@ pass, 신규 PUT/DELETE 라우트 테스트 8건 포함, `db_manager.js` export 
 `docs/TEST_CHECKLIST.md`에 AI섹션 신설(목록/상세/명령어 진입/디스코드·웹 상호 호환 4갈래).
 **실사용 미검증** — 특히 Link 버튼 클릭 후 실제 세션 인증, 디스코드 쪽에서 만든 프리셋이 웹에 그대로
 보이는지(그 반대도)는 실제 서버+브라우저에서 확인 필요.
+
+## 2026-08-29 — 멀티플레이 로비 관리자 강제삭제/영구밴 기능
+
+사용자 요청: 멀티플레이 로비의 방 제목은 자유 입력이라 타 길드 비하/욕설 등 문제 방제목을 만들어둘
+수 있는데, 지금까지는 관리자가 이를 지울 방법이 없었음(자연 만료를 기다리는 것뿐) — `/quizmgr`에
+"대기 중인 로비 목록 조회 → 강제 삭제 / 삭제+방장 길드 영구밴" 기능 신설. 착수 전 세부 설계 4가지를
+사용자와 확정: (1) 목록은 LOBBY(대기중)+INGAME(진행중) 둘 다 보여주되 삭제/밴 액션은 LOBBY에서만,
+(2) 밴 대상은 로비를 만든 방장 길드만(참가 길드는 제외), (3) 강제 종료 시 참가 길드에는 전용 문구
+없이 기존 정상 종료(`EXPIRED_SESSION`)와 동일한 안내를 재사용, (4) UI 흐름은 select 목록 → 상세
+화면 → 확인 버튼.
+
+**조사로 밝혀진 핵심**: 로비 레지스트리(`multiplayer_session_registry.js`)는 마스터 프로세스에만
+있어 클러스터(`/quizmgr`는 DM이라 임의 클러스터에서 실행)에서는 `ipc_manager.sendMultiplayerSignal`
+왕복이 필요함. 기존 `CLIENT_SIGNAL.REQUEST_LOBBY_LIST` 핸들러가 이미 PREPARE만 제외하고 LOBBY+INGAME
+전부(제목/호스트 길드ID/참가수/진행여부/평균MMR)를 반환하고 있어서 **목록 조회는 새 신호 없이 기존
+신호 재사용만으로 요구사항을 100% 충족** — 방장 길드ID가 곧 `session_id`라 밴 대상 확인도 별도 조회
+없이 됨. 강제 종료도 `acceptLeaveLobby`의 호스트 이탈 경로(`sendSignal(EXPIRED_SESSION)` 후
+`finish()`)를 그대로 신호 핸들러 안에서 호출하면 돼서 **`multiplayer_session.js`는 전혀 수정하지
+않음**. 밴도 `ban_manager.banId(guild_id, actor)`(길드ID/유저ID 통합 관리)를 그대로 재사용.
+
+**구현**: `multiplayer_signal.js`에 `CLIENT_SIGNAL.ADMIN_FORCE_DELETE_LOBBY`(0x13) 신설.
+`multiplayer_signal_handlers.js`에 `handleAdminForceDeleteLobby` 추가(LOBBY 상태 아니면 거부,
+`EXPIRED_SESSION` 브로드캐스트 후 `session.finish()`). 신규 화면 `admin-lobby-list-ui.ts`(select
+목록, `AdminNoticeListUI`와 동일 패턴)/`admin-lobby-detail-ui.ts`(상세+확인, `AdminNoticeDetailUI`와
+동일 패턴 — 밴 포함 삭제는 `quiz_delete_confirm_admin_comp`처럼 확인 절차를 2개 ActionRow로 분리해
+오클릭 방지) — `AdminPanelUI`의 관리자 패널 2번째 줄에 "🎮 로비 관리" 버튼으로 진입. 밴은 삭제 IPC
+성공 응답을 받은 뒤 클러스터 로컬에서 바로 `ban_manager.banId` 호출(IPC 불필요, `user-quiz-info.ui.ts`의
+"퀴즈 삭제+제작자 영구밴" 버튼과 동일 패턴).
+
+검증: `npm run lint`(0 error, 기존 56개 warning 유지)/`npm test`(421 pass, `components.test.js` export
+개수 78→80 갱신 포함) 전부 통과. `docs/TEST_CHECKLIST.md` N섹션(실전 대결)에 신규 항목 추가.
+**실사용 미검증** — 실제 2개 이상 길드로 로비를 만들어 강제 삭제/영구밴이 참가 길드 쪽 화면과
+밴 목록에 정상 반영되는지는 다음 세션에서 확인 필요.

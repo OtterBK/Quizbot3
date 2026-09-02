@@ -44,6 +44,7 @@ const CLIENT_SIGNAL =
   FINISHED: 0x10,                   // 00010000 - 게임 종료 알림. (완료)
   REQUEST_CHAT: 0x11,               // 00010001 - 채팅 요청. (완료)
   REQUEST_READY: 0x12,               // 00010010 - 준비 요청. (완료)
+  ADMIN_FORCE_DELETE_LOBBY: 0x13,    // 00010011 - 관리자 로비 강제 삭제 요청. (완료)
 };
 
 

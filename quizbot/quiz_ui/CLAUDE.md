@@ -31,7 +31,19 @@ Discord UI 화면들. `components/`(→ `components/CLAUDE.md`)에 버튼/모달
   공유 모듈 — `multiplayer_mmr.js`와 동일 관례. 디스코드 UI가 지금 이 함수들을 호출하고, Phase 3~4의
   REST 핸들러(`web_quiz_editor_routes.ts`)도 같은 함수를 재사용할 예정.
 - **`multiplayer-quiz-select-ui.js`** — 멀티플레이 로비 생성/참가 진입점. `checkMultiplayerBanMessage(interaction)`(2026-08-12, UI 개선 2라운드 B-5 — 원래 이름 `checkMultiplayerBan(list)`)이 `ban_manager.isBanned(...)`로 위임하되, 유저ID/길드ID를 따로 검사해서 어느 쪽이 밴됐는지 구분하는 메시지(+문의처 안내)를 반환한다 — 예전엔 `[guild.id, user.id]`를 한 배열로 묶어 검사해서 "당신 또는 이 서버가..."로 뭉뚱그려 안내했음. 같은 증상이 있는 `web-handoff-ui.ts`의 `buildMultiplayerUI`(웹 경로)는 아직 안 고침.
-- **`admin-panel-ui.js`**/**`admin-ban-list-ui.js`** — `/quizmgr` 관리자 패널(밴 목록 관리/신고처리/퀴즈 관리/공지 관리/점검 모드/실시간 공지 수정/시즌 관리, 2번째 줄 3버튼 — 점검 모드+실시간 공지 수정은 2026-08-15 추가, 시즌 관리는 같은 날 후속 추가). 다른 유저는 절대 접근 불가하도록 다층 방어(루트 `CLAUDE.md`의 "관리자 전용 기능" 참고). `AdminPanelUI` 자체가 "실시간 공지 수정" 버튼→모달 흐름을 직접 처리함(별도 화면 전환 없음, `managers/notice_manager.ts`의 `readCurrentNotice`/`writeCurrentNotice` 위임).
+- **`admin-panel-ui.js`**/**`admin-ban-list-ui.js`** — `/quizmgr` 관리자 패널(밴 목록 관리/신고처리/퀴즈 관리/공지 관리/점검 모드/실시간 공지 수정/시즌 관리/로비 관리, 2번째 줄 4버튼 — 점검 모드+실시간 공지 수정은 2026-08-15 추가, 시즌 관리는 같은 날 후속 추가, 로비 관리는 2026-08-29 추가). 다른 유저는 절대 접근 불가하도록 다층 방어(루트 `CLAUDE.md`의 "관리자 전용 기능" 참고). `AdminPanelUI` 자체가 "실시간 공지 수정" 버튼→모달 흐름을 직접 처리함(별도 화면 전환 없음, `managers/notice_manager.ts`의 `readCurrentNotice`/`writeCurrentNotice` 위임).
+- **`admin-lobby-list-ui.ts`**/**`admin-lobby-detail-ui.ts`**(quizmgr 멀티플레이 로비 관리, 2026-08-29 신설) —
+  `AdminPanelUI`의 "🎮 로비 관리" 버튼에서 진입. `AdminNoticeListUI`/`AdminNoticeDetailUI`와 동일한
+  "목록→상세→확인" 패턴 — `AdminLobbyListUI`는 `ipc_manager.sendMultiplayerSignal({signal_type:
+  CLIENT_SIGNAL.REQUEST_LOBBY_LIST, ...})`로 마스터 프로세스의 로비 레지스트리를 조회(신규 신호 없이
+  기존 신호 재사용, `managers/CLAUDE.md`의 "멀티플레이" 섹션 참고)해 LOBBY+INGAME 전체를 select
+  메뉴로 보여준다. `AdminLobbyDetailUI`는 선택된 로비가 INGAME이면 관리 버튼 자체를 안 보여주고(진행
+  중 로비는 삭제 불가), LOBBY면 "🗑 로비 강제 삭제" → 확인 절차(`quiz_delete_confirm_admin_comp`와
+  동일 패턴, 취소/삭제/삭제+영구밴 2개 ActionRow) → 확정 시 `CLIENT_SIGNAL.ADMIN_FORCE_DELETE_LOBBY`
+  신호로 마스터에 강제 삭제 요청(성공하면 참가 길드 전체에 기존 정상 종료와 동일한
+  `SERVER_SIGNAL.EXPIRED_SESSION`이 브로드캐스트됨) → "삭제+영구밴"이면 성공 응답 이후 클러스터
+  로컬에서 `ban_manager.banId(host_guild_id, actor)`를 바로 호출(IPC 불필요,
+  `user-quiz-info.ui.ts`의 "퀴즈 삭제+제작자 영구밴" 버튼과 동일 패턴) — 밴 대상은 방장 길드만.
 - **`admin-notice-list-ui.ts`**/**`admin-notice-detail-ui.ts`**(quizmgr 공지 관리, 2026-08-15 신설) —
   `AdminPanelUI`의 "공지 관리" 버튼(`admin_panel_notice_manage`)에서 진입. `AdminNoticeListUI`는
   `AdminBanListUI`와 동일 패턴(select 메뉴, 최대 25개)으로 `notice_manager.loadNoticeList` 목록을
@@ -120,7 +132,8 @@ AdminPanelUI ─┬─ AdminBanListUI
               ├─ UserQuizListUI(show_all_quizzes=true)
               ├─ AdminNoticeListUI ── AdminNoticeDetailUI
               ├─ AdminMaintenanceUI
-              └─ AdminSeasonUI
+              ├─ AdminSeasonUI
+              └─ AdminLobbyListUI ── AdminLobbyDetailUI
 ```
 
 **웹 포팅(2026-08-15)**: 순위표(`ScoreboardUI`)는 위 `select-ui-mode-ui.js` 트랙 분기와 무관하게

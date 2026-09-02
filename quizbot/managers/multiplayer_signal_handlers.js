@@ -32,8 +32,9 @@ const signalHandlers =
   [CLIENT_SIGNAL.LEAVE_GAME]: handleLeaveGame,
   [CLIENT_SIGNAL.FINISH_UP]: handleFinishUp,
   [CLIENT_SIGNAL.FINISHED]: handleFinished,
-  [CLIENT_SIGNAL.REQUEST_CHAT]: handleRequestChat,  
-  [CLIENT_SIGNAL.REQUEST_READY]: handleRequestReady,  
+  [CLIENT_SIGNAL.REQUEST_CHAT]: handleRequestChat,
+  [CLIENT_SIGNAL.REQUEST_READY]: handleRequestReady,
+  [CLIENT_SIGNAL.ADMIN_FORCE_DELETE_LOBBY]: handleAdminForceDeleteLobby,
 };
 
 exports.onSignalReceived = (signal) => 
@@ -580,7 +581,7 @@ function handleRequestChat(signal)
   return { state: result };
 }
 
-function handleRequestReady(signal) 
+function handleRequestReady(signal)
 {
   const guild_id = signal.guild_id;
 
@@ -590,14 +591,14 @@ function handleRequestReady(signal)
   if(session === undefined)
   {
     logger.error(`${guild_id} request ready ${session_id}. but this session is not exists`);
-    return { state: true, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` }; 
+    return { state: true, reason: `더 이상 존재하지 않는 퀴즈 세션입니다.` };
   }
 
   const guild_info = session.getParticipant(guild_id);
   if(guild_info === undefined)
   {
     logger.error(`${guild_id} request ready ${session_id}. but this session does not include this guild`);
-    return { state: false, reason: `해당 세션에 속하지 않습니다.`}; 
+    return { state: false, reason: `해당 세션에 속하지 않습니다.`};
   }
 
   if(guild_info.isReady())
@@ -607,4 +608,31 @@ function handleRequestReady(signal)
 
   const result = session.acceptReady(guild_id);
   return { state: result };
+}
+
+//관리자 전용: 대기 중인(LOBBY 상태) 로비 강제 삭제. quizmgr의 "로비 관리" 화면(admin-lobby-detail-ui.ts)에서만 호출됨
+function handleAdminForceDeleteLobby(signal)
+{
+  const session_id = signal.session_id;
+  const session = session_registry.multiplayer_sessions[session_id];
+
+  if(session === undefined)
+  {
+    return { state: false, reason: `더 이상 존재하지 않는 로비 세션입니다.` };
+  }
+
+  if(session.getState() !== SESSION_STATE.LOBBY)
+  {
+    return { state: false, reason: `대기 중인 로비만 강제 삭제할 수 있습니다.` };
+  }
+
+  const session_name = session.getSessionName(); //finish()가 free()로 필드를 null시키기 전에 미리 확보
+
+  session.sendSignal({ signal_type: SERVER_SIGNAL.EXPIRED_SESSION }); //acceptLeaveLobby 호스트 이탈 경로와 동일 패턴
+
+  logger.warn(`Admin force deleted lobby ${session_id}(${session_name}) by ${signal.actor}`);
+
+  session.finish(signal.actor ?? 'admin');
+
+  return { state: true, session_name: session_name };
 }

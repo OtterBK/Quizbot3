@@ -18,7 +18,7 @@ const multiplayer_components = require('../../quizbot/quiz_ui/components/multipl
 const report_components = require('../../quizbot/quiz_ui/components/report_components');
 const web_handoff_components = require('../../quizbot/quiz_ui/components/web_handoff_components');
 
-test('components.js: 6개 도메인 파일의 export를 빠짐없이 재수출한다 (총 78개)', () =>
+test('components.js: 6개 도메인 파일의 export를 빠짐없이 재수출한다 (총 80개)', () =>
 {
   // 죽은 export였던 note_ui_component는 Phase 6에서 삭제됨 (DEPRECATED_CODE_REMOVED.md 참고)
   // quiz_delete_confirm_admin_comp/admin_panel_comp는 관리자 기능 추가로 신설됨
@@ -43,6 +43,8 @@ test('components.js: 6개 도메인 파일의 export를 빠짐없이 재수출�
   // omakase_basket_select_menu/omakase_basket_select_row 4개가 완전히 죽은 코드가 돼 삭제됨(원문은
   // docs/archive/DEPRECATED_CODE_REMOVED.md 보존), 대신 multiplayer_basket_manage_open_comp(호스트
   // 길드용)/multiplayer_basket_view_comp(참가 길드용) 2개가 멀티플레이 전용으로 신설됨(80 - 4 + 2 = 78)
+  // admin_lobby_delete_request_comp/admin_lobby_delete_confirm_comp는 멀티플레이 로비 관리자 강제삭제/
+  // 영구밴 기능(2026-08-29) 신설로 추가됨(78 + 2 = 80)
   const expected_names = [
     ...Object.keys(base_components),
     ...Object.keys(custom_quiz_components),
@@ -54,7 +56,7 @@ test('components.js: 6개 도메인 파일의 export를 빠짐없이 재수출�
 
   const actual_names = Object.keys(components).sort();
 
-  assert.equal(actual_names.length, 78);
+  assert.equal(actual_names.length, 80);
   assert.deepEqual(actual_names, expected_names);
 });
 
