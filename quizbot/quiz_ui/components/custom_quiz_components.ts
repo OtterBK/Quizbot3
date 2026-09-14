@@ -260,7 +260,47 @@ const admin_panel_row2_comp = new ActionRowBuilder()
       .setCustomId('admin_panel_season_manage')
       .setLabel('🏆 시즌 관리')
       .setStyle(ButtonStyle.Primary),
+  )
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('admin_panel_lobby_manage')
+      .setLabel('🎮 로비 관리')
+      .setStyle(ButtonStyle.Primary),
   );
+
+//관리자 패널 - 멀티플레이 로비 강제 삭제 진입 버튼(대기 중인 로비 상세 화면에서만 노출, 2026-08-29 신설)
+const admin_lobby_delete_request_comp = new ActionRowBuilder()
+  .addComponents(
+    new ButtonBuilder()
+      .setCustomId('admin_lobby_delete_request')
+      .setLabel('🗑 로비 강제 삭제')
+      .setStyle(ButtonStyle.Danger),
+  );
+
+//관리자 전용: 로비 강제 삭제 + 방장 길드 영구밴을 함께 처리할 수 있는 확인 컴포넌트
+//(quiz_delete_confirm_admin_comp와 동일 패턴 - 영구밴 버튼은 되돌리기 어려운 동작이라 별도 행으로 분리해 오클릭 방지)
+const admin_lobby_delete_confirm_comp = [
+  new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_lobby_delete_cancel')
+        .setLabel('아니요, 삭제하지 않습니다.')
+        .setStyle(ButtonStyle.Success),
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_lobby_delete_confirmed')
+        .setLabel('네, 로비만 삭제합니다.')
+        .setStyle(ButtonStyle.Danger),
+    ),
+  new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_lobby_delete_confirmed_and_ban')
+        .setLabel('⚠️ 삭제 + 방장 길드 영구밴 (해제 전까지 되돌릴 수 없음)')
+        .setStyle(ButtonStyle.Danger),
+    ),
+];
 
 //관리자 패널 - 점검 모드 꺼짐 상태의 "켜기" 버튼
 const admin_maintenance_enable_btn_comp = new ActionRowBuilder()
@@ -745,6 +785,8 @@ module.exports = {
   admin_season_end_btn_comp,
   admin_season_end_confirm_comp,
   modal_new_season_name,
+  admin_lobby_delete_request_comp,
+  admin_lobby_delete_confirm_comp,
   modal_quiz_info,
   modal_question_info,
   modal_question_additional_info,

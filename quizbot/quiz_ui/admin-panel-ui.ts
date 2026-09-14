@@ -24,6 +24,7 @@ const { AdminBanListUI } = require("./admin-ban-list-ui");
 const { AdminNoticeListUI } = require("./admin-notice-list-ui");
 const { AdminMaintenanceUI } = require("./admin-maintenance-ui");
 const { AdminSeasonUI } = require("./admin-season-ui");
+const { AdminLobbyListUI } = require("./admin-lobby-list-ui");
 
 //#endregion
 
@@ -93,6 +94,11 @@ class AdminPanelUI extends QuizbotUI
     if(interaction.isButton() && interaction.customId === 'admin_panel_season_manage')
     {
       return new AdminSeasonUI();
+    }
+
+    if(interaction.isButton() && interaction.customId === 'admin_panel_lobby_manage')
+    {
+      return new AdminLobbyListUI(interaction.user);
     }
   }
 

@@ -133,6 +133,31 @@ UTF-8 locale 설정도 install_quizbot3.sh에만 있어서 기존 서버엔 소�
   고쳐야 한다**:
     sudo chown -R ubuntu:ubuntu "$QUIZBOT_PATH"
 
+[DB 백업 구글드라이브 오프사이트 업로드 설정 - 2026-09-03 추가]
+
+backup_script.sh는 로컬 백업(db_backup/, 7일 지나면 자동 삭제) 외에 rclone이 설치+설정돼 있으면
+구글드라이브(gdrive:quizbot_backup/)에도 같은 파일을 업로드한다. 원래 로컬 장비(개인 PC)로 주기적으로
+백업을 내려받아 보관하던 걸 보완하는 용도라, 드라이브 쪽엔 **최신 백업 1개만** 남기고(업로드 성공
+직후 그 폴더의 다른 파일은 전부 삭제) 여러 세대를 쌓아두지 않는다. rclone이 없거나 설정이 안 돼있으면
+경고만 찍고 로컬 백업은 그대로 정상 진행 - 필수 아님.
+
+이 스크립트는 cron에서 `sudo -E bash backup_script.sh`로 실행되므로(위 4번 참고) 결국 root 권한으로
+돌아간다. 따라서 rclone 설정도 반드시 **root**로 해야 한다(사용자 계정으로 설정하면 rclone.conf가
+~ubuntu/.config/rclone/에 생겨서 root가 못 찾음).
+
+최초 1회 설정 (서버에서):
+  1. rclone 설치: curl https://rclone.org/install.sh | sudo bash
+  2. sudo rclone config 실행 → n(새 원격) → name: gdrive → Storage: drive(Google Drive) 검색해서 선택
+     → client_id/secret은 빈 칸(엔터, rclone 기본값 사용) → scope는 2(drive.file, rclone이 직접 만든
+     파일만 건드림 - 전체 드라이브 접근보다 안전) → root_folder_id 빈 칸 → service_account 빈 칸 →
+     고급 설정(Edit advanced config)? n
+  3. "Use auto config?"에서 서버는 브라우저가 없으므로 **n** 선택 → 안내되는 대로 로컬(브라우저 있는)
+     PC에서 `rclone authorize "drive"` 실행 → 뜨는 브라우저에서 구글 로그인/권한 승인 → 터미널에 출력된
+     토큰 블록을 복사해서 서버 쪽 프롬프트에 붙여넣기
+  4. 원격 이름(gdrive) 확인 후 q로 종료
+  5. sudo rclone mkdir gdrive:quizbot_backup 로 업로드 폴더 미리 생성
+  6. sudo rclone ls gdrive:quizbot_backup 로 접근 확인 (또는 백업 스크립트 한 번 수동 실행해서 확인)
+
 [참고용 - DB 직접 조작 시]
 
 psql -U quizbot -d quizbot3 -c "DROP SCHEMA quizbot CASCADE";
